@@ -6,6 +6,12 @@ This is a simple example showing how to call an LLM from Temporal using the [Ope
 
 Being an external API call, the LLM invocation happens in a Temporal Activity.
 
+This recipe highlights two key design decisions:
+
+- A generic activity for invoking an LLM API. This activity can be re-used with different arguments throughout your codebase.
+- Retries are handled by Temporal and not by the underlying libraries such as the OpenAI client. This is important because if you leave the client retires on they can interfere with correct and durable error handling and recovery.
+
+
 ## Create the Activity
 
 We create wrapper for the `create` method of the `AsyncOpenAI` client object.
