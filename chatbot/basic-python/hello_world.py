@@ -8,7 +8,7 @@ async def main():
     resp = await client.responses.create(
         model="gpt-5-mini",
         instructions="You only respond in haikus.",
-        input="Hello, world!"
+        input="Tell me about recursion in programming",
     )
 
     print(resp.output_text)
