@@ -15,7 +15,7 @@ class HelloWorldAgent:
                 instructions=system_instructions,
                 input=input,
             ),
-            schedule_to_close_timeout=timedelta(seconds=30),
+            start_to_close_timeout=timedelta(seconds=30),
         )
         return result
  

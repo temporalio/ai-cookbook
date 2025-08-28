@@ -15,6 +15,7 @@ async def create(request: OpenAIResponsesRequest) -> str:
         model="gpt-4o-mini",
         instructions=request.instructions,
         input=request.input,
+        timeout=15,
     )
     print(f"Response: {resp.output_text}")
     return resp.output_text
