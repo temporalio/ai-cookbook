@@ -2,18 +2,17 @@ import asyncio
 
 from temporalio.client import Client
 
-from workflows.hello_world_workflow import HelloWorldAgent
+from workflows.hello_world_workflow import HelloWorld
 
 
 async def main():
-    # Create client connected to server at the given address
     client = await Client.connect(
         "localhost:7233",
     )
 
-    # Execute a workflow
+    # Submit the Hello World workflow for execution
     result = await client.execute_workflow(
-        HelloWorldAgent.run,
+        HelloWorld.run,
         "Tell me about recursion in programming.",
         id="my-workflow-id",
         task_queue="hello-world-python-task-queue",
