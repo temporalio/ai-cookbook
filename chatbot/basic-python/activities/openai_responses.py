@@ -9,7 +9,7 @@ class OpenAIResponsesRequest:
 
 @activity.defn
 async def create(request: OpenAIResponsesRequest) -> str:
-    client = AsyncOpenAI()
+    client = AsyncOpenAI(max_retries=0)
     print(f"Creating response for with instructions: {request.instructions} and input: {request.input}")
     resp = await client.responses.create(
         model="gpt-4o-mini",
