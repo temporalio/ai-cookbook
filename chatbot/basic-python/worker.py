@@ -1,8 +1,12 @@
+from __future__ import annotations
+
 import asyncio
 
 from temporalio.client import Client
+from temporalio.worker import Worker
 
 from workflows.hello_world_workflow import HelloWorldAgent
+from activities import openai_responses
 
 
 async def main():
@@ -11,14 +15,17 @@ async def main():
         "localhost:7233",
     )
 
-    # Execute a workflow
-    result = await client.execute_workflow(
-        HelloWorldAgent.run,
-        "Tell me about recursion in programming.",
-        id="my-workflow-id",
+    worker = Worker(
+        client,
         task_queue="hello-world-python-task-queue",
+        workflows=[
+            HelloWorldAgent,
+        ],
+        activities=[
+            openai_responses.create,
+        ],
     )
-    print(f"Result: {result}")
+    await worker.run()
 
 
 if __name__ == "__main__":
