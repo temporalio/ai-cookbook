@@ -5,11 +5,13 @@ from temporalio.worker import Worker
 
 from workflows.hello_world_workflow import HelloWorld
 from activities import openai_responses
+from temporalio.contrib.pydantic import pydantic_data_converter
 
 
 async def main():
     client = await Client.connect(
         "localhost:7233",
+        data_converter=pydantic_data_converter,
     )
 
     worker = Worker(

@@ -9,6 +9,7 @@ Being an external API call, the LLM invocation happens in a Temporal Activity.
 This recipe highlights two key design decisions:
 
 - A generic activity for invoking an LLM API. This activity can be re-used with different arguments throughout your codebase.
+- Configuring the Temporal client with a `dataconverter` to allow serialization of Pydantic types.
 - Retries are handled by Temporal and not by the underlying libraries such as the OpenAI client. This is important because if you leave the client retires on they can interfere with correct and durable error handling and recovery.
 
 
@@ -27,6 +28,7 @@ In this implementation, we include only the `instructions` and `input` argument,
 
 from temporalio import activity
 from openai import AsyncOpenAI
+from openai.types.responses import Response
 from dataclasses import dataclass
 
 # Temporal best practice: Create a data structure to hold the request parameters.
@@ -37,7 +39,7 @@ class OpenAIResponsesRequest:
     input: str
 
 @activity.defn
-async def create(request: OpenAIResponsesRequest) -> str:
+async def create(request: OpenAIResponsesRequest) -> Response:
     # Temporal best practice: Disable retry logic in OpenAI API client library.
     client = AsyncOpenAI(max_retries=0)
 
@@ -48,12 +50,13 @@ async def create(request: OpenAIResponsesRequest) -> str:
         timeout=15,
     )
 
-    return resp.output_text
+    return resp
 ```
 
 ## Create the Workflow
 
-In this example, we take the user input and generate a response in haiku format, using the OpenAI Responses activity.
+In this example, we take the user input and generate a response in haiku format, using the OpenAI Responses activity. The
+Workflow returns `result.output_text` from the OpenAI `Response`.
 
 As per usual, the activity retry configuration is set here in the Workflow.
 
@@ -79,12 +82,13 @@ class HelloWorld:
             ),
             start_to_close_timeout=timedelta(seconds=30),
         )
-        return result
+        return result.output_text
 ```
 
 ## Create the Worker
 
 Create the process for executing Activities and Workflows.
+We configure the Temporal client with `pydantic_data_converter` so Temporal can serialize/deserialize output of the OpenAI SDK.
 
 *File: worker.py*
 ```python
@@ -95,11 +99,13 @@ from temporalio.worker import Worker
 
 from workflows.hello_world_workflow import HelloWorld
 from activities import openai_responses
+from temporalio.contrib.pydantic import pydantic_data_converter
 
 
 async def main():
     client = await Client.connect(
         "localhost:7233",
+        data_converter=pydantic_data_converter,
     )
 
     worker = Worker(
@@ -122,6 +128,7 @@ if __name__ == "__main__":
 ## Create the Workflow Starter
 
 The starter script submits the workflow to Temporal for execution, then waits for the result and prints it out.
+It uses the `pydantic_data_converter` to match the Worker configuration.
 
 *File: start_workflow.py*
 ```python
@@ -130,11 +137,13 @@ import asyncio
 from temporalio.client import Client
 
 from workflows.hello_world_workflow import HelloWorld
+from temporalio.contrib.pydantic import pydantic_data_converter
 
 
 async def main():
     client = await Client.connect(
         "localhost:7233",
+        data_converter=pydantic_data_converter,
     )
 
     # Submit the Hello World workflow for execution

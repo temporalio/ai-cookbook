@@ -18,5 +18,5 @@ class HelloWorld:
             ),
             start_to_close_timeout=timedelta(seconds=30),
         )
-        return result
+        return result.output_text
  

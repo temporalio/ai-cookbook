@@ -3,11 +3,13 @@ import asyncio
 from temporalio.client import Client
 
 from workflows.hello_world_workflow import HelloWorld
+from temporalio.contrib.pydantic import pydantic_data_converter
 
 
 async def main():
     client = await Client.connect(
         "localhost:7233",
+        data_converter=pydantic_data_converter,
     )
 
     # Submit the Hello World workflow for execution

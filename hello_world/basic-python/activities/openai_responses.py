@@ -1,5 +1,6 @@
 from temporalio import activity
 from openai import AsyncOpenAI
+from openai.types.responses import Response
 from dataclasses import dataclass
 
 # Temporal best practice: Create a data structure to hold the request parameters.
@@ -10,7 +11,7 @@ class OpenAIResponsesRequest:
     input: str
 
 @activity.defn
-async def create(request: OpenAIResponsesRequest) -> str:
+async def create(request: OpenAIResponsesRequest) -> Response:
     # Temporal best practice: Disable retry logic in OpenAI API client library.
     client = AsyncOpenAI(max_retries=0)
 
@@ -21,4 +22,4 @@ async def create(request: OpenAIResponsesRequest) -> str:
         timeout=15,
     )
 
-    return resp.output_text
+    return resp
