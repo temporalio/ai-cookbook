@@ -58,7 +58,9 @@ async def create(request: OpenAIResponsesRequest) -> Response:
 In this example, we take the user input and generate a response in haiku format, using the OpenAI Responses activity. The
 Workflow returns `result.output_text` from the OpenAI `Response`.
 
-As per usual, the activity retry configuration is set here in the Workflow.
+As per usual, the activity retry configuration is set here in the Workflow. In this case, a retry policy is not specified 
+so the default retry policy is used (exponential backoff with 1s initial interval, 2.0 backoff coefficient, max interval 
+100× initial, unlimited attempts, no non-retryable errors).
 
 *File: workflows/hello_world_workflow.py*
 ```python

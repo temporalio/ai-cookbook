@@ -1,0 +1,15 @@
+[project]
+name = "cookbook-basic-python"
+version = "0.1"
+description = "Basic example with http retries"
+authors = [{ name = "Temporal Technologies Inc", email = "sdk@temporal.io" }]
+requires-python = ">=3.10"
+readme = "README.md"
+license = "MIT"
+dependencies = [
+    "temporalio>=1.15.0,<2",
+ "openai>=1.40.0",
+ "pytest>=8.4.1",
+]
+[tool.pytest.ini_options]
+pythonpath = ["."]
