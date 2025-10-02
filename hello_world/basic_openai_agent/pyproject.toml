@@ -1,0 +1,12 @@
+[project]
+name = "cookbook-basic-openai-agent"
+version = "0.1"
+description = "Basic example showing how to build a Durable Agent using the OpenAI Agents SDK Temporal integration"
+authors = [{ name = "Temporal Technologies Inc", email = "sdk@temporal.io" }]
+requires-python = ">=3.10"
+readme = "README.md"
+license = "MIT"
+dependencies = [
+    "temporalio>=1.15.0,<2",
+    "openai-agents>=0.1.0",
+]
