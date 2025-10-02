@@ -1,14 +1,12 @@
 # Deep Research
 
-## Overview
-
 Deep research systems combine multiple agents with information retrieval from the web or other sources to produce evidence-based reports on specific topics.
 Commercial implementations include [Anthropic Research](https://www.anthropic.com/engineering/multi-agent-research-system), [OpenAI Deep Research](https://openai.com/index/introducing-deep-research/), and [Google Gemini Deep Research](https://gemini.google/overview/deep-research/).
 
 This recipe demonstrates a simple deep research system embodying the standard deep research architecture.
 Deep research spans the following four phases:
 
-- **Planning**. Task decomposition and research strategy formulation. This involves identifying separate aspects of the research problem that can be worked on independently. 
+- **Planning**. Task decomposition and research strategy formulation. This involves identifying separate aspects of the research problem that can be worked on independently.
 - **Question Development/Query Generation**. Designing queries for each of the research questions.
 - **Web Exploration/Information Retrieval**. Searching the web to retrieve documents relevant to the research question. Extracting and summarizing relevant information.
 - **Report Generation/Synthesis**. Synthesizing findings into comprehensive, well-cited reports.
@@ -18,7 +16,6 @@ This creates many possible failure modes that durable execution helps protect ag
 
 This recipe uses OpenAI's Responses API, which includes a tool for web search.
 It also uses OpenAI's [Structured Outputs API](https://platform.openai.com/docs/guides/structured-outputs), which asks the model to generate outputs corresponding to desired data structures.
-
 
 ## Create the data structures
 
@@ -35,7 +32,6 @@ class ResearchPlan(BaseModel):
     search_strategy: str
     success_criteria: List[str]
 ```
-
 
 ```python
 class ResearchAspect(BaseModel):
@@ -82,15 +78,14 @@ class ResearchReport(BaseModel):
     follow_up_questions: List[str]
 ```
 
-
 ## Create the Agents
 
 The deep research system uses four specialized agents, each implemented as Temporal activities.
 In this implementation, each agent is implemented as a single call to the OpenAI Responses API.
 
-This is possible because we are using the structured outputs, which guarantees the response will be in the correct format, eliminating the need for retries.
+This is possible because we are using structured outputs, which guarantee the response will be in the correct format, eliminating the need for retries.
 
-The web search agent also requires only a single API call because the OpenAI integrates the web search tool into the Responses API.
+The web search agent also requires only a single API call because OpenAI integrates the web search tool into the Responses API.
 
 These agents run in the Workflow and use the `invoke_model` activity to make OpenAI API calls.
 It is critical to set the `start_to_close_timeout` for these activities to a value that is long enough to complete the task.
@@ -98,12 +93,12 @@ If it is too short, the activity will fail with a timeout error, causing a retry
 Response times for reasoning models such as `GPT-5` can vary significantly depending on the nature of the request.
 Web search times also vary depending on the size and content of the documents located by the search.
 
-
 ### Research Planning Agent
 
 Analyzes research queries and creates comprehensive research strategies. Takes an unstructured question and decomposes it into specific research aspects with priorities, identifies expected source types, and defines success criteria.
 
-*File: agents/research_planning.py*
+_File: agents/research_planning.py_
+
 ```python
 from .models import ResearchPlan
 from .config import COMPLEX_REASONING_MODEL
@@ -124,7 +119,7 @@ OUTPUT REQUIREMENTS:
 - research_question: Clarified version of the original query
 - key_aspects: Specific areas requiring investigation, each with:
   - aspect: The research area name
-  - priority: 1-5 ranking (5 highest priority)  
+  - priority: 1-5 ranking (5 highest priority)
   - description: What needs to be investigated
 - expected_sources: Types of sources likely to contain relevant information
 - search_strategy: High-level approach for information gathering
@@ -147,12 +142,12 @@ async def plan_research(query: str) -> ResearchPlan:
     return result.response
 ```
 
-
-### Query Generation Agent  
+### Query Generation Agent
 
 Converts research plans into optimized web search queries. Creates 3-5 diverse queries that target different information types (factual data, expert analysis, case studies, recent news) with varied search styles and temporal modifiers.
 
-*File: agents/research_query_generation.py*
+_File: agents/research_query_generation.py_
+
 ```python
 from .models import QueryPlan, ResearchPlan
 from .config import EFFICIENT_PROCESSING_MODEL
@@ -176,7 +171,7 @@ APPROACH:
 OUTPUT REQUIREMENTS:
 - queries: Search queries, each with:
   - query: The actual search string
-  - rationale: Why this query addresses research needs  
+  - rationale: Why this query addresses research needs
   - expected_info_type: One of "factual_data", "expert_analysis", "case_studies", "recent_news"
   - priority: 1-5 (5 highest priority)
 """
@@ -214,7 +209,7 @@ Success Criteria: {", ".join(research_plan.success_criteria)}
 
 Executes searches using OpenAI's web search tool and analyzes results. Prioritizes authoritative sources, extracts key findings, assesses relevance, and provides proper citations with reliability assessments.
 
-*File: agents/research_web_search.py*
+_File: agents/research_web_search.py_
 
 ```python
 from .models import SearchResult, SearchQuery
@@ -271,13 +266,12 @@ Please search for information using the provided query and analyze the results a
     return result.response
 ```
 
-
 ### Report Synthesis Agent
 
 Directs the agent to synthesize all research findings into comprehensive, well-cited reports.
 These should include structured narratives with executive summaries, detailed analysis, key findings, confidence assessments, and follow-up research questions.
 
-*File: agents/research_report_synthesis.py*
+_File: agents/research_report_synthesis.py_
 
 ```python
 from typing import List
@@ -363,7 +357,6 @@ Please synthesize all this information into a comprehensive research report foll
     return result.response
 ```
 
-
 ## Create the Workflow
 
 The `DeepResearchWorkflow` orchestrates the four-phase research process with built-in resilience and error handling:
@@ -373,7 +366,8 @@ Then, the workflow executes searches concurrently.
 For robustness, the workflow continues with partial results if some searches fail.
 Finally, the report synthesis agent pulls together the findings into a comprehensive report.
 
-*File: workflows/deep_research_workflow.py*
+_File: workflows/deep_research_workflow.py_
+
 ```python
 from temporalio import workflow
 from temporalio.exceptions import ApplicationError
@@ -463,7 +457,6 @@ class DeepResearchWorkflow:
 """
 
 ```
-
 
 ## Running
 
