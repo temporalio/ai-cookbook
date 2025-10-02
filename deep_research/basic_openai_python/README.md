@@ -1,28 +1,44 @@
 # Deep Research
 
-Deep research systems combine multiple agents with information retrieval from the web or other sources to produce evidence-based reports on specific topics.
-Commercial implementations include [Anthropic Research](https://www.anthropic.com/engineering/multi-agent-research-system), [OpenAI Deep Research](https://openai.com/index/introducing-deep-research/), and [Google Gemini Deep Research](https://gemini.google/overview/deep-research/).
+Deep research systems combine multiple agents with information retrieval from
+the web or other sources to produce evidence-based reports on specific topics.
+Commercial implementations include
+[Anthropic Research](https://www.anthropic.com/engineering/multi-agent-research-system),
+[OpenAI Deep Research](https://openai.com/index/introducing-deep-research/), and
+[Google Gemini Deep Research](https://gemini.google/overview/deep-research/).
 
-This recipe demonstrates a simple deep research system embodying the standard deep research architecture.
-Deep research spans the following four phases:
+This recipe demonstrates a simple deep research system embodying the standard
+deep research architecture. Deep research spans the following four phases:
 
-- **Planning**. Task decomposition and research strategy formulation. This involves identifying separate aspects of the research problem that can be worked on independently.
-- **Question Development/Query Generation**. Designing queries for each of the research questions.
-- **Web Exploration/Information Retrieval**. Searching the web to retrieve documents relevant to the research question. Extracting and summarizing relevant information.
-- **Report Generation/Synthesis**. Synthesizing findings into comprehensive, well-cited reports.
+- **Planning**. Task decomposition and research strategy formulation. This
+  involves identifying separate aspects of the research problem that can be
+  worked on independently.
+- **Question Development/Query Generation**. Designing queries for each of the
+  research questions.
+- **Web Exploration/Information Retrieval**. Searching the web to retrieve
+  documents relevant to the research question. Extracting and summarizing
+  relevant information.
+- **Report Generation/Synthesis**. Synthesizing findings into comprehensive,
+  well-cited reports.
 
-Deep research tasks can involve dozens of searches and process hundreds of documents.
-This creates many possible failure modes that durable execution helps protect against.
+Deep research tasks can involve dozens of searches and process hundreds of
+documents. This creates many possible failure modes that durable execution helps
+protect against.
 
 This recipe uses OpenAI's Responses API, which includes a tool for web search.
-It also uses OpenAI's [Structured Outputs API](https://platform.openai.com/docs/guides/structured-outputs), which asks the model to generate outputs corresponding to desired data structures.
+It also uses OpenAI's
+[Structured Outputs API](https://platform.openai.com/docs/guides/structured-outputs),
+which asks the model to generate outputs corresponding to desired data
+structures.
 
 ## Create the data structures
 
-We will use Python classes to ensure information passes between agents in a structured way.
+We will use Python classes to ensure information passes between agents in a
+structured way.
 
-The Planning Agent creates a `ResearchPlan`, which includes a research question, a list of `ResearchAspects`, expected sources, a search strategy, and success criteria.
-ResearchAspects include an aspect name, a priority, and a description.
+The Planning Agent creates a `ResearchPlan`, which includes a research question,
+a list of `ResearchAspects`, expected sources, a search strategy, and success
+criteria. ResearchAspects include an aspect name, a priority, and a description.
 
 ```python
 class ResearchPlan(BaseModel):
@@ -40,7 +56,8 @@ class ResearchAspect(BaseModel):
     description: str
 ```
 
-The Query Generation Agent creates a `QueryPlan`, and generates a list of `SearchQueries`.
+The Query Generation Agent creates a `QueryPlan`, and generates a list of
+`SearchQueries`.
 
 ```python
 class QueryPlan(BaseModel):
@@ -55,7 +72,8 @@ class SearchQuery(BaseModel):
     priority: int
 ```
 
-The Web Search Agent creates a `SearchResult`, which includes a query, a list of sources, a key finding, a relevance score, and a list of citations.
+The Web Search Agent creates a `SearchResult`, which includes a query, a list of
+sources, a key finding, a relevance score, and a list of citations.
 
 ```python
 class SearchResult(BaseModel):
@@ -66,7 +84,9 @@ class SearchResult(BaseModel):
     citations: List[str]
 ```
 
-Finally, the Report Synthesis Agent creates a `ResearchReport`, which includes an executive summary, a detailed analysis, a list of key findings, a confidence assessment, a list of citations, and a list of follow-up questions.
+Finally, the Report Synthesis Agent creates a `ResearchReport`, which includes
+an executive summary, a detailed analysis, a list of key findings, a confidence
+assessment, a list of citations, and a list of follow-up questions.
 
 ```python
 class ResearchReport(BaseModel):
@@ -80,22 +100,29 @@ class ResearchReport(BaseModel):
 
 ## Create the Agents
 
-The deep research system uses four specialized agents, each implemented as Temporal activities.
-In this implementation, each agent is implemented as a single call to the OpenAI Responses API.
+The deep research system uses four specialized agents, each implemented as
+Temporal activities. In this implementation, each agent is implemented as a
+single call to the OpenAI Responses API.
 
-This is possible because we are using structured outputs, which guarantee the response will be in the correct format, eliminating the need for retries.
+This is possible because we are using structured outputs, which guarantee the
+response will be in the correct format, eliminating the need for retries.
 
-The web search agent also requires only a single API call because OpenAI integrates the web search tool into the Responses API.
+The web search agent also requires only a single API call because OpenAI
+integrates the web search tool into the Responses API.
 
-These agents run in the Workflow and use the `invoke_model` activity to make OpenAI API calls.
-It is critical to set the `start_to_close_timeout` for these activities to a value that is long enough to complete the task.
-If it is too short, the activity will fail with a timeout error, causing a retry loop that never completes.
-Response times for reasoning models such as `GPT-5` can vary significantly depending on the nature of the request.
-Web search times also vary depending on the size and content of the documents located by the search.
+These agents run in the Workflow and use the `invoke_model` activity to make
+OpenAI API calls. It is critical to set the `start_to_close_timeout` for these
+activities to a value that is long enough to complete the task. If it is too
+short, the activity will fail with a timeout error, causing a retry loop that
+never completes. Response times for reasoning models such as `GPT-5` can vary
+significantly depending on the nature of the request. Web search times also vary
+depending on the size and content of the documents located by the search.
 
 ### Research Planning Agent
 
-Analyzes research queries and creates comprehensive research strategies. Takes an unstructured question and decomposes it into specific research aspects with priorities, identifies expected source types, and defines success criteria.
+Analyzes research queries and creates comprehensive research strategies. Takes
+an unstructured question and decomposes it into specific research aspects with
+priorities, identifies expected source types, and defines success criteria.
 
 _File: agents/research_planning.py_
 
@@ -144,7 +171,9 @@ async def plan_research(query: str) -> ResearchPlan:
 
 ### Query Generation Agent
 
-Converts research plans into optimized web search queries. Creates 3-5 diverse queries that target different information types (factual data, expert analysis, case studies, recent news) with varied search styles and temporal modifiers.
+Converts research plans into optimized web search queries. Creates 3-5 diverse
+queries that target different information types (factual data, expert analysis,
+case studies, recent news) with varied search styles and temporal modifiers.
 
 _File: agents/research_query_generation.py_
 
@@ -207,7 +236,9 @@ Success Criteria: {", ".join(research_plan.success_criteria)}
 
 ### Web Search Agent
 
-Executes searches using OpenAI's web search tool and analyzes results. Prioritizes authoritative sources, extracts key findings, assesses relevance, and provides proper citations with reliability assessments.
+Executes searches using OpenAI's web search tool and analyzes results.
+Prioritizes authoritative sources, extracts key findings, assesses relevance,
+and provides proper citations with reliability assessments.
 
 _File: agents/research_web_search.py_
 
@@ -268,8 +299,10 @@ Please search for information using the provided query and analyze the results a
 
 ### Report Synthesis Agent
 
-Directs the agent to synthesize all research findings into comprehensive, well-cited reports.
-These should include structured narratives with executive summaries, detailed analysis, key findings, confidence assessments, and follow-up research questions.
+Directs the agent to synthesize all research findings into comprehensive,
+well-cited reports. These should include structured narratives with executive
+summaries, detailed analysis, key findings, confidence assessments, and
+follow-up research questions.
 
 _File: agents/research_report_synthesis.py_
 
@@ -359,12 +392,13 @@ Please synthesize all this information into a comprehensive research report foll
 
 ## Create the Workflow
 
-The `DeepResearchWorkflow` orchestrates the four-phase research process with built-in resilience and error handling:
+The `DeepResearchWorkflow` orchestrates the four-phase research process with
+built-in resilience and error handling:
 
-First, planning and query generation agents are run sequentially.
-Then, the workflow executes searches concurrently.
-For robustness, the workflow continues with partial results if some searches fail.
-Finally, the report synthesis agent pulls together the findings into a comprehensive report.
+First, planning and query generation agents are run sequentially. Then, the
+workflow executes searches concurrently. For robustness, the workflow continues
+with partial results if some searches fail. Finally, the report synthesis agent
+pulls together the findings into a comprehensive report.
 
 _File: workflows/deep_research_workflow.py_
 
