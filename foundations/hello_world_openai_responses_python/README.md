@@ -20,7 +20,7 @@ This moves the responsibility for retries from the OpenAI client to Temporal.
 
 In this implementation, we include only the `instructions` and `input` argument, but it could be extended to others.
 
-_File: activities/openai_responses.py_
+*File: activities/openai_responses.py*
 
 ```python
 
@@ -60,7 +60,7 @@ As per usual, the Activity retry configuration is set here in the Workflow. In t
 so the default retry policy is used (exponential backoff with 1s initial interval, 2.0 backoff coefficient, max interval
 100× initial, unlimited attempts, no non-retryable errors).
 
-_File: workflows/hello_world_workflow.py_
+*File: workflows/hello_world_workflow.py*
 
 ```python
 from temporalio import workflow
@@ -91,7 +91,7 @@ class HelloWorld:
 Create the process for executing Activities and Workflows.
 We configure the Temporal client with `pydantic_data_converter` so Temporal can serialize/deserialize output of the OpenAI SDK.
 
-_File: worker.py_
+*File: worker.py*
 
 ```python
 import asyncio
@@ -132,7 +132,7 @@ if __name__ == "__main__":
 The starter script submits the workflow to Temporal for execution, then waits for the result and prints it out.
 It uses the `pydantic_data_converter` to match the Worker configuration.
 
-_File: start_workflow.py_
+*File: start_workflow.py*
 
 ```python
 import asyncio

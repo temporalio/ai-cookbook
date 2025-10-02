@@ -41,7 +41,7 @@ TODO: Add description
 
 TODO: Insert code block
 
-_File: workflows/get_weather_workflow.py_
+*File: workflows/get_weather_workflow.py*
 
 ## Create the Worker
 
@@ -49,7 +49,7 @@ TODO: Add description
 
 TODO: Insert code block
 
-_File: worker.py_
+*File: worker.py*
 
 ```python
 

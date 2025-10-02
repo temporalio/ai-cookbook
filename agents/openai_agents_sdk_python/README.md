@@ -16,7 +16,7 @@ This recipe highlights key implementation patterns:
 
 We create activities that serve as tools for the agent. These activities can perform various tasks like getting weather information or performing calculations.
 
-_File: activities/tools.py_
+*File: activities/tools.py*
 
 ```python
 from dataclasses import dataclass
@@ -45,7 +45,7 @@ async def calculate_circle_area(radius: float) -> float:
 
 The workflow creates an agent with specific instructions and tools. The agent can then process user input and decide which tools to use to answer questions. Since LLM invocation is an external API call, this typically would happen in a Temporal Activity. However, because of the Temporal Integration with OpenAI Agents SDK, this is being handled for us and we do not need to implement the Activity ourselves.
 
-_File: workflows/hello_world_workflow.py_
+*File: workflows/hello_world_workflow.py*
 
 ```python
 from temporalio import workflow
@@ -85,7 +85,7 @@ class HelloWorldAgent:
 Create the process for executing Activities and Workflows.
 We configure the Temporal client with the `OpenAIAgentsPlugin` to enable OpenAI Agents SDK integration.
 
-_File: worker.py_
+*File: worker.py*
 
 ```python
 import asyncio
@@ -128,7 +128,7 @@ if __name__ == "__main__":
 The starter script submits the agent workflow to Temporal for execution, then waits for the result and prints it out.
 It uses the `OpenAIAgentsPlugin` to match the Worker configuration.
 
-_File: start_workflow.py_
+*File: start_workflow.py*
 
 ```python
 import asyncio

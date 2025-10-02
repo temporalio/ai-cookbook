@@ -124,7 +124,7 @@ Analyzes research queries and creates comprehensive research strategies. Takes
 an unstructured question and decomposes it into specific research aspects with
 priorities, identifies expected source types, and defines success criteria.
 
-_File: agents/research_planning.py_
+*File: agents/research_planning.py*
 
 ```python
 from .models import ResearchPlan
@@ -175,7 +175,7 @@ Converts research plans into optimized web search queries. Creates 3-5 diverse
 queries that target different information types (factual data, expert analysis,
 case studies, recent news) with varied search styles and temporal modifiers.
 
-_File: agents/research_query_generation.py_
+*File: agents/research_query_generation.py*
 
 ```python
 from .models import QueryPlan, ResearchPlan
@@ -240,7 +240,7 @@ Executes searches using OpenAI's web search tool and analyzes results.
 Prioritizes authoritative sources, extracts key findings, assesses relevance,
 and provides proper citations with reliability assessments.
 
-_File: agents/research_web_search.py_
+*File: agents/research_web_search.py*
 
 ```python
 from .models import SearchResult, SearchQuery
@@ -304,7 +304,7 @@ well-cited reports. These should include structured narratives with executive
 summaries, detailed analysis, key findings, confidence assessments, and
 follow-up research questions.
 
-_File: agents/research_report_synthesis.py_
+*File: agents/research_report_synthesis.py*
 
 ```python
 from typing import List
@@ -400,7 +400,7 @@ workflow executes searches concurrently. For robustness, the workflow continues
 with partial results if some searches fail. Finally, the report synthesis agent
 pulls together the findings into a comprehensive report.
 
-_File: workflows/deep_research_workflow.py_
+*File: workflows/deep_research_workflow.py*
 
 ```python
 from temporalio import workflow
