@@ -1,8 +1,11 @@
 import asyncio
 
 from temporalio.client import Client
+from temporalio.worker import Worker
 
 from workflows.hello_world_workflow import HelloWorld
+from activities import litellm_completion
+
 from temporalio.contrib.pydantic import pydantic_data_converter
 
 
@@ -12,14 +15,17 @@ async def main():
         data_converter=pydantic_data_converter,
     )
 
-    # Submit the Hello World workflow for execution
-    result = await client.execute_workflow(
-        HelloWorld.run,
-        "Tell me about recursion in programming.",
-        id="my-workflow-id-2",
+    worker = Worker(
+        client,
         task_queue="hello-world-python-task-queue",
+        workflows=[
+            HelloWorld,
+        ],
+        activities=[
+            litellm_completion.create,
+        ],
     )
-    print(f"Result: {result}")
+    await worker.run()
 
 
 if __name__ == "__main__":

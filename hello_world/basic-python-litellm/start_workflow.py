@@ -16,7 +16,7 @@ async def main():
     result = await client.execute_workflow(
         HelloWorld.run,
         "Tell me about recursion in programming.",
-        id="my-workflow-id-2",
+        id="my-workflow-id",
         task_queue="hello-world-python-task-queue",
     )
     print(f"Result: {result}")
