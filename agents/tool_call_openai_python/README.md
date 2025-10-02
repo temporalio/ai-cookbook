@@ -6,7 +6,7 @@ priority: 775
 
 # Tool calling agent
 
-## Overview
+In this example, we demonstrate how function calling (also known as tool calling) works with the OpenAI API and Temporal. Tool calling allows the model to make decisions on when functions should be invoked, and structure the data that is needed for the function call.
 
 This example shows how function calling (also known as tool calling) works with the [Open AI API](https://github.com/openai/openai-python) and Temporal. Tool calling allows the model to make decisions on which, if any, functions should be invoked. It also provides information to the LLM that will allow it to structure the response in such a way that the agent can easily invoke the functions.
 
@@ -15,7 +15,7 @@ Tools are supplied to the [`responses` API](https://platform.openai.com/docs/api
 > [!WARNING]
 > The API used to generate the tools json is an interal function from the [Open AI API](https://github.com/openai/openai-python) and may therefore change in the future. There currently is no public API to generate the tool definition from a Pydantic model or a function signature.
 
-Being external API calls, invoking the LLM and invoking the function are each done within a Temporal Activity. 
+Being external API calls, invoking the LLM and invoking the function are each done within a Temporal Activity.
 
 This example lays the foundation for the core agentic pattern where the LLM makes the decision on functions/tools to invoke, the agent calls the function/tool(s) and the response from the such calls is sent back to the LLM for interpretation.
 
@@ -27,10 +27,10 @@ This recipe highlights these key design decisions:
 
 ## Create the Activity for LLM invocations
 
-We create wrapper for the `create` method of the `AsyncOpenAI` client object.
-This is a generic activity that invokes the OpenAI LLM.
+We create a wrapper for the `create` method of the `AsyncOpenAI` client object.
+This is a generic Activity that invokes the OpenAI LLM.
 
-We set `max_retries=0` on when creating the `AsyncOpenAI` client.
+We set `max_retries=0` when creating the `AsyncOpenAI` client.
 This moves the responsibility for retries from the OpenAI client to Temporal.
 
 In this implementation, we allow for the model, instructions and input to be passed in, and also the list of tools.
@@ -240,6 +240,7 @@ class ToolCallingWorkflow:
 The worker is the process that dispatches work to the various parts of the agent implementation - the orchestrator and the activities for the LLM and tool invocations.
 
 *File: worker.py*
+
 ```python
 import asyncio
 
