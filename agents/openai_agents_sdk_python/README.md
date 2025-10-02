@@ -1,3 +1,9 @@
+<!--
+description: Build a durable AI agent with OpenAI Agents SDK and Temporal that can intelligently choose tools to answer user questions
+tags: [agents, python, openai]
+priority: 5
+-->
+
 # Hello World - Agent with Tools
 
 ## Overview
