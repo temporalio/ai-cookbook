@@ -13,17 +13,17 @@ This example shows how function calling (also known as tool calling) works with 
 Tools are supplied to the [`responses` API](https://platform.openai.com/docs/api-reference/responses/create) through the [`tools` parameter](https://platform.openai.com/docs/api-reference/responses/create#responses-create-tools). The `tools` parameter is in`json` and includes a description of the function as well as descriptions of each of the arguments.
 
 > [!WARNING]
-> The API used to generate the tools json is an interal function from the [Open AI API](https://github.com/openai/openai-python) and may therefore change in the future. There currently is no public API to generate the tool definition from a Pydantic model or a function signature.
+> The API used to generate the tools json is an internal function from the [Open AI API](https://github.com/openai/openai-python) and may therefore change in the future. There currently is no public API to generate the tool definition from a Pydantic model or a function signature.
 
 Being external API calls, invoking the LLM and invoking the function are each done within a Temporal Activity.
 
-This example lays the foundation for the core agentic pattern where the LLM makes the decision on functions/tools to invoke, the agent calls the function/tool(s) and the response from the such calls is sent back to the LLM for interpretation.
+This example lays the foundation for the core agentic pattern where the LLM makes the decision on functions/tools to invoke, the agent calls the function/tool(s) and the response from such calls is sent back to the LLM for interpretation.
 
 This recipe highlights these key design decisions:
 
 - A generic Activity for invoking an LLM API; that is, instructions and other responses arguments are passed into the Activity making it appropriate for use in a variety of different use cases. Similarly, the result from the responses API call is returned out of the Activity so that it is usable in a variety of different use cases.
 - We have intentionally not implemented the agentic loop so as to focus on how tool details are made available to the LLM and how functions are invoked. We do take the tool output and have the LLM interpret it in a manner consistent with the AI agent pattern.
-- Retries are handled by Temporal and not by the underlying libraries such as the OpenAI client. This is important because if you leave the client retires on they can interfere with correct and durable error handling and recovery.
+- Retries are handled by Temporal and not by the underlying libraries such as the OpenAI client. This is important because if you leave the client retries on they can interfere with correct and durable error handling and recovery.
 
 ## Create the Activity for LLM invocations
 
@@ -69,7 +69,7 @@ async def create(request: OpenAIResponsesRequest) -> Response:
 
 ## Create the Activity for the tool invocation
 
-We create wrapper for invoking the [National Weather Service API](https://www.weather.gov/documentation/services-web-api), specifically for the weather alerts endpoint.
+We create a wrapper for invoking the [National Weather Service API](https://www.weather.gov/documentation/services-web-api), specifically for the weather alerts endpoint.
 
 We follow the Temporal best practice of encapsulating all input parameters to the activity in
 data structure, even here where this is only one argument.
