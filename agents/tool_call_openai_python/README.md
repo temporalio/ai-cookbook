@@ -21,7 +21,7 @@ This example lays the foundation for the core agentic pattern where the LLM make
 
 This recipe highlights these key design decisions:
 
-- A generic activity for invoking an LLM API; that is, instructions and other responses arguments are passed into the activity making it appropriate for use in a variety of differnt use cases. Similarly, the result from the responses API call is returned out of the activity so that it is usable in a variety of different use cases.
+- A generic Activity for invoking an LLM API; that is, instructions and other responses arguments are passed into the Activity making it appropriate for use in a variety of different use cases. Similarly, the result from the responses API call is returned out of the Activity so that it is usable in a variety of different use cases.
 - We have intentionally not implemented the agentic loop so as to focus on how tool details are made available to the LLM and how functions are invoked. We do take the tool output and have the LLM interpret it in a manner consistent with the AI agent pattern.
 - Retries are handled by Temporal and not by the underlying libraries such as the OpenAI client. This is important because if you leave the client retires on they can interfere with correct and durable error handling and recovery.
 
