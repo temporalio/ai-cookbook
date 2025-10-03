@@ -4,7 +4,7 @@ tags: [agents, python, openai]
 priority: 750
 -->
 
-# Hello World - Agent with Tools
+# Durable Agent using OpenAI Agents SDK
 
 ## Overview
 This is an example showing how to build a Durable Agent using the [OpenAI Agents SDK Integration for Temporal](https://github.com/temporalio/sdk-python/tree/main/temporalio/contrib/openai_agents). 
