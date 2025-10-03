@@ -1,3 +1,10 @@
+<!-- 
+description: Build a simple deep research system embodying the standard
+deep research architecture.
+tags: [agents, toolcalling, python]
+priority: 399
+-->
+
 # Deep Research
 
 Deep research systems combine multiple agents with information retrieval from
