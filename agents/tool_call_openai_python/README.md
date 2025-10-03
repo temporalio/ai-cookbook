@@ -6,9 +6,7 @@ priority: 775
 
 # Tool calling agent
 
-In this example, we demonstrate how function calling (also known as tool calling) works with the OpenAI API and Temporal. Tool calling allows the model to make decisions on when functions should be invoked, and structure the data that is needed for the function call.
-
-This example shows how function calling (also known as tool calling) works with the [Open AI API](https://github.com/openai/openai-python) and Temporal. Tool calling allows the model to make decisions on which, if any, functions should be invoked. It also provides information to the LLM that will allow it to structure the response in such a way that the agent can easily invoke the functions.
+In this example, we demonstrate how function calling (also known as tool calling) works with the [Open AI API](https://github.com/openai/openai-python) and Temporal. Tool calling allows the model to make decisions on which, if any, functions should be invoked. It also provides information to the LLM that will allow it to structure the response in such a way that the agent can easily invoke the functions.
 
 Tools are supplied to the [`responses` API](https://platform.openai.com/docs/api-reference/responses/create) through the [`tools` parameter](https://platform.openai.com/docs/api-reference/responses/create#responses-create-tools). The `tools` parameter is in`json` and includes a description of the function as well as descriptions of each of the arguments.
 
