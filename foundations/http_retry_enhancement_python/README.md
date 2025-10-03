@@ -1,3 +1,9 @@
+<!-- 
+description: Extract retry information from HTTP response headers and make it available to Temporal's retry mechanisms.
+tags:[foundations, openai, python]
+priority: 920
+-->
+
 # Retry Policy from HTTP Responses
 
 This recipe extends the [Basic Example](../basic-python) to show how to extract retry information from HTTP response headers and make it available to Temporal's retry mechanisms.

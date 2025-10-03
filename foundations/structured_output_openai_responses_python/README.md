@@ -1,3 +1,9 @@
+<!-- 
+description: Use Temporal and OpenAI Responses API to reliably request output conforming to a specific data structure. 
+tags:[foundations, openai, python]
+priority: 980
+-->
+
 # Structured Outputs with Temporal and OpenAI
 
 The OpenAI Responses API provides the [Structured Outputs API](https://platform.openai.com/docs/guides/structured-outputs) allowing you to request responses conforming to a specific data structure.
