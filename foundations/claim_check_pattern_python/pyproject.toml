@@ -1,0 +1,17 @@
+[project]
+name = "claim-check-pattern-python"
+version = "0.1"
+description = "Claim Check pattern implementation for handling large payloads in Temporal"
+authors = [{ name = "Temporal Technologies Inc", email = "sdk@temporal.io" }]
+requires-python = ">=3.9"
+readme = "README.md"
+license = "MIT"
+dependencies = [
+    "temporalio>=1.15.0,<2",
+    "redis>=5.0.0",
+    "requests>=2.25.0",
+    "aiohttp>=3.8.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
