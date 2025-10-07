@@ -1,3 +1,9 @@
+<!-- 
+description: Integrate LiteLLM into a Temporal Workflow in Python.
+tags:[python, litellm, provider-neutral]
+priority: 920
+-->
+
 # Hello World with LiteLLM
 
 [LiteLLM](https://github.com/BerriAI/litellm) is a library for calling LLMs from Python. It makes it easy to access, and switch between, many providers, including OpenAI, Anthropic, Google, and more.
