@@ -5,7 +5,7 @@ from temporalio.client import Client
 
 from claim_check_plugin import ClaimCheckPlugin
 from workflows.large_data_workflow import LargeDataProcessingWorkflow
-from activities.large_data_processing import LargeDataset
+from activities.large_data_processing import LargeDataset, SummaryResult
 
 
 async def main():
@@ -37,13 +37,25 @@ async def main():
     )
 
     # Submit the Large Data Processing workflow for execution
-    result = await client.execute_workflow(
+    result: SummaryResult = await client.execute_workflow(
         LargeDataProcessingWorkflow.run,
         large_dataset,  # Pass the large dataset as input
         id=f"claim-check-test-{int(time.time())}",
         task_queue="claim-check-pattern-task-queue",
     )
-    print(f"Result: {result}")
+    
+    print("=== CLAIM CHECK PATTERN DEMONSTRATION ===")
+    print(f"Workflow completed successfully!")
+    print(f"Total items processed: {result.total_items}")
+    print(f"Items successfully transformed: {result.processed_items}")
+    print(f"Transformation errors: {result.errors}")
+    print("\n=== SUMMARY STATISTICS ===")
+    print(f"Value Statistics: {result.summary_stats['value_stats']}")
+    print(f"Text Statistics: {result.summary_stats['text_stats']}")
+    print(f"Score Statistics: {result.summary_stats['score_stats']}")
+    print("\n=== TRANSFORMATION DETAILS ===")
+    print(f"Transformations applied: {result.transformation_stats['transformations_applied']}")
+    print(f"Processing completed at: {result.transformation_stats.get('processed_at', 'N/A')}")
 
 
 if __name__ == "__main__":
