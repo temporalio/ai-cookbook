@@ -1,14 +1,16 @@
 # Claim Check Pattern with Temporal
 
-This recipe demonstrates how to use the Claim Check pattern to efficiently handle large payloads in Temporal workflows by storing them externally and passing only keys through the system.
+This recipe demonstrates how to use the Claim Check pattern to offload data from Temporal Server's Event History to external storage. This can be useful in conversational AI applications that include the full conversation history with each LLM call, creating large Event History that can exceed server size limits.
 
 ## What is the Claim Check Pattern?
 
-The Claim Check pattern allows you to work with large data in Temporal workflows without hitting payload size limits or performance issues. Instead of passing large payloads directly through Temporal, the pattern:
+Each Temporal Workflow has an associated Event History that is stored in Temporal Server and used to provide durable execution. When using the Claim Check pattern, we store the payload content of the Event in separate storage system, then store a reference to that storage in the Temporal Event History instead.
 
-1. Stores large payloads in external storage (Redis, S3, etc.)
-2. Replaces the payload with a unique key
-3. Automatically retrieves the original payload when needed
+That is, we:
+
+1. Store large payloads in external storage (Redis, S3, etc.)
+2. Replace the payload with a unique key
+3. Automatically retrieve the original payload when needed
 
 This is implemented as a `PayloadCodec` that operates transparently - your workflows don't need to know about the claim check mechanism.
 
