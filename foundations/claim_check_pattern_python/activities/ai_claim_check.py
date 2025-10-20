@@ -3,7 +3,7 @@ from typing import List, Dict, Any
 
 from temporalio import activity
 
-from openai import OpenAI
+from openai import AsyncOpenAI
 from rank_bm25 import BM25Okapi
 
 
@@ -49,24 +49,13 @@ def _split_text(text: str, chunk_size: int, overlap: int) -> List[str]:
     return chunks
 
 
-def _cosine(a: List[float], b: List[float]) -> float:
-    # No longer used (embeddings removed). Kept for potential future extension.
-    import math
-    dot = sum(x * y for x, y in zip(a, b))
-    na = math.sqrt(sum(x * x for x in a))
-    nb = math.sqrt(sum(y * y for y in b))
-    denom = (na * nb) or 1e-12
-    return dot / denom
-
-
 @activity.defn
 async def ingest_document(req: IngestRequest) -> IngestResult:
     # Convert bytes to text. For PDFs/audio/images, integrate proper extractors.
-    if req.mime_type == "text/plain":
-        text = req.document_bytes.decode("utf-8", errors="ignore")
-    else:
-        text = req.document_bytes.decode("utf-8", errors="ignore")
+    if req.mime_type != "text/plain":
+        raise ValueError(f"Unsupported MIME type: {req.mime_type}")
 
+    text = req.document_bytes.decode("utf-8", errors="ignore")
     chunks = _split_text(text, req.chunk_size, req.chunk_overlap)
     return IngestResult(
         chunk_texts=chunks,
@@ -80,7 +69,7 @@ async def ingest_document(req: IngestRequest) -> IngestResult:
 
 @activity.defn
 async def rag_answer(req: RagRequest, ingest_result: IngestResult) -> RagAnswer:
-    client = OpenAI()
+    client = AsyncOpenAI(max_retries=0)
 
     # Lexical retrieval using BM25 over chunk texts
     # Simple whitespace tokenization
@@ -100,7 +89,7 @@ async def rag_answer(req: RagRequest, ingest_result: IngestResult) -> RagAnswer:
         "Context:\n" + "\n---\n".join(contexts) + "\n\nAnswer:"
     )
 
-    chat = client.chat.completions.create(
+    chat = await client.chat.completions.create(
         model=req.generation_model,
         messages=[{"role": "user", "content": prompt}],
         temperature=0.2,

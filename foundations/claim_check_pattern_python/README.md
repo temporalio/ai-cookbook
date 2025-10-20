@@ -79,7 +79,7 @@ This example also includes a simple Retrieval-Augmented Generation (RAG) flow th
 
 - `activities/ai_claim_check.py`: Activities `ingest_document` and `rag_answer` using OpenAI.
 - `workflows/ai_rag_workflow.py`: Orchestrates ingestion then question answering.
-- `start_workflow_ai.py`: Starter that downloads a public-domain text if missing and asks a question.
+- `start_workflow.py`: Starter that downloads a public-domain text if missing and asks a question.
 
 ### Requirements
 
