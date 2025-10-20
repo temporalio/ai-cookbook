@@ -90,7 +90,7 @@ def build_codec_server() -> web.Application:
         # Read payloads as JSON
         assert req.content_type == "application/json"
         data = await req.read()
-        payloads = json_format.Parse(data, Payloads())
+        payloads = json_format.Parse(data.decode("utf-8"), Payloads())
         
         # Apply
         payloads = Payloads(payloads=await fn(payloads.payloads))
