@@ -1,6 +1,12 @@
+<!-- 
+description: Extract retry information from HTTP response headers and make it available to Temporal's retry mechanisms.
+tags:[foundations, openai, python]
+priority: 920
+-->
+
 # Retry Policy from HTTP Responses
 
-This recipe extends the [Basic Example](../basic-python) to show how to extract retry information from HTTP response headers and make it available to Temporal's retry mechanisms.
+This recipe extends the [Basic Example](../hello_world_openai_responses_python/README.md) to show how to extract retry information from HTTP response headers and make it available to Temporal's retry mechanisms.
 
 HTTP response codes and headers on API calls have implications for retry behavior.
 For example, an HTTP `404 Not Found` generally represents an application-level error that should not be retried.

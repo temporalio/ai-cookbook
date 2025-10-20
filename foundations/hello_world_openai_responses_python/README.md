@@ -1,3 +1,9 @@
+<!-- 
+description: Simple example demonstrating how to call an LLM from Temporal using the OpenAI Python API library.
+tags:[foundations, openai, python]
+priority: 999
+-->
+
 # Hello World
 
 This is a simple example showing how to call an LLM from Temporal using the [OpenAI Python API library](https://github.com/openai/openai-python).
