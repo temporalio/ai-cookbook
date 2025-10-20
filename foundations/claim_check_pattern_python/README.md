@@ -49,6 +49,14 @@ export REDIS_HOST=localhost
 export REDIS_PORT=6379
 ```
 
+### Inline payload threshold (skip claim check for small payloads)
+
+By default, payloads that are small enough are kept inline to improve debuggability and avoid unnecessary indirection. This example sets the inline threshold to 20KB. Any payload larger than 20KB will be claim-checked and stored in Redis; payloads at or below 20KB remain inline.
+
+- Default: 20KB
+- Where configured: `ClaimCheckCodec(max_inline_bytes=20 * 1024)` in `claim_check_codec.py`
+- How to change: pass a different `max_inline_bytes` when constructing `ClaimCheckCodec` (e.g., in your client/plugin wiring)
+
 ## Key Components
 
 - `claim_check_codec.py`: Implements the PayloadCodec for claim check functionality
@@ -60,6 +68,51 @@ export REDIS_PORT=6379
 - `workflows/`: Workflows that demonstrate the pattern
 - `worker.py`: Temporal worker with claim check plugin
 - `start_workflow.py`: Example workflow execution
+
+## AI / RAG Example using Claim Check
+
+This example also includes a simple Retrieval-Augmented Generation (RAG) flow that ingests a large text (a public-domain book), creates embeddings, and answers a question while keeping large intermediates (chunks, embeddings) out of Temporal payloads via the Claim Check codec. Only the small final answer is returned inline.
+
+### Files
+
+- `activities/ai_claim_check.py`: Activities `ingest_document` and `rag_answer` using OpenAI.
+- `workflows/ai_rag_workflow.py`: Orchestrates ingestion then question answering.
+- `start_workflow_ai.py`: Starter that downloads a public-domain text if missing and asks a question.
+
+### Requirements
+
+- Set `OPENAI_API_KEY` for embeddings and chat generation.
+- Redis and Temporal dev server running (same as the main example).
+- Internet access for the first run to download the text from Project Gutenberg (`https://www.gutenberg.org/ebooks/100.txt.utf-8`).
+
+### Run
+
+1. Export your API key:
+```bash
+export OPENAI_API_KEY=your_key_here
+```
+2. Start the worker (claim check enabled by default):
+```bash
+uv run python -m worker
+```
+3. Start the AI/RAG workflow (first run will download the text):
+```bash
+uv run python -m start_workflow
+```
+
+### Toggle Claim Check (optional)
+
+To demonstrate payload size failures without claim check, disable it with an environment variable:
+
+```bash
+export CLAIM_CHECK_ENABLED=false
+uv run python -m worker
+uv run python -m start_workflow
+```
+
+With claim check disabled, large payloads (e.g., the Shakespeare text or large intermediates) may exceed Temporal's default payload size limits and fail. Re-enable by unsetting or setting `CLAIM_CHECK_ENABLED=true`.
+
+The starter downloads “The Complete Works of William Shakespeare” from Project Gutenberg [link](https://www.gutenberg.org/ebooks/100.txt.utf-8) on first run and saves it under `assets/shakespeare_complete.txt` (~5.1MB). This exceeds Temporal’s default payload size (2MB), making it a good demonstration for the claim check pattern. Large intermediates (chunked text and embeddings) will be claim-checked automatically (payloads > 20KB stored in Redis). The final `RagAnswer` is small and remains inline for easy inspection in the Web UI.
 
 ## How It Works
 

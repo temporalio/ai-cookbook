@@ -14,7 +14,7 @@ class ClaimCheckCodec(PayloadCodec):
     of large payload data.
     """
 
-    def __init__(self, redis_host: str = "localhost", redis_port: int = 6379):
+    def __init__(self, redis_host: str = "localhost", redis_port: int = 6379, max_inline_bytes: int = 20 * 1024):
         """Initialize the claim check codec with Redis connection details.
         
         Args:
@@ -22,6 +22,8 @@ class ClaimCheckCodec(PayloadCodec):
             redis_port: Redis server port
         """
         self.redis_client = redis.Redis(host=redis_host, port=redis_port)
+        # Payloads up to this size (in bytes) will be left inline and not claim-checked
+        self.max_inline_bytes = max_inline_bytes
 
     async def encode(self, payloads: Iterable[Payload]) -> List[Payload]:
         """Replace large payloads with keys and store original data in Redis.
@@ -34,6 +36,12 @@ class ClaimCheckCodec(PayloadCodec):
         """
         out: List[Payload] = []
         for payload in payloads:
+            # Leave small payloads inline to improve debuggability and avoid unnecessary indirection
+            data_size = len(payload.data or b"")
+            if data_size <= self.max_inline_bytes:
+                out.append(payload)
+                continue
+
             encoded = await self.encode_payload(payload)
             out.append(encoded)
         return out
