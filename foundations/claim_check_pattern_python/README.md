@@ -1,33 +1,175 @@
+<!-- 
+description: Use the Claim Check pattern to keep large payloads out of Temporal Event History by storing them in Redis and referencing them with keys, with optional codec server support for a better Web UI experience.
+tags:[foundations, claim-check, python, redis]
+priority: 999
+-->
+
 # Claim Check Pattern with Temporal
 
-This recipe demonstrates how to use the Claim Check pattern to offload data from Temporal Server's Event History to external storage. This can be useful in conversational AI applications that include the full conversation history with each LLM call, creating large Event History that can exceed server size limits.
+The Claim Check pattern enables efficient handling of large payloads by storing them externally and passing only keys through Temporal workflows and activities. This keeps Temporal Event History small while preserving transparent access to full data via a codec.
 
-## What is the Claim Check Pattern?
+This recipe includes:
 
-Each Temporal Workflow has an associated Event History that is stored in Temporal Server and used to provide durable execution. When using the Claim Check pattern, we store the payload content of the Event in separate storage system, then store a reference to that storage in the Temporal Event History instead.
+- A `PayloadCodec` that stores large payloads in Redis and replaces them with keys
+- A client plugin that wires the codec into the Temporal data converter
+- A lightweight codec server for a better Web UI experience
+- An AI/RAG example workflow that demonstrates the pattern end-to-end
 
-That is, we:
+## How the Claim Check Pattern Works
 
-1. Store large payloads in external storage (Redis, S3, etc.)
-2. Replace the payload with a unique key
-3. Automatically retrieve the original payload when needed
+The Claim Check pattern implements a `PayloadCodec` that:
 
-This is implemented as a `PayloadCodec` that operates transparently - your workflows don't need to know about the claim check mechanism.
+1. Encode: Replaces large payloads with unique keys and stores the original data in external storage (Redis, S3, etc.)
+2. Decode: Retrieves the original payload using the key when needed
+
+Workflows operate with small, lightweight keys while maintaining transparent access to full data through automatic encoding/decoding.
+
+## Claim Check Codec Implementation
+
+The `ClaimCheckCodec` implements `PayloadCodec` and adds an inline threshold to keep small payloads inline for debuggability.
+
+*File: claim_check_codec.py*
+
+```python
+class ClaimCheckCodec(PayloadCodec):
+    def __init__(self, redis_host: str = "localhost", redis_port: int = 6379, max_inline_bytes: int = 20 * 1024):
+        self.redis_client = redis.Redis(host=redis_host, port=redis_port)
+        self.max_inline_bytes = max_inline_bytes
+
+    async def encode(self, payloads: Iterable[Payload]) -> List[Payload]:
+        out: List[Payload] = []
+        for payload in payloads:
+            if len(payload.data or b"") <= self.max_inline_bytes:
+                out.append(payload)
+                continue
+            out.append(await self.encode_payload(payload))
+        return out
+
+    async def decode(self, payloads: Iterable[Payload]) -> List[Payload]:
+        out: List[Payload] = []
+        for payload in payloads:
+            if payload.metadata.get("temporal.io/claim-check-codec", b"").decode() != "v1":
+                out.append(payload)
+                continue
+            redis_key = payload.data.decode("utf-8")
+            stored_data = await self.redis_client.get(redis_key)
+            if stored_data is None:
+                raise ValueError(f"Claim check key not found in Redis: {redis_key}")
+            out.append(Payload.FromString(stored_data))
+        return out
+```
+
+### Inline payload threshold
+
+- Default: 20KB
+- Where configured: `ClaimCheckCodec(max_inline_bytes=20 * 1024)` in `claim_check_codec.py`
+- Change by passing a different `max_inline_bytes` when constructing `ClaimCheckCodec`
+
+## Claim Check Plugin
+
+The `ClaimCheckPlugin` integrates the codec with the Temporal client configuration and supports plugin chaining.
+
+*File: claim_check_plugin.py*
+
+```python
+class ClaimCheckPlugin(Plugin):
+    def __init__(self):
+        self.redis_host = os.getenv("REDIS_HOST", "localhost")
+        self.redis_port = int(os.getenv("REDIS_PORT", "6379"))
+        self._next_plugin = None
+
+    def init_client_plugin(self, next_plugin: Plugin) -> None:
+        self._next_plugin = next_plugin
+
+    def configure_client(self, config: ClientConfig) -> ClientConfig:
+        default_converter_class = config["data_converter"].payload_converter_class
+        claim_check_codec = ClaimCheckCodec(self.redis_host, self.redis_port)
+        config["data_converter"] = DataConverter(
+            payload_converter_class=default_converter_class,
+            payload_codec=claim_check_codec,
+        )
+        return self._next_plugin.configure_client(config) if self._next_plugin else config
+```
+
+## Example: AI / RAG Workflow using Claim Check
+
+This example ingests a large text, performs lightweight lexical retrieval, and answers a question with an LLM. Large intermediates (chunks, scores) are kept out of Temporal payloads via the Claim Check codec. Only the small final answer is returned inline.
+
+### Activities
+
+*File: activities/ai_claim_check.py*
+
+```python
+@activity.defn
+async def ingest_document(req: IngestRequest) -> IngestResult:
+    text = req.document_bytes.decode("utf-8", errors="ignore")
+    chunks = _split_text(text, req.chunk_size, req.chunk_overlap)
+    return IngestResult(chunk_texts=chunks, metadata={"filename": req.filename, "mime_type": req.mime_type, "chunk_count": len(chunks)})
+
+@activity.defn
+async def rag_answer(req: RagRequest, ingest_result: IngestResult) -> RagAnswer:
+    tokenized_corpus = [chunk.split() for chunk in ingest_result.chunk_texts]
+    bm25 = BM25Okapi(tokenized_corpus)
+    tokenized_query = req.question.split()
+    scores = bm25.get_scores(tokenized_query)
+    top_indices = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)[: max(1, req.top_k)]
+    contexts = [ingest_result.chunk_texts[i] for i in top_indices]
+    chat = await AsyncOpenAI(max_retries=0).chat.completions.create(
+        model=req.generation_model,
+        messages=[{"role": "user", "content": "..."}],
+        temperature=0.2,
+    )
+    return RagAnswer(answer=chat.choices[0].message.content.strip(), sources=[{"chunk_index": i, "score": float(scores[i])} for i in top_indices])
+```
+
+### Workflow
+
+*File: workflows/ai_rag_workflow.py*
+
+```python
+@workflow.defn
+class AiRagWorkflow:
+    @workflow.run
+    async def run(self, document_bytes: bytes, filename: str, mime_type: str, question: str) -> RagAnswer:
+        ingest = await workflow.execute_activity(
+            ingest_document,
+            IngestRequest(document_bytes=document_bytes, filename=filename, mime_type=mime_type),
+            start_to_close_timeout=timedelta(minutes=10),
+            summary="Ingest and embed large document",
+        )
+        answer = await workflow.execute_activity(
+            rag_answer,
+            args=[RagRequest(question=question), ingest],
+            start_to_close_timeout=timedelta(minutes=5),
+            summary="RAG answer using embedded chunks",
+        )
+        return answer
+```
+
+## Configuration
+
+Set environment variables to configure Redis and OpenAI:
+
+```bash
+export REDIS_HOST=localhost
+export REDIS_PORT=6379
+export OPENAI_API_KEY=your_key_here
+```
 
 ## Prerequisites
 
-- **Redis Server**: Required for external storage of large payloads
-- **Temporal Server**: Required for workflow execution
-- **Python 3.9+**: Required for running the code
+- Redis server
+- Temporal dev server
+- Python 3.9+
 
-## Running the Example
+## Running
 
-1. Start Redis server:
+1. Start Redis:
 ```bash
 redis-server
 ```
 
-2. Start the Temporal Dev Server:
+2. Start Temporal dev server:
 ```bash
 temporal server start-dev
 ```
@@ -42,130 +184,39 @@ uv run python -m worker
 uv run python -m start_workflow
 ```
 
-## Configuration
-
-The example uses Redis for external storage. You can configure the Redis connection with environment variables:
-
-```bash
-export REDIS_HOST=localhost
-export REDIS_PORT=6379
-```
-
-### Inline payload threshold (skip claim check for small payloads)
-
-By default, payloads that are small enough are kept inline to improve debuggability and avoid unnecessary indirection. This example sets the inline threshold to 20KB. Any payload larger than 20KB will be claim-checked and stored in Redis; payloads at or below 20KB remain inline.
-
-- Default: 20KB
-- Where configured: `ClaimCheckCodec(max_inline_bytes=20 * 1024)` in `claim_check_codec.py`
-- How to change: pass a different `max_inline_bytes` when constructing `ClaimCheckCodec` (e.g., in your client/plugin wiring)
-
-## Key Components
-
-- `claim_check_codec.py`: Implements the PayloadCodec for claim check functionality
-- `claim_check_plugin.py`: Temporal plugin that integrates the codec
-- `codec_server.py`: Lightweight codec server for Web UI integration
-- `activities/`: Activities that demonstrate large data processing:
-  - `transform_large_dataset`: Transforms large input into large output
-  - `generate_summary`: Takes large input and produces small summary
-- `workflows/`: Workflows that demonstrate the pattern
-- `worker.py`: Temporal worker with claim check plugin
-- `start_workflow.py`: Example workflow execution
-
-## AI / RAG Example using Claim Check
-
-This example also includes a simple Retrieval-Augmented Generation (RAG) flow that ingests a large text (a public-domain book), creates embeddings, and answers a question while keeping large intermediates (chunks, embeddings) out of Temporal payloads via the Claim Check codec. Only the small final answer is returned inline.
-
-### Files
-
-- `activities/ai_claim_check.py`: Activities `ingest_document` and `rag_answer` using OpenAI.
-- `workflows/ai_rag_workflow.py`: Orchestrates ingestion then question answering.
-- `start_workflow.py`: Starter that downloads a public-domain text if missing and asks a question.
-
-### Requirements
-
-- Set `OPENAI_API_KEY` for embeddings and chat generation.
-- Redis and Temporal dev server running (same as the main example).
-- Internet access for the first run to download the text from Project Gutenberg (`https://www.gutenberg.org/ebooks/100.txt.utf-8`).
-
-### Run
-
-1. Export your API key:
-```bash
-export OPENAI_API_KEY=your_key_here
-```
-2. Start the worker (claim check enabled by default):
-```bash
-uv run python -m worker
-```
-3. Start the AI/RAG workflow (first run will download the text):
-```bash
-uv run python -m start_workflow
-```
-
 ### Toggle Claim Check (optional)
 
-To demonstrate payload size failures without claim check, disable it with an environment variable:
-
-```bash
-export CLAIM_CHECK_ENABLED=false
-uv run python -m worker
-uv run python -m start_workflow
-```
-
-With claim check disabled, large payloads (e.g., the Shakespeare text or large intermediates) may exceed Temporal's default payload size limits and fail. Re-enable by unsetting or setting `CLAIM_CHECK_ENABLED=true`.
-
-The starter downloads “The Complete Works of William Shakespeare” from Project Gutenberg [link](https://www.gutenberg.org/ebooks/100.txt.utf-8) on first run and saves it under `assets/shakespeare_complete.txt` (~5.1MB). This exceeds Temporal’s default payload size (2MB), making it a good demonstration for the claim check pattern. Large intermediates (chunked text and embeddings) will be claim-checked automatically (payloads > 20KB stored in Redis). The final `RagAnswer` is small and remains inline for easy inspection in the Web UI.
-
-## How It Works
-
-This example demonstrates the claim check pattern with a realistic data processing pipeline:
-
-1. **Large Workflow Input**: The workflow receives a large dataset from the client
-2. **Large Activity Input/Output**: The first activity transforms the large dataset, producing another large dataset
-3. **Large Activity Input, Small Output**: The second activity takes the transformed data and produces a compact summary
-
-This flow shows how the claim check pattern handles large payloads at multiple stages of processing, making it transparent to your workflow logic while avoiding Temporal's payload size limits.
+To demonstrate payload size failures without claim check, you can disable it in your local wiring (e.g., omit the plugin/codec) and re-run. With claim check disabled, large payloads may exceed Temporal's default payload size limits and fail.
 
 ## Codec Server for Web UI
 
-When using the Claim Check pattern, the Temporal Web UI will show encoded Redis keys instead of the actual payload data. This makes debugging and monitoring difficult since you can't see what data is being passed through your workflows.
-
-### The Problem
-
-Without a codec server, the Web UI displays raw claim check keys like:
-```
-abc123-def4-5678-9abc-def012345678
-```
-
-This provides no context about what data is stored or how to access it, making workflow debugging and monitoring challenging.
-
-### Our Solution: Lightweight Codec Server
-
-The codec server provides helpful information without reading large payload data during Web UI operations.
-
-Instead of raw keys, the Web UI displays:
-```
-"Claim check data (key: abc123-def4-5678-9abc-def012345678) - View at: http://localhost:8081/view/abc123-def4-5678-9abc-def012345678"
-```
-
-This gives you the Redis key and a direct link to view the full payload data when needed.
+When claim check is enabled, the Web UI would otherwise show opaque keys. This codec server shows helpful text with a link to view the raw data on demand.
 
 ### Running the Codec Server
 
-1. Start the codec server:
 ```bash
 uv run python -m codec_server
 ```
 
-2. Configure the Temporal Web UI to use the codec server. For `temporal server start-dev`, see the [Temporal documentation on configuring codec servers](https://docs.temporal.io/production-deployment/data-encryption#set-your-codec-server-endpoints-with-web-ui-and-cli) for the appropriate configuration method.
+Then configure the Web UI to use the codec server. For `temporal server start-dev`, see the Temporal docs on configuring codec servers.
 
-3. Access the Temporal Web UI and you'll see helpful summaries instead of raw keys.
+### What it shows
 
-### Configuration Details
+Instead of raw keys:
 
-The codec server implements the Temporal codec server protocol with two endpoints:
+```
+abc123-def4-5678-9abc-def012345678
+```
 
-- **`/decode`**: Returns helpful text with Redis key and view URL
-- **`/view/{key}`**: Serves the raw payload data for inspection
+You will see text like:
 
-When you click the view URL, you'll see the complete payload data as stored in Redis, formatted appropriately for text or binary content.
+```
+"Claim check data (key: abc123-def4-5678-9abc-def012345678) - View at: http://localhost:8081/view/abc123-def4-5678-9abc-def012345678"
+```
+
+### Endpoints
+
+- `POST /decode`: Returns helpful text with Redis key and view URL (no data reads)
+- `GET /view/{key}`: Serves raw payload data for inspection
+
+The server also includes CORS handling for the local Web UI.
