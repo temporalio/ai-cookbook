@@ -7,7 +7,7 @@ from aiohttp import hdrs, web
 from google.protobuf import json_format
 from temporalio.api.common.v1 import Payload, Payloads
 
-from claim_check_codec import ClaimCheckCodec
+from .claim_check import ClaimCheckCodec
 
 def build_codec_server() -> web.Application:
     # Create codec with environment variable configuration (same as plugin)
@@ -16,11 +16,16 @@ def build_codec_server() -> web.Application:
         endpoint_url=os.getenv("S3_ENDPOINT_URL"),
         region_name=os.getenv("AWS_REGION", "us-east-1")
     )
+    
+    # Configure Web UI endpoint
+    temporal_web_url = os.getenv("TEMPORAL_WEB_URL", "http://localhost:8233")
+    # Configure codec server endpoint for viewing raw data
+    codec_server_url = os.getenv("CODEC_SERVER_URL", "http://localhost:8081")
     # Cors handler
     async def cors_options(req: web.Request) -> web.Response:
         resp = web.Response()
-        if req.headers.get(hdrs.ORIGIN) == "http://localhost:8233":
-            resp.headers[hdrs.ACCESS_CONTROL_ALLOW_ORIGIN] = "http://localhost:8233"
+        if req.headers.get(hdrs.ORIGIN) == temporal_web_url:
+            resp.headers[hdrs.ACCESS_CONTROL_ALLOW_ORIGIN] = temporal_web_url
             resp.headers[hdrs.ACCESS_CONTROL_ALLOW_METHODS] = "POST"
             resp.headers[hdrs.ACCESS_CONTROL_ALLOW_HEADERS] = "content-type,x-namespace"
         return resp
@@ -40,7 +45,7 @@ def build_codec_server() -> web.Application:
             s3_key = payload.data.decode("utf-8")
             
             # Return simple text with link - no data reading
-            link_text = f"Claim check data (key: {s3_key}) - View at: http://localhost:8081/view/{s3_key}"
+            link_text = f"Claim check data (key: {s3_key}) - View at: {codec_server_url}/view/{s3_key}"
             
             summary_payload = Payload(
                 metadata={"encoding": b"json/plain"},

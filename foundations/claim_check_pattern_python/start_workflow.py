@@ -6,7 +6,7 @@ from pathlib import Path
 import requests
 from temporalio.client import Client
 
-from claim_check_plugin import ClaimCheckPlugin
+from codec import ClaimCheckPlugin
 from workflows.ai_rag_workflow import AiRagWorkflow
 
 

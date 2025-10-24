@@ -233,7 +233,7 @@ When claim check is enabled, the Web UI would otherwise show opaque keys. This c
 ### Running the Codec Server
 
 ```bash
-uv run python -m codec_server
+uv run python -m codec.codec_server
 ```
 
 Then configure the Web UI to use the codec server. For `temporal server start-dev`, see the Temporal docs on configuring codec servers.

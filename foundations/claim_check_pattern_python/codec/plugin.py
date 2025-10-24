@@ -3,7 +3,7 @@ from temporalio.client import Plugin, ClientConfig
 from temporalio.converter import DataConverter
 from temporalio.service import ConnectConfig, ServiceClient
 
-from claim_check_codec import ClaimCheckCodec
+from .claim_check import ClaimCheckCodec
 
 
 class ClaimCheckPlugin(Plugin):
