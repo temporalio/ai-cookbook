@@ -21,7 +21,9 @@ def build_codec_server() -> web.Application:
     temporal_web_url = os.getenv("TEMPORAL_WEB_URL", "http://localhost:8233")
     # Configure codec server endpoint for viewing raw data
     codec_server_url = os.getenv("CODEC_SERVER_URL", "http://localhost:8081")
-    # Cors handler
+    
+    # CORS handler - needed because Temporal Web UI runs on a different port/domain
+    # and the browser blocks cross-origin requests by default; CORS headers allow these requests
     async def cors_options(req: web.Request) -> web.Response:
         resp = web.Response()
         if req.headers.get(hdrs.ORIGIN) == temporal_web_url:
