@@ -4,7 +4,7 @@ import os
 from temporalio.client import Client
 from temporalio.worker import Worker
 
-from codec import ClaimCheckPlugin
+from codec.plugin import ClaimCheckPlugin
 from workflows.ai_rag_workflow import AiRagWorkflow
 from activities.ai_claim_check import ingest_document, rag_answer
 
