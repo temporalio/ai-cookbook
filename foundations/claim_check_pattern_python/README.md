@@ -1,6 +1,6 @@
 <!-- 
-description: Use the Claim Check pattern to keep large payloads out of Temporal Event History by storing them in Redis and referencing them with keys, with optional codec server support for a better Web UI experience.
-tags:[foundations, claim-check, python, redis]
+description: Use the Claim Check pattern to keep large payloads out of Temporal Event History by storing them in S3 and referencing them with keys, with optional codec server support for a better Web UI experience.
+tags:[foundations, claim-check, python, s3]
 priority: 999
 -->
 
@@ -10,7 +10,7 @@ This recipe demonstrates how to use the Claim Check pattern to offload data from
 
 This recipe includes:
 
-- A `PayloadCodec` that stores large payloads in Redis and replaces them with keys
+- A `PayloadCodec` that stores large payloads in S3 and replaces them with keys
 - A client plugin that wires the codec into the Temporal data converter
 - A lightweight codec server for a better Web UI experience
 - An AI/RAG example workflow that demonstrates the pattern end-to-end
@@ -21,7 +21,7 @@ Each Temporal Workflow has an associated Event History that is stored in Tempora
 
 The Claim Check Recipe implements a `PayloadCodec` that:
 
-1. Encode: Replaces large payloads with unique keys and stores the original data in external storage (Redis, S3, etc.)
+1. Encode: Replaces large payloads with unique keys and stores the original data in external storage (S3, Database, etc.)
 2. Decode: Retrieves the original payload using the key when needed
 
 Workflows operate with small, lightweight keys while maintaining transparent access to full data through automatic encoding/decoding.
@@ -34,11 +34,15 @@ The `ClaimCheckCodec` implements `PayloadCodec` and adds an inline threshold to 
 
 ```python
 class ClaimCheckCodec(PayloadCodec):
-    def __init__(self, redis_host: str = "localhost", redis_port: int = 6379, max_inline_bytes: int = 20 * 1024):
-        self.redis_client = redis.Redis(host=redis_host, port=redis_port)
+    def __init__(self, bucket_name: str = "temporal-claim-check", endpoint_url: str = None, region_name: str = "us-east-1", max_inline_bytes: int = 20 * 1024):
+        self.bucket_name = bucket_name
+        self.endpoint_url = endpoint_url
+        self.region_name = region_name
         self.max_inline_bytes = max_inline_bytes
+        self.session = aioboto3.Session()
 
     async def encode(self, payloads: Iterable[Payload]) -> List[Payload]:
+        await self._ensure_bucket_exists()
         out: List[Payload] = []
         for payload in payloads:
             if len(payload.data or b"") <= self.max_inline_bytes:
@@ -48,15 +52,16 @@ class ClaimCheckCodec(PayloadCodec):
         return out
 
     async def decode(self, payloads: Iterable[Payload]) -> List[Payload]:
+        await self._ensure_bucket_exists()
         out: List[Payload] = []
         for payload in payloads:
             if payload.metadata.get("temporal.io/claim-check-codec", b"").decode() != "v1":
                 out.append(payload)
                 continue
-            redis_key = payload.data.decode("utf-8")
-            stored_data = await self.redis_client.get(redis_key)
+            s3_key = payload.data.decode("utf-8")
+            stored_data = await self.get_payload_from_s3(s3_key)
             if stored_data is None:
-                raise ValueError(f"Claim check key not found in Redis: {redis_key}")
+                raise ValueError(f"Claim check key not found in S3: {s3_key}")
             out.append(Payload.FromString(stored_data))
         return out
 ```
@@ -76,8 +81,9 @@ The `ClaimCheckPlugin` integrates the codec with the Temporal client configurati
 ```python
 class ClaimCheckPlugin(Plugin):
     def __init__(self):
-        self.redis_host = os.getenv("REDIS_HOST", "localhost")
-        self.redis_port = int(os.getenv("REDIS_PORT", "6379"))
+        self.bucket_name = os.getenv("S3_BUCKET_NAME", "temporal-claim-check")
+        self.endpoint_url = os.getenv("S3_ENDPOINT_URL")
+        self.region_name = os.getenv("AWS_REGION", "us-east-1")
         self._next_plugin = None
 
     def init_client_plugin(self, next_plugin: Plugin) -> None:
@@ -85,7 +91,11 @@ class ClaimCheckPlugin(Plugin):
 
     def configure_client(self, config: ClientConfig) -> ClientConfig:
         default_converter_class = config["data_converter"].payload_converter_class
-        claim_check_codec = ClaimCheckCodec(self.redis_host, self.redis_port)
+        claim_check_codec = ClaimCheckCodec(
+            bucket_name=self.bucket_name,
+            endpoint_url=self.endpoint_url,
+            region_name=self.region_name
+        )
         config["data_converter"] = DataConverter(
             payload_converter_class=default_converter_class,
             payload_codec=claim_check_codec,
@@ -150,26 +160,45 @@ class AiRagWorkflow:
 
 ## Configuration
 
-Set environment variables to configure Redis and OpenAI:
+Set environment variables to configure S3 and OpenAI:
 
 ```bash
-export REDIS_HOST=localhost
-export REDIS_PORT=6379
+# For MinIO (recommended for local testing)
+export S3_ENDPOINT_URL=http://localhost:9000
+export S3_BUCKET_NAME=temporal-claim-check
+export AWS_ACCESS_KEY_ID=minioadmin
+export AWS_SECRET_ACCESS_KEY=minioadmin
+export AWS_REGION=us-east-1
+
+# For production AWS S3
+# export S3_BUCKET_NAME=your-bucket-name
+# export AWS_REGION=us-east-1
+# export AWS_ACCESS_KEY_ID=your-access-key
+# export AWS_SECRET_ACCESS_KEY=your-secret-key
+
 export OPENAI_API_KEY=your_key_here
 ```
 
 ## Prerequisites
 
-- Redis server
+- MinIO server (for local testing) or AWS S3 access (for production)
 - Temporal dev server
 - Python 3.9+
 
 ## Running
 
-1. Start Redis:
+### Option 1: MinIO (Recommended for Testing)
+
+1. Start MinIO:
 ```bash
-redis-server
+docker run -d -p 9000:9000 -p 9001:9001 \
+  --name minio \
+  -e "MINIO_ROOT_USER=minioadmin" \
+  -e "MINIO_ROOT_PASSWORD=minioadmin" \
+  quay.io/minio/minio server /data --console-address ":9001"
 ```
+
+The bucket will be auto-created by the code. You can view stored objects in the MinIO web console at http://localhost:9001 (credentials: minioadmin/minioadmin).
 
 2. Start Temporal dev server:
 ```bash
@@ -185,6 +214,13 @@ uv run python -m worker
 ```bash
 uv run python -m start_workflow
 ```
+
+### Option 2: AWS S3 (Production)
+
+1. Create an S3 bucket in your AWS account
+2. Configure AWS credentials (via AWS CLI, environment variables, or IAM roles)
+3. Set the environment variables for your bucket
+4. Follow steps 2-4 from Option 1
 
 ### Toggle Claim Check (optional)
 
@@ -218,7 +254,7 @@ You will see text like:
 
 ### Endpoints
 
-- `POST /decode`: Returns helpful text with Redis key and view URL (no data reads)
+- `POST /decode`: Returns helpful text with S3 key and view URL (no data reads)
 - `GET /view/{key}`: Serves raw payload data for inspection
 
 The server also includes CORS handling for the local Web UI.

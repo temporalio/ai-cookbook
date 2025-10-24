@@ -1,6 +1,7 @@
 from functools import partial
 from typing import Awaitable, Callable, Iterable, List
 import json
+import os
 
 from aiohttp import hdrs, web
 from google.protobuf import json_format
@@ -9,6 +10,12 @@ from temporalio.api.common.v1 import Payload, Payloads
 from claim_check_codec import ClaimCheckCodec
 
 def build_codec_server() -> web.Application:
+    # Create codec with environment variable configuration (same as plugin)
+    codec = ClaimCheckCodec(
+        bucket_name=os.getenv("S3_BUCKET_NAME", "temporal-claim-check"),
+        endpoint_url=os.getenv("S3_ENDPOINT_URL"),
+        region_name=os.getenv("AWS_REGION", "us-east-1")
+    )
     # Cors handler
     async def cors_options(req: web.Request) -> web.Response:
         resp = web.Response()
@@ -29,11 +36,11 @@ def build_codec_server() -> web.Application:
                 out.append(payload)
                 continue
 
-            # Get the Redis key
-            redis_key = payload.data.decode("utf-8")
+            # Get the S3 key
+            s3_key = payload.data.decode("utf-8")
             
             # Return simple text with link - no data reading
-            link_text = f"Claim check data (key: {redis_key}) - View at: http://localhost:8081/view/{redis_key}"
+            link_text = f"Claim check data (key: {s3_key}) - View at: http://localhost:8081/view/{s3_key}"
             
             summary_payload = Payload(
                 metadata={"encoding": b"json/plain"},
@@ -45,15 +52,14 @@ def build_codec_server() -> web.Application:
 
     # Endpoint to view raw payload data
     async def view_raw_data(req: web.Request) -> web.Response:
-        """View the raw payload data for a given Redis key."""
-        redis_key = req.match_info['key']
-        codec = ClaimCheckCodec()
+        """View the raw payload data for a given S3 key."""
+        s3_key = req.match_info['key']
         
         try:
-            stored_data = await codec.redis_client.get(redis_key)
+            stored_data = await codec.get_payload_from_s3(s3_key)
             if stored_data is None:
                 return web.Response(
-                    text=json.dumps({"error": f"Key not found: {redis_key}"}),
+                    text=json.dumps({"error": f"Key not found: {s3_key}"}),
                     content_type="application/json",
                     status=404
                 )
@@ -106,7 +112,7 @@ def build_codec_server() -> web.Application:
     app = web.Application()
     app.add_routes(
         [
-            web.post("/encode", partial(apply, ClaimCheckCodec().encode)),
+            web.post("/encode", partial(apply, codec.encode)),
             web.post("/decode", partial(apply, decode_with_urls)),
             web.get("/view/{key}", view_raw_data),
             web.options("/decode", cors_options),

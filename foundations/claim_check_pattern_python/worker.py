@@ -34,8 +34,8 @@ async def main():
     )
     
     if claim_check_enabled:
-        logger.info("Starting worker with claim check enabled (Redis-backed)")
-        logger.info("Worker will handle large payloads using Redis storage")
+        logger.info("Starting worker with claim check enabled (S3-backed)")
+        logger.info("Worker will handle large payloads using S3 storage")
     else:
         logger.info("Starting worker with claim check DISABLED (for demo)")
         logger.info("Large payloads may exceed Temporal payload limits and fail")

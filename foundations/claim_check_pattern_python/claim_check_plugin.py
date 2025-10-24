@@ -10,9 +10,10 @@ class ClaimCheckPlugin(Plugin):
     """Temporal plugin that integrates the Claim Check codec with client configuration."""
 
     def __init__(self):
-        """Initialize the plugin with Redis connection configuration."""
-        self.redis_host = os.getenv("REDIS_HOST", "localhost")
-        self.redis_port = int(os.getenv("REDIS_PORT", "6379"))
+        """Initialize the plugin with S3 connection configuration."""
+        self.bucket_name = os.getenv("S3_BUCKET_NAME", "temporal-claim-check")
+        self.endpoint_url = os.getenv("S3_ENDPOINT_URL")
+        self.region_name = os.getenv("AWS_REGION", "us-east-1")
         self._next_plugin = None
 
     def init_client_plugin(self, next_plugin: Plugin) -> None:
@@ -30,7 +31,11 @@ class ClaimCheckPlugin(Plugin):
         """
         # Configure the data converter with claim check codec
         default_converter_class = config["data_converter"].payload_converter_class
-        claim_check_codec = ClaimCheckCodec(self.redis_host, self.redis_port)
+        claim_check_codec = ClaimCheckCodec(
+            bucket_name=self.bucket_name,
+            endpoint_url=self.endpoint_url,
+            region_name=self.region_name
+        )
         
         config["data_converter"] = DataConverter(
             payload_converter_class=default_converter_class,
