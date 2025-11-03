@@ -1,3 +1,8 @@
+<!--
+description: A basic agentic loop that invokes a dyanamic set of tools. 
+tags: [agents, python]
+priority: 775
+-->
 # Basic Agentic Loop with Tool Calling
 
 This example implements a basic agentic loop that has a set of tools available. If the
