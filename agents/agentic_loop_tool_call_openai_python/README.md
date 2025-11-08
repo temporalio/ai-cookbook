@@ -157,7 +157,9 @@ We create a wrapper for the `create` method of the `AsyncOpenAI` client object.
 This is a generic Activity that invokes the OpenAI LLM.
 
 We set `max_retries=0` when creating the `AsyncOpenAI` client.
-This moves the responsibility for retries from the OpenAI client to Temporal.
+This moves the responsibility for retries from the OpenAI client to Temporal. This means
+that the activity should interpret any errors coming from the OpenAI API call and return
+the appropriate error type so that the workflow knows if it should retry the activity or not.
 
 In this implementation, we allow for the model, instructions and input to be passed in, and also the list of tools.
 
@@ -179,7 +181,10 @@ class OpenAIResponsesRequest:
 
 @activity.defn
 async def create(request: OpenAIResponsesRequest) -> Response:
-    # Temporal best practice: Disable retry logic in OpenAI API client library.
+    # We disable retry logic in OpenAI API client library so that Temporal can handle retries.
+    # In a real setting, you would need to handle any errors coming back from the OpenAI API,
+    # so that Temporal can appropriately retry in the manner that OpenAI API would.
+    # See the `http_retry_enhancement_python` example for inspiration.
     client = AsyncOpenAI(max_retries=0)
 
     try:

@@ -1,7 +1,7 @@
 # get_location.py
 
 from typing import Any
-import requests
+import httpx
 from pydantic import BaseModel, Field
 from helpers import tool_helpers
 
@@ -24,13 +24,15 @@ GET_IP_ADDRESS_TOOL_OAI: dict[str, Any] = tool_helpers.oai_responses_tool_from_m
     None)
 
 # The functions
-def get_ip_address() -> str:
-    response = requests.get("https://icanhazip.com")
-    response.raise_for_status()
-    return response.text.strip()
+async def get_ip_address() -> str:
+    async with httpx.AsyncClient() as client:
+        response = await client.get("https://icanhazip.com")
+        response.raise_for_status()
+        return response.text.strip()
 
-def get_location_info(req: GetLocationRequest) -> str:
-    response = requests.get(f"http://ip-api.com/json/{req.ipaddress}")
-    response.raise_for_status()
-    result = response.json()
-    return f"{result['city']}, {result['regionName']}, {result['country']}"
+async def get_location_info(req: GetLocationRequest) -> str:
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"http://ip-api.com/json/{req.ipaddress}")
+        response.raise_for_status()
+        result = response.json()
+        return f"{result['city']}, {result['regionName']}, {result['country']}"

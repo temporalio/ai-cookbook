@@ -14,7 +14,10 @@ class OpenAIResponsesRequest:
 
 @activity.defn
 async def create(request: OpenAIResponsesRequest) -> Response:
-    # Temporal best practice: Disable retry logic in OpenAI API client library.
+    # We disable retry logic in OpenAI API client library so that Temporal can handle retries.
+    # In a real setting, you would need to handle any errors coming back from the OpenAI API,
+    # so that Temporal can appropriately retry in the manner that OpenAI API would.
+    # See the `http_retry_enhancement_python` example for inspiration.
     client = AsyncOpenAI(max_retries=0)
 
     try:
