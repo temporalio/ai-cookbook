@@ -28,7 +28,9 @@ async def dynamic_tool_activity(args: Sequence[RawValue]) -> dict:
         else:
             call_args = [tool_args]
 
-    result = await handler(*call_args) if inspect.iscoroutinefunction(handler) else handler(*call_args)
+    if not inspect.iscoroutinefunction(handler):
+        raise TypeError("Tool handler must be async (awaitable).")
+    result = await handler(*call_args)
 
     # Optionally log or augment the result
     activity.logger.info(f"Tool '{tool_name}' result: {result}")
