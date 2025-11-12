@@ -664,7 +664,7 @@ if __name__ == "__main__":
 uv run python -m codec.codec_server
 ```
 
-Then configure the Web UI to use the codec server. For `temporal server start-dev`, see the Temporal docs on configuring codec servers.
+Then [configure the Web UI to use the codec server](https://docs.temporal.io/production-deployment/data-encryption#set-your-codec-server-endpoints-with-web-ui-and-cli).
 
 ### What it shows
 
