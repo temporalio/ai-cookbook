@@ -1,0 +1,2 @@
+#!/bin/bash
+export GOOGLE_API_KEY="AIzaSyCybC2HGaUPUxD8JQmLAvCfXMO38dBXRLA"
