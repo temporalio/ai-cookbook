@@ -14,7 +14,7 @@ GET_LOCATION_TOOL_GEMINI = {
     "function_declarations": [
         {
             "name": "get_location_info",
-            "description": "Get the location information for an IP address. This includes the city, state, and country.",
+            "description": "Get the location information for an IP address. This includes the city, state, and country. For user location queries, first call get_ip_address to obtain the IP, then use this tool with that IP address.",
             "parameters": {
                 "type": "object",
                 "properties": {
@@ -33,7 +33,7 @@ GET_IP_ADDRESS_TOOL_GEMINI = {
     "function_declarations": [
         {
             "name": "get_ip_address",
-            "description": "Get the IP address of the current machine.",
+            "description": "Get the IP address of the current machine. Use this tool first when answering location-related questions (like 'where am I?').",
             "parameters": {
                 "type": "object",
                 "properties": {},
