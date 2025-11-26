@@ -80,8 +80,6 @@ class GetForecast:
         if not points_data:
             return "Unable to fetch forecast data for this location."
 
-        await workflow.sleep(10)
-
         # Get the forecast URL from the points response
         forecast_url = points_data["properties"]["forecast"]
         forecast_data = await workflow.execute_activity(
