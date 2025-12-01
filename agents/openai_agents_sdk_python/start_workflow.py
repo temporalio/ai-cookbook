@@ -1,14 +1,23 @@
 import asyncio
+from pathlib import Path
 
 from temporalio.client import Client
+from temporalio.envconfig import ClientConfig
 
 from temporalio.common import WorkflowIDReusePolicy
 from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
 from workflows.hello_world_workflow import HelloWorldAgent
 
 async def main():
+    config_dir = Path(__file__).parent.parent.parent
+    config_file = config_dir / "config.toml"
+    if not config_file.exists():
+        config_file = config_dir / "config.toml.example"
+    connect_config = ClientConfig.load_client_connect_config(
+        config_file=str(config_file)
+    )
     client = await Client.connect(
-        "localhost:7233",
+        **connect_config,
         # Use the plugin to configure Temporal for use with OpenAI Agents SDK
         plugins=[OpenAIAgentsPlugin()],
     )

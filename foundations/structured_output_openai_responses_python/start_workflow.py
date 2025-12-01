@@ -3,8 +3,10 @@ import sys
 import uuid
 import os
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 from temporalio.client import Client
+from temporalio.envconfig import ClientConfig
 from temporalio.contrib.pydantic import pydantic_data_converter
 
 from workflows.clean_data_workflow import CleanDataWorkflow
@@ -12,8 +14,15 @@ from workflows.clean_data_workflow import CleanDataWorkflow
 
 async def main():
     # Connect to Temporal server with matching data converter
+    config_dir = Path(__file__).parent.parent.parent
+    config_file = config_dir / "config.toml"
+    if not config_file.exists():
+        config_file = config_dir / "config.toml.example"
+    connect_config = ClientConfig.load_client_connect_config(
+        config_file=str(config_file)
+    )
     client = await Client.connect(
-        "localhost:7233",
+        **connect_config,
         data_converter=pydantic_data_converter,
     )
 

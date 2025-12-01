@@ -147,9 +147,11 @@ Temporal manages Activity retries, so LiteLLM's retry helper is disabled via `nu
 
 ```python
 import asyncio
+from pathlib import Path
 
 from temporalio.client import Client
 from temporalio.worker import Worker
+from temporalio.envconfig import ClientConfig
 
 from activities import litellm_completion
 from workflows.hello_world_workflow import HelloWorld
@@ -157,8 +159,15 @@ from temporalio.contrib.pydantic import pydantic_data_converter
 
 
 async def main():
+    config_dir = Path(__file__).parent.parent.parent
+    config_file = config_dir / "config.toml"
+    if not config_file.exists():
+        config_file = config_dir / "config.toml.example"
+    connect_config = ClientConfig.load_client_connect_config(
+        config_file=str(config_file)
+    )
     client = await Client.connect(
-        "localhost:7233",
+        **connect_config,
         data_converter=pydantic_data_converter,
     )
 
@@ -185,16 +194,25 @@ if __name__ == "__main__":
 
 ```python
 import asyncio
+from pathlib import Path
 
 from temporalio.client import Client
+from temporalio.envconfig import ClientConfig
 from temporalio.contrib.pydantic import pydantic_data_converter
 
 from workflows.hello_world_workflow import HelloWorld
 
 
 async def main():
+    config_dir = Path(__file__).parent.parent.parent
+    config_file = config_dir / "config.toml"
+    if not config_file.exists():
+        config_file = config_dir / "config.toml.example"
+    connect_config = ClientConfig.load_client_connect_config(
+        config_file=str(config_file)
+    )
     client = await Client.connect(
-        "localhost:7233",
+        **connect_config,
         data_converter=pydantic_data_converter,
     )
 
@@ -210,6 +228,29 @@ async def main():
 if __name__ == "__main__":
     asyncio.run(main())
 ```
+
+## Configuration
+
+This recipe uses Temporal's environment configuration system to connect to Temporal. By default, it connects to a local Temporal server. To use Temporal Cloud:
+
+1. Copy the example configuration file from the ai-cookbook root:
+   ```bash
+   cp ../config.toml.example ../config.toml
+   ```
+
+2. Edit `config.toml` in the ai-cookbook root and update the `[profile.cloud]` section with your Temporal Cloud credentials:
+   - Set `address` to your Temporal Cloud namespace address
+   - Set `namespace` to your namespace name
+   - For authentication, choose one of:
+     - Set `api_key` to your Temporal Cloud API key, or
+     - Set `client_cert_path` and `client_key_path` in the `[profile.cloud.tls]` section to use TLS certificates
+
+3. Set the `TEMPORAL_PROFILE` environment variable to use the cloud profile:
+   ```bash
+   export TEMPORAL_PROFILE=cloud
+   ```
+
+The code will automatically use `config.toml` if it exists, otherwise it falls back to `config.toml.example`.
 
 ## Running
 
