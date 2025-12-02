@@ -1,21 +1,26 @@
+<!-- 
+description: Use Temporal and OpenAI Responses API to reliably request output conforming to a specific data structure. 
+tags:[foundations, openai, python]
+priority: 980
+-->
+
 # Structured Outputs with Temporal and OpenAI
 
-## Overview
-
-The OpenAI Responses API provides the [Structured Outputs API](https://platform.openai.com/docs/guides/structured-outputs) allowing you to request responses conforming to a specific data structures.
+The OpenAI Responses API provides the [Structured Outputs API](https://platform.openai.com/docs/guides/structured-outputs) allowing you to request responses conforming to a specific data structure.
 
 In this example, we use structured outputs in a business data cleaning scenario.
-Structured output are also commonly used for tool calling.
+Structured outputs are also commonly used for tool calling.
 
-OpenAI usually but not always returns the correct type, but due to the non-deterministic nature of LLMs, it does not always do so.
-When this occurs, Temporal automatically retries the LLM call activity.
+OpenAI usually returns the correct type. However, this is not always the case due to the non-deterministic nature of LLMs.
+When OpenAI returns an incorrect type, Temporal automatically retries the LLM call Activity.
 
 ## Invoke Model Activity
 
 We create a model-calling Activity that uses the `responses.parse` method of the OpenAI client.
 
 Key challenges are related to serialization:
-1. In `InvokeModelRequest` the `response_format` field is a class reference. We provide customer Pydantic serialization and deserialization logic.
+
+1. In `InvokeModelRequest` the `response_format` field is a class reference. We provide custom Pydantic serialization and deserialization logic.
 2. In `InvokeModelResponse` the `response_model` must be deserialized to the correct type. We serialize the type in one field and the model, represented as a dictionary, in another.
 
 ```python
@@ -117,15 +122,14 @@ async def invoke_model(request: InvokeModelRequest[T]) -> InvokeModelResponse[T]
         )
 ```
 
-
 ## Workflow
 
 We define the `Business` class as a Pydantic model.
 We use the Pydantic's `EmailStr` type for the email field.
 For the phone field, we use a custom validator to ensure the phone number is in E.164 format.
 
-The validators should check for obvious structural errors that an LLMs will only get wrong sporadically.
-If the LLMs produces invalid responses consistently, Activity retries will fail consistently.
+The validators should check for obvious structural errors that LLMs will only get wrong sporadically.
+If the LLM produces invalid responses consistently, Activity retries will fail consistently.
 To mitigate the cost of such futile retries, we limit the number of retry attempts when using structured outputs.
 
 ```python
@@ -136,7 +140,7 @@ from temporalio import workflow
 from activities import invoke_model
 from activities.invoke_model import InvokeModelRequest
 from typing import List, Optional
-from datetime import timedelta  
+from datetime import timedelta
 from temporalio.common import RetryPolicy
 
 class Business(BaseModel):
@@ -227,7 +231,7 @@ class CleanDataWorkflow:
                 instructions=f"""Extract and clean business data with these specific rules:
 
 1. BUSINESS NAME: Extract the main business name, normalize capitalization (Title Case for proper nouns)
-2. EMAIL: 
+2. EMAIL:
    - Extract only ONE primary email address
    - If multiple emails, choose the one marked as "primary" or the first valid one
    - Validate format (must have @ and valid domain with .)
@@ -261,7 +265,6 @@ Return null for any field that cannot be reliably extracted or validated.""",
         return results.response
 
 ```
-
 
 ## Running
 

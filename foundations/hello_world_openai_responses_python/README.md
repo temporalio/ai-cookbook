@@ -1,6 +1,10 @@
-# Hello World
+<!-- 
+description: Simple example demonstrating how to call an LLM from Temporal using the OpenAI Python API library.
+tags:[foundations, openai, python]
+priority: 999
+-->
 
-## Overview
+# Hello World
 
 This is a simple example showing how to call an LLM from Temporal using the [OpenAI Python API library](https://github.com/openai/openai-python).
 
@@ -8,22 +12,22 @@ Being an external API call, the LLM invocation happens in a Temporal Activity.
 
 This recipe highlights two key design decisions:
 
-- A generic activity for invoking an LLM API. This activity can be re-used with different arguments throughout your codebase.
+- A generic Activity for invoking an LLM API. This Activity can be re-used with different arguments throughout your codebase.
 - Configuring the Temporal client with a `dataconverter` to allow serialization of Pydantic types.
-- Retries are handled by Temporal and not by the underlying libraries such as the OpenAI client. This is important because if you leave the client retires on they can interfere with correct and durable error handling and recovery.
-
+- Retries are handled by Temporal and not by the underlying libraries such as the OpenAI client. This is important because if you leave the client retries on they can interfere with correct and durable error handling and recovery.
 
 ## Create the Activity
 
-We create wrapper for the `create` method of the `AsyncOpenAI` client object.
-This is a generic activity that invokes the OpenAI LLM.
+We create a wrapper for the `create` method of the `AsyncOpenAI` client object.
+This is a generic Activity that invokes the OpenAI LLM.
 
-We set `max_retries=0` on when creating the `AsyncOpenAI` client.
+We set `max_retries=0` when creating the `AsyncOpenAI` client.
 This moves the responsibility for retries from the OpenAI client to Temporal.
 
 In this implementation, we include only the `instructions` and `input` argument, but it could be extended to others.
 
 *File: activities/openai_responses.py*
+
 ```python
 
 from temporalio import activity
@@ -55,14 +59,15 @@ async def create(request: OpenAIResponsesRequest) -> Response:
 
 ## Create the Workflow
 
-In this example, we take the user input and generate a response in haiku format, using the OpenAI Responses activity. The
+In this example, we take the user input and generate a response in haiku format, using the OpenAI Responses Activity. The
 Workflow returns `result.output_text` from the OpenAI `Response`.
 
-As per usual, the activity retry configuration is set here in the Workflow. In this case, a retry policy is not specified 
-so the default retry policy is used (exponential backoff with 1s initial interval, 2.0 backoff coefficient, max interval 
+As per usual, the Activity retry configuration is set here in the Workflow. In this case, a retry policy is not specified
+so the default retry policy is used (exponential backoff with 1s initial interval, 2.0 backoff coefficient, max interval
 100× initial, unlimited attempts, no non-retryable errors).
 
 *File: workflows/hello_world_workflow.py*
+
 ```python
 from temporalio import workflow
 from datetime import timedelta
@@ -93,6 +98,7 @@ Create the process for executing Activities and Workflows.
 We configure the Temporal client with `pydantic_data_converter` so Temporal can serialize/deserialize output of the OpenAI SDK.
 
 *File: worker.py*
+
 ```python
 import asyncio
 
@@ -133,6 +139,7 @@ The starter script submits the workflow to Temporal for execution, then waits fo
 It uses the `pydantic_data_converter` to match the Worker configuration.
 
 *File: start_workflow.py*
+
 ```python
 import asyncio
 
