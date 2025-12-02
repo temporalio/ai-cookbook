@@ -183,6 +183,13 @@ Start the Temporal Dev Server:
 temporal server start-dev
 ```
 
+Open a new terminal where you will run the agent worker. 
+Set an OpenAI API key:
+
+```bash
+export OPENAI_API_KEY=sk...
+```
+
 Run the worker:
 
 ```bash
