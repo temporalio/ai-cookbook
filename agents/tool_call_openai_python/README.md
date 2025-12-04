@@ -17,6 +17,8 @@ Being external API calls, invoking the LLM and invoking the function are each do
 
 This example lays the foundation for the core agentic pattern where the LLM makes the decision on functions/tools to invoke, the agent calls the function/tool(s) and the response from such calls is sent back to the LLM for interpretation.
 
+<img src="_assets/tool-calling-flow.png">
+
 This recipe highlights these key design decisions:
 
 - A generic Activity for invoking an LLM API; that is, instructions and other responses arguments are passed into the Activity making it appropriate for use in a variety of different use cases. Similarly, the result from the responses API call is returned out of the Activity so that it is usable in a variety of different use cases.
