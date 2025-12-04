@@ -122,9 +122,9 @@ class AgentWorkflow:
 
 The function call handler is invoked by the main agentic loop when an LLM has chosen
 a tool. Because the activty implementation is dynamic, the arguments are passed 
-to the activity in a property bag; the `args` variable is appropriately set.
-Otherwise, the activity invocation is the same as any non-dynamic activity 
-invocation passing the name of the activity, the arguments and any activity
+to the Activity in a property bag; the `args` variable is appropriately set.
+Otherwise, the Activity invocation is the same as any non-dynamic Activity 
+invocation passing the name of the Activity, the arguments and any Activity
 configurations.
 
 *File: workflows\agent.py*
@@ -158,8 +158,8 @@ This is a generic Activity that invokes the OpenAI LLM.
 
 We set `max_retries=0` when creating the `AsyncOpenAI` client.
 This moves the responsibility for retries from the OpenAI client to Temporal. This means
-that the activity should interpret any errors coming from the OpenAI API call and return
-the appropriate error type so that the workflow knows if it should retry the activity or not.
+that the Activity should interpret any errors coming from the OpenAI API call and return
+the appropriate error type so that the workflow knows if it should retry the Activity or not.
 
 In this implementation, we allow for the model, instructions and input to be passed in, and also the list of tools.
 
@@ -202,10 +202,10 @@ async def create(request: OpenAIResponsesRequest) -> Response:
 
 ## Create the Activity for the tool invocation
 
-Implement a single tool invocation Activity, as a dynamic activitym (note the 
+Implement a single tool invocation Activity, as a dynamic Activity (note the 
 `@activity.defn(dynamic=True)` annotation) that acts as a broker to the right
-tool function. The name of the activity is drawn from the `activity.info()` and the
-property bag of arguments from the activity payload. The `handler` is the function
+tool function. The name of the Activity is drawn from the `activity.info()` and the
+property bag of arguments from the Activity payload. The `handler` is the function
 that maps to the `tool_name` 
 (see [Create Tool Definitions](#create-tool-definitions) for more details)
 and that function is then called with the supplied arguments.
