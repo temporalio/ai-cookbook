@@ -122,9 +122,9 @@ class AgentWorkflow:
 
 The function call handler is invoked by the main agentic loop when an LLM has chosen
 a tool. Because the activty implementation is dynamic, the arguments are passed 
-to the activity in a property bag; the `args` variable is appropriately set.
-Otherwise, the activity invocation is the same as any non-dynamic activity 
-invocation passing the name of the activity, the arguments and any activity
+to the Activity in a property bag; the `args` variable is appropriately set.
+Otherwise, the Activity invocation is the same as any non-dynamic Activity 
+invocation passing the name of the Activity, the arguments and any Activity
 configurations.
 
 *File: workflows\agent.py*
@@ -157,7 +157,9 @@ We create a wrapper for the `create` method of the `AsyncOpenAI` client object.
 This is a generic Activity that invokes the OpenAI LLM.
 
 We set `max_retries=0` when creating the `AsyncOpenAI` client.
-This moves the responsibility for retries from the OpenAI client to Temporal.
+This moves the responsibility for retries from the OpenAI client to Temporal. This means
+that the Activity should interpret any errors coming from the OpenAI API call and return
+the appropriate error type so that the workflow knows if it should retry the Activity or not.
 
 In this implementation, we allow for the model, instructions and input to be passed in, and also the list of tools.
 
@@ -179,7 +181,10 @@ class OpenAIResponsesRequest:
 
 @activity.defn
 async def create(request: OpenAIResponsesRequest) -> Response:
-    # Temporal best practice: Disable retry logic in OpenAI API client library.
+    # We disable retry logic in OpenAI API client library so that Temporal can handle retries.
+    # In a real setting, you would need to handle any errors coming back from the OpenAI API,
+    # so that Temporal can appropriately retry in the manner that OpenAI API would.
+    # See the `http_retry_enhancement_python` example for inspiration.
     client = AsyncOpenAI(max_retries=0)
 
     try:
@@ -197,10 +202,10 @@ async def create(request: OpenAIResponsesRequest) -> Response:
 
 ## Create the Activity for the tool invocation
 
-Implement a single tool invocation Activity, as a dynamic activitym (note the 
+Implement a single tool invocation Activity, as a dynamic Activity (note the 
 `@activity.defn(dynamic=True)` annotation) that acts as a broker to the right
-tool function. The name of the activity is drawn from the `activity.info()` and the
-property bag of arguments from the activity payload. The `handler` is the function
+tool function. The name of the Activity is drawn from the `activity.info()` and the
+property bag of arguments from the Activity payload. The `handler` is the function
 that maps to the `tool_name` 
 (see [Create Tool Definitions](#create-tool-definitions) for more details)
 and that function is then called with the supplied arguments.
@@ -237,7 +242,9 @@ async def dynamic_tool_activity(args: Sequence[RawValue]) -> dict:
         else:
             call_args = [tool_args]
 
-    result = await handler(*call_args) if inspect.iscoroutinefunction(handler) else handler(*call_args)
+    if not inspect.iscoroutinefunction(handler):
+        raise TypeError("Tool handler must be async (awaitable).")
+    result = await handler(*call_args)
 
     # Optionally log or augment the result
     activity.logger.info(f"Tool '{tool_name}' result: {result}")
@@ -303,19 +310,24 @@ the LLM.
 ```python
 # Uncomment and comment out the tools you want to use
 
+from typing import Any, Awaitable, Callable
+
 # Location and weather related tools
 from .get_location import get_location_info, get_ip_address
 from .get_weather import get_weather_alerts
 
-def get_handler(tool_name: str):
+ToolHandler = Callable[..., Awaitable[Any]]
+
+def get_handler(tool_name: str) -> ToolHandler:
     if tool_name == "get_location_info":
         return get_location_info
     if tool_name == "get_ip_address":
         return get_ip_address
     if tool_name == "get_weather_alerts":
         return get_weather_alerts
+    raise ValueError(f"Unknown tool name: {tool_name}")
 
-def get_tools():
+def get_tools() -> list[dict[str, Any]]:
     return [get_weather.WEATHER_ALERTS_TOOL_OAI, 
             get_location.GET_LOCATION_TOOL_OAI,
             get_location.GET_IP_ADDRESS_TOOL_OAI]
@@ -323,11 +335,12 @@ def get_tools():
 # Random number tool
 # from .random_stuff import get_random_number, RANDOM_NUMBER_TOOL_OAI
 
-# def get_handler(tool_name: str):
+# def get_handler(tool_name: str) -> ToolHandler:
 #     if tool_name == "get_random_number":
 #         return get_random_number
+#     raise ValueError(f"Unknown tool name: {tool_name}")
 
-# def get_tools():
+# def get_tools() -> list[dict[str, Any]]:
 #     return [RANDOM_NUMBER_TOOL_OAI]
 ```
 
