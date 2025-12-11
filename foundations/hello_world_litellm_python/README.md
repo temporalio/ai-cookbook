@@ -228,9 +228,9 @@ This recipe uses Temporal's environment configuration system to connect to Tempo
 
 2. Configure the cloud profile using the Temporal CLI:
    ```bash
-   temporal config set --profile cloud --prop address --value "CLOUD_REMOTE_ADDRESS"
-   temporal config set --profile cloud --prop namespace --value "CLOUD_NAMESPACE"
-   temporal config set --profile cloud --prop api_key --value "CLOUD_API_KEY"
+   temporal config set --profile cloud --prop address --value "<your temporal cloud endpoint>"
+   temporal config set --profile cloud --prop namespace --value "<your temporal cloud namespace>"
+   temporal config set --profile cloud --prop api_key --value "<your temporal cloud api key>"
    ```
 
    For TLS certificate authentication instead of API key, refer to the [Temporal environment configuration documentation](https://docs.temporal.io/develop/environment-configuration) for details.
