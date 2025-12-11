@@ -1,6 +1,5 @@
 import asyncio
 from datetime import timedelta
-from pathlib import Path
 
 from temporalio.client import Client
 from temporalio.worker import Worker
@@ -14,15 +13,10 @@ from activities.tools import get_weather, calculate_circle_area
 
 async def worker_main():
     # Use the plugin to configure Temporal for use with OpenAI Agents SDK
-    config_dir = Path(__file__).parent.parent.parent
-    config_file = config_dir / "config.toml"
-    if not config_file.exists():
-        config_file = config_dir / "config.toml.example"
-    connect_config = ClientConfig.load_client_connect_config(
-        config_file=str(config_file)
-    )
+    config = ClientConfig.load_client_connect_config()
+    config.setdefault("target_host", "localhost:7233")
     client = await Client.connect(
-        **connect_config,
+        **config,
         plugins=[
             OpenAIAgentsPlugin(
                 model_params=ModelActivityParameters(

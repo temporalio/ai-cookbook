@@ -14,15 +14,10 @@ from workflows.clean_data_workflow import CleanDataWorkflow
 
 async def main():
     # Connect to Temporal server with matching data converter
-    config_dir = Path(__file__).parent.parent.parent
-    config_file = config_dir / "config.toml"
-    if not config_file.exists():
-        config_file = config_dir / "config.toml.example"
-    connect_config = ClientConfig.load_client_connect_config(
-        config_file=str(config_file)
-    )
+    config = ClientConfig.load_client_connect_config()
+    config.setdefault("target_host", "localhost:7233")
     client = await Client.connect(
-        **connect_config,
+        **config,
         data_converter=pydantic_data_converter,
     )
 
