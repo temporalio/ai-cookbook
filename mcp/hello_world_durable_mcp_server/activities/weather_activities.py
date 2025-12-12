@@ -1,5 +1,3 @@
-# weather_activities.py
-
 from typing import Any
 from temporalio import activity
 import httpx
