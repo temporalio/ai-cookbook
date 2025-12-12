@@ -79,11 +79,11 @@ async def get_alerts(state: str) -> str:
 
 @mcp.tool
 async def get_forecast(latitude: float, longitude: float) -> str:
-    """Get weather forecast for a location.
+    """Get weather forecast for a US location.
 
     Args:
-        latitude: Latitude of the location
-        longitude: Longitude of the location
+        latitude: Latitude of the location (must be within the US)
+        longitude: Longitude of the location (must be within the US)
     """
     # The business logic has been moved into the Temporal Workflow, the MCP tool kicks off the Workflow
     client = await get_temporal_client()
@@ -178,11 +178,11 @@ The `GetForecast` workflow demonstrates a multi-step operation: it first fetches
 class GetForecast:
     @workflow.run
     async def get_forecast(self, latitude: float, longitude: float) -> str:
-        """Get weather forecast for a location.
+        """Get weather forecast for a US location.
 
         Args:
-            latitude: Latitude of the location
-            longitude: Longitude of the location
+            latitude: Latitude of the location (must be within the US)
+            longitude: Longitude of the location (must be within the US)
         """
         # First get the forecast grid endpoint
         points_url = f"{NWS_API_BASE}/points/{latitude},{longitude}"
@@ -352,6 +352,9 @@ This recipe uses Temporal's environment configuration system to connect to Tempo
 
 Once configured, you should see the tool appear under the slider icon underneath the Claude Desktop chat input box.
 
-You can now ask Claude something like `What is the weather like in San Francisco, CA?`. Claude Desktop will understand that it needs to use the `get_forecast` tool in the Weather MCP server that you just configured. 
+You can now ask Claude something like `What is the weather like in San Francisco, CA?`. Claude Desktop will understand that it needs to use the `get_forecast` tool in the Weather MCP server that you just configured.
+
+> [!NOTE]
+> The National Weather Service API only supports US locations. Asking about weather in non-US locations (e.g., "What is the weather in London?") will result in a 404 error from the API. 
 
 After tool execution, Claude Desktop will send the result over to the LLM (with other context) for human formating, and then returns that result to the user. You can see these and other MCP-related actions in the `mcp_server.log`.
