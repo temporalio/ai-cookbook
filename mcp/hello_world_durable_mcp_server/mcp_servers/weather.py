@@ -1,4 +1,5 @@
 from temporalio.client import Client
+from temporalio.envconfig import ClientConfig
 from fastmcp import FastMCP
 
 # Initialize FastMCP server
@@ -10,7 +11,9 @@ temporal_client = None
 async def get_temporal_client():
     global temporal_client
     if not temporal_client:
-        temporal_client = await Client.connect("localhost:7233")
+        config = ClientConfig.load_client_connect_config()
+        config.setdefault("target_host", "localhost:7233")
+        temporal_client = await Client.connect(**config)
     return temporal_client
 
 @mcp.tool

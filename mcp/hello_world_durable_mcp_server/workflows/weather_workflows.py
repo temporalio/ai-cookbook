@@ -51,9 +51,6 @@ class GetAlerts:
         if not data or "features" not in data:
             return "Unable to fetch alerts or no alerts found."
 
-        if not data["features"]:
-            return "No active alerts for this state."
-
         alerts = [format_alert(feature) for feature in data["features"]]
         return "\n---\n".join(alerts)
 

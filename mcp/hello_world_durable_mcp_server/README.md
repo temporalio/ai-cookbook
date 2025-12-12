@@ -55,7 +55,9 @@ temporal_client = None
 async def get_temporal_client():
     global temporal_client
     if not temporal_client:
-        temporal_client = await Client.connect("localhost:7233")
+        config = ClientConfig.load_client_connect_config()
+        config.setdefault("target_host", "localhost:7233")
+        temporal_client = await Client.connect(**config)
     return temporal_client
 
 @mcp.tool
@@ -262,8 +264,12 @@ from workflows.weather_workflows import GetAlerts, GetForecast
 from activities.weather_activities import make_nws_request
 
 async def main():
-    # Connect to Temporal server (change address if using Temporal Cloud)
-    client = await Client.connect("localhost:7233")
+    config = ClientConfig.load_client_connect_config()
+    config.setdefault("target_host", "localhost:7233")
+    client = await Client.connect(
+        **config,
+        data_converter=pydantic_data_converter,
+    )
 
     # Register both Workflows and the Activity 
     worker = Worker(
@@ -289,22 +295,40 @@ For this example, we are using Claude Desktop as the MCP Client. To use this MCP
 ```json
 {
     "mcpServers": {
-      "weather": {
+        "weather": {
         "command": "uv",
         "args": [
-          "--directory",
-          "<full path to the directory containing the weather.py>",
-          "run",
-          "mcp_servers/weather.py"
+            "--directory",
+            "<full path to the directory containing the weather.py>",
+            "run",
+            "mcp_servers/weather.py"
         ]
-      }
+        }
     }
-  }
+}
 ```
 
 Replace `<full path to the directory containing the weather.py>` with the absolute path to the `hello_world_durable_mcp_server` directory.
 
-## Running the app
+## Configuration
+
+This recipe uses Temporal's environment configuration system to connect to Temporal. By default, it connects to a local Temporal server. To use Temporal Cloud:
+
+1. Set the `TEMPORAL_PROFILE` environment variable to use the cloud profile:
+   ```bash
+   export TEMPORAL_PROFILE=cloud
+   ```
+
+2. Configure the cloud profile using the Temporal CLI:
+   ```bash
+   temporal config set --profile cloud --prop address --value "<your temporal cloud endpoint>"
+   temporal config set --profile cloud --prop namespace --value "<your temporal cloud namespace>"
+   temporal config set --profile cloud --prop api_key --value "<your temporal cloud api key>"
+   ```
+
+   For TLS certificate authentication instead of API key, refer to the [Temporal environment configuration documentation](https://docs.temporal.io/develop/environment-configuration) for details.
+
+## Running the MCP Server
 
 1. Install dependencies:
    ```bash
