@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "weather": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "<full path to the directory containing the weather.py>",
+        "run",
+        "weather.py"
+      ]
+    }
+  }
+}
