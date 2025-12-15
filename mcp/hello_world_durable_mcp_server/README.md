@@ -34,7 +34,7 @@ This example includes the following components:
 - The [Workflows](#create-the-workflows) (weather_workflows.py) that orchestrate the multi-step weather operations
 - The [Activity](#create-the-activity) (weather_activities.py) for making external API calls to the National Weather Service
 - The [Worker](#create-the-worker) (worker.py) (that manages the Workflows and Activities)
-- [Config for Claude Desktop](#configure-claude) (claude_desktop_config.json) for connecting the MCP server to Claude Desktop
+- [Config for Claude Desktop](#configure-claude-desktop) (claude_desktop_config.json) for connecting the MCP server to Claude Desktop
 
 ## Create the MCP Server
 
