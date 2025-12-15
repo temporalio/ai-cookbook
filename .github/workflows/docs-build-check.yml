@@ -12,6 +12,9 @@ concurrency:
   group: docs-build-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   build-docs:
     name: Verify Documentation Build
