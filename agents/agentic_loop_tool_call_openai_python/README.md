@@ -1,5 +1,5 @@
 <!--
-description: A basic agentic loop that invokes a dyanamic set of tools. 
+description: A basic agentic loop that invokes a dynamic set of tools. 
 tags: [agents, python]
 priority: 775
 -->
@@ -21,7 +21,7 @@ Being external API calls, invoking the LLM and invoking any functions/tools are 
 This recipe highlights the following key design decisions:
 - We use dynamic Activities to allow the agent to be loosely coupled from specific
 tools. This sample isolates the tools in the `tools` directory; changing the tools
-requires NO changes to the agent implemention.
+requires NO changes to the agent implementation.
 - Because there is an agentic loop, each LLM invocation is passed the accumulated 
 *conversation history*, that includes the initial user input as well as LLM and tool 
 calls.
@@ -59,7 +59,7 @@ the initial user input and any previous LLM responses and tool outputs.
 demonstrates a most simple UX where the user provides single shot input. Note
 however that the agent is not single shot.
 
-*File:workflows/agent.py*
+*File: workflows/agent.py*
 
 ```python
 from temporalio import workflow
@@ -127,7 +127,7 @@ Otherwise, the Activity invocation is the same as any non-dynamic Activity
 invocation passing the name of the Activity, the arguments and any Activity
 configurations.
 
-*File: workflows\agent.py*
+*File: workflows/agent.py*
 
 ```python
     async def _handle_function_call(self, item, result, input_list):
@@ -256,9 +256,9 @@ async def dynamic_tool_activity(args: Sequence[RawValue]) -> dict:
 The `oai_responses_tool_from_model` function accepts a tool name and description, as well as a list of argument name/description pairs and returns json that is in the format expected for tool definitions in the OpenAI responses API.
 
 > [!WARNING]
-> The API used to generate the tools json is an interal function from the [Open AI API](https://github.com/openai/openai-python) and may therefore change in the future. There currently is no public API to generate the tool definition from a Pydantic model or a function signature.
+> The API used to generate the tools json is an internal function from the [Open AI API](https://github.com/openai/openai-python) and may therefore change in the future. There currently is no public API to generate the tool definition from a Pydantic model or a function signature.
 
-*File:helpers/tool_helpers.py*
+*File: helpers/tool_helpers.py*
 ```python
 from openai.lib._pydantic import to_strict_json_schema  # private API; may change
 # there currently is no public API to generate the tool definition from a Pydantic model
@@ -306,7 +306,7 @@ updating the `get_tools` and `get_handler` methods).
 the LLM.
 - The `get_handler` method captures the mapping from tool name to tool function
 
-*File: tools/__init__py*
+*File: tools/__init__.py*
 ```python
 # Uncomment and comment out the tools you want to use
 
@@ -344,7 +344,7 @@ def get_tools() -> list[dict[str, Any]]:
 #     return [RANDOM_NUMBER_TOOL_OAI]
 ```
 
-The tool descriptions and functions are defined in `tools/get_location.,py`, 
+The tool descriptions and functions are defined in `tools/get_location.py`, 
 `tools/get_weather.py` and `tools/random_stuff.py` files. Each of these files contains:
 - data structures for function arguments
 - tool definitions (in `json` form)
