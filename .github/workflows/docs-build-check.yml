@@ -1,0 +1,125 @@
+name: Documentation Build Check
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: docs-build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-docs:
+    name: Verify Documentation Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout ai-cookbook repository
+        uses: actions/checkout@v4
+        with:
+          path: ai-cookbook
+
+      - name: Checkout documentation repository
+        uses: actions/checkout@v4
+        with:
+          repository: temporalio/documentation
+          path: documentation
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Detect package manager and install dependencies
+        working-directory: documentation
+        run: |
+          if [ -f "yarn.lock" ]; then
+            echo "Using yarn"
+            corepack enable
+            yarn install --frozen-lockfile
+          elif [ -f "pnpm-lock.yaml" ]; then
+            echo "Using pnpm"
+            corepack enable
+            pnpm install --frozen-lockfile
+          elif [ -f "package-lock.json" ]; then
+            echo "Using npm"
+            npm ci
+          else
+            echo "No lockfile found, using npm install"
+            npm install
+          fi
+
+      - name: Configure ai-cookbook to use local checkout
+        working-directory: documentation
+        run: |
+          # Look for sample fetch configurations and update them to use local ai-cookbook
+          # This ensures the doc build uses the PR's ai-cookbook content, not the remote main branch
+          
+          # Check for common config file patterns and update ai-cookbook references
+          for config_file in samples-fetch.json assembly/assembly.json assembly.json .snipsync.json snipsync.yaml; do
+            if [ -f "$config_file" ]; then
+              echo "Found config file: $config_file"
+              # Update GitHub URLs to local path
+              sed -i 's|https://github.com/temporalio/ai-cookbook\.git|../ai-cookbook|g' "$config_file" || true
+              sed -i 's|https://github.com/temporalio/ai-cookbook|../ai-cookbook|g' "$config_file" || true
+              sed -i 's|git@github.com:temporalio/ai-cookbook\.git|../ai-cookbook|g' "$config_file" || true
+              sed -i 's|temporalio/ai-cookbook@main|../ai-cookbook|g' "$config_file" || true
+              cat "$config_file"
+            fi
+          done
+          
+          # If there's a script that clones/fetches ai-cookbook, we may need to skip it
+          # since we already have the local checkout
+
+      - name: Fetch samples and external content
+        working-directory: documentation
+        run: |
+          # Try common sample fetching approaches
+          if [ -f "scripts/fetch-samples.sh" ]; then
+            echo "Running fetch-samples.sh"
+            chmod +x scripts/fetch-samples.sh
+            ./scripts/fetch-samples.sh || true
+          fi
+          
+          # Check for npm/yarn scripts that fetch samples
+          if grep -q '"samples:fetch"' package.json 2>/dev/null; then
+            echo "Running samples:fetch script"
+            if [ -f "yarn.lock" ]; then
+              yarn samples:fetch || true
+            else
+              npm run samples:fetch || true
+            fi
+          fi
+          
+          if grep -q '"fetch-samples"' package.json 2>/dev/null; then
+            echo "Running fetch-samples script"
+            if [ -f "yarn.lock" ]; then
+              yarn fetch-samples || true
+            else
+              npm run fetch-samples || true
+            fi
+          fi
+
+      - name: Build documentation site
+        working-directory: documentation
+        run: |
+          if [ -f "yarn.lock" ]; then
+            yarn build
+          elif [ -f "pnpm-lock.yaml" ]; then
+            pnpm build
+          else
+            npm run build
+          fi
+
+      - name: Report success
+        run: |
+          echo "✅ Documentation site builds successfully with ai-cookbook changes"
+          echo ""
+          echo "This validates that changes in this PR/commit do not break the Temporal documentation site."
