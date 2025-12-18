@@ -1,5 +1,5 @@
 from temporalio import activity
-from anthropic import Anthropic
+from anthropic import AsyncAnthropic
 from anthropic.types import Message
 from dataclasses import dataclass
 from typing import Any
@@ -15,19 +15,13 @@ class ClaudeResponsesRequest:
 
 @activity.defn
 async def create(request: ClaudeResponsesRequest) -> Message:
-    """
-    Activity that calls Claude's Messages API with tools.
-    
-    Claude's API structure differs from OpenAI:
-    - Uses 'system' parameter instead of 'instructions'
-    - Returns Message object with content blocks
-    - Tool calls are embedded in content blocks with type 'tool_use'
-    """
     # We disable retry logic in Anthropic API client library so that Temporal can handle retries.
-    client = Anthropic()
+    # In a real setting, you would need to handle any errors coming back from the Anthropic API,
+    # so that Temporal can appropriately retry in the manner that Anthropic API would.
+    client = AsyncAnthropic(max_retries=0)
 
     try:
-        resp = client.messages.create(
+        resp = await client.messages.create(
             model=request.model,
             system=request.system,
             messages=request.messages,
@@ -36,6 +30,5 @@ async def create(request: ClaudeResponsesRequest) -> Message:
         )
         return resp
     finally:
-        # Anthropic client doesn't require explicit closing like AsyncOpenAI
-        pass
+        await client.close()
 

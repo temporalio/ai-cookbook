@@ -11,21 +11,15 @@ with workflow.unsafe.imports_passed_through():
 class AgentWorkflow:
     @workflow.run
     async def run(self, input: str) -> str:
-        """
-        Agentic loop using Claude (Anthropic) API.
-        
-        Key differences from OpenAI:
-        - Claude uses 'messages' array with 'role' and 'content'
-        - Tool calls come back as content blocks with type 'tool_use'
-        - Tool results are sent back as messages with 'tool_result' content blocks
-        """
         
         # Initialize messages list with user input
         messages = [{"role": "user", "content": input}]
+        print(f"\n{'='*80}")
+        print(f"[User] {input}")
+        print(f"{'='*80}\n")
 
         # The agentic loop
         while True:
-            print(80 * "=")
                 
             # Consult Claude
             result = await workflow.execute_activity(
@@ -48,28 +42,33 @@ class AgentWorkflow:
                 # First, add the assistant's response to messages
                 # Convert content blocks to dictionaries for serialization
                 assistant_content = []
+                print(f"[Agent (Assistant)]")
                 for block in result.content:
                     if block.type == "text":
+                        # assistant's text response
+                        print(f"  Text: {block.text}")
                         assistant_content.append({"type": "text", "text": block.text})
                     elif block.type == "tool_use":
+                        print(f"  Tool use: {block.name}({block.input})")
                         assistant_content.append({
                             "type": "tool_use",
                             "id": block.id,
                             "name": block.name,
                             "input": block.input
                         })
+                print()
                 
                 messages.append({"role": "assistant", "content": assistant_content})
                 
                 # Execute all tool calls and collect results
                 tool_results = []
+                print(f"[Tool Execution]")
                 for block in tool_use_blocks:
                     print(f"[Agent] Tool call: {block.name}({block.input})")
                     
                     # Execute the tool
                     tool_result = await self._execute_tool(block.name, block.input)
-                    
-                    print(f"[Agent] Tool result: {tool_result}")
+                    print(f"  {block.name} -> {tool_result}")
                     
                     # Add tool result in Claude's expected format
                     tool_results.append({
@@ -79,13 +78,19 @@ class AgentWorkflow:
                     })
                 
                 # Add tool results as a user message
+                print(f"\n[User - Tool Results]")
+                for result in tool_results:
+                    print(f"  Tool result for {result['tool_use_id']}: {result['content'][:100]}...")
+                print(f"{'='*80}\n")
                 messages.append({"role": "user", "content": tool_results})
             else:
                 # No tool calls - extract the text response and return
                 text_blocks = [block for block in result.content if block.type == "text"]
                 if text_blocks:
                     response_text = text_blocks[0].text
-                    print(f"[Agent] Final response: {response_text}")
+                    print(f"[Assistant - Final]")
+                    print(f"  {response_text}")
+                    print(f"{'='*80}\n")
                     return response_text
                 else:
                     return "No text response from Claude"

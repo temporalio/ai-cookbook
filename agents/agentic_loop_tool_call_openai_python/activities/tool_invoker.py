@@ -9,7 +9,7 @@ from pydantic import BaseModel
 async def dynamic_tool_activity(args: Sequence[RawValue]) -> dict:
     from tools import get_handler
 
-    # the name of the tool to execute - this is passed in via the execute_activity call in the workflow
+    # the name of the tool to execute - this is passed in via the execute_activity call in the Workflow
     tool_name = activity.info().activity_type 
     tool_args = activity.payload_converter().from_payload(args[0].payload, dict)
     activity.logger.info(f"Running dynamic tool '{tool_name}' with args: {tool_args}")

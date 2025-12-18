@@ -1,5 +1,3 @@
-# Uncomment and comment out the tools you want to use
-
 from typing import Any, Awaitable, Callable
 
 # Location and weather related tools
