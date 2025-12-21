@@ -22,11 +22,13 @@ async def notify_approval_needed(request: ApprovalRequest) -> None:
     )
     
     # In a real implementation, you would call notification services here
+    risk_indicator = "⚠️  RISKY ACTION" if request.proposed_action.risky_action else "✓ Safe Action"
     print(f"\n{'='*60}")
     print(f"APPROVAL REQUIRED")
     print(f"{'='*60}")
     print(f"Workflow ID: {workflow_id}")
     print(f"Request ID: {request.request_id}")
+    print(f"Risk Level: {risk_indicator}")
     print(f"Action: {request.proposed_action.action_type}")
     print(f"Description: {request.proposed_action.description}")
     print(f"Reasoning: {request.proposed_action.reasoning}")

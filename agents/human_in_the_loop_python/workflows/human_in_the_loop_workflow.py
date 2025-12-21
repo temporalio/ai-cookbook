@@ -3,9 +3,9 @@ from datetime import timedelta
 from typing import Optional
 import asyncio
 
-##with workflow.unsafe.imports_passed_through():
-from models.models import WorkflowInput, ProposedAction, ApprovalRequest, ApprovalDecision
-from activities import openai_responses, execute_action, notify_approval_needed
+with workflow.unsafe.imports_passed_through():
+    from models.models import WorkflowInput, ProposedAction, ApprovalRequest, ApprovalDecision
+    from activities import openai_responses, execute_action, notify_approval_needed
 
 
 @workflow.defn
@@ -29,37 +29,53 @@ class HumanInTheLoopWorkflow:
         # Step 1: AI analyzes the request and proposes an action
         proposed_action = await self._analyze_and_propose_action(input.user_request)
         
+        risk_status = "RISKY" if proposed_action.risky_action else "SAFE"
         workflow.logger.info(
-            f"AI proposed action: {proposed_action.action_type}",
+            f"AI proposed action: {proposed_action.action_type} (Risk level: {risk_status})",
             extra={"proposed_action": proposed_action.model_dump()}
         )
 
-        # Step 2: Request human approval
-        approval_result = await self._request_approval(
-            proposed_action, 
-            input.user_request,
-            timeout_seconds=input.approval_timeout_seconds
-        )
+        # Step 2: Request human approval only if action is risky
+        if proposed_action.risky_action:
+            workflow.logger.info("Action is risky, requesting human approval")
+            approval_result = await self._request_approval(
+                proposed_action, 
+                input.user_request,
+                timeout_seconds=input.approval_timeout_seconds
+            )
 
-        # Step 3: Handle the approval result
-        if approval_result == "approved":
-            workflow.logger.info("Action approved, proceeding with execution")
+            # Step 3: Handle the approval result
+            if approval_result == "approved":
+                workflow.logger.info("Action approved, proceeding with execution")
+                result = await workflow.execute_activity(
+                    execute_action.execute_action,
+                    proposed_action,
+                    start_to_close_timeout=timedelta(seconds=60),
+                )
+                return f"Action completed successfully: {result}"
+            
+            elif approval_result == "rejected":
+                workflow.logger.info("Action rejected by human reviewer")
+                reviewer_notes = self.current_decision.reviewer_notes or 'None provided'
+                return f"Action rejected. Reviewer notes: {reviewer_notes}"
+            
+            else:  # timeout
+                workflow.logger.warning("Approval request timed out")
+                timeout_msg = f"Action cancelled: approval request timed out after {input.approval_timeout_seconds} seconds"
+                return timeout_msg
+        else:
+            # Auto-approve non-risky actions
+            workflow.logger.info("Action is safe, auto-approving and proceeding with execution")
             result = await workflow.execute_activity(
                 execute_action.execute_action,
                 proposed_action,
                 start_to_close_timeout=timedelta(seconds=60),
             )
-            return f"Action completed successfully: {result}"
-        
-        elif approval_result == "rejected":
-            workflow.logger.info("Action rejected by human reviewer")
-            reviewer_notes = self.current_decision.reviewer_notes or 'None provided'
-            return f"Action rejected. Reviewer notes: {reviewer_notes}"
-        
-        else:  # timeout
-            workflow.logger.warning("Approval request timed out")
-            timeout_msg = f"Action cancelled: approval request timed out after {input.approval_timeout_seconds} seconds"
-            return timeout_msg
+            print(f"\n{'='*60}")
+            print(f"Action completed successfully (auto-approved)")
+            print(f"{'='*60}\n")
+
+            return f"Action completed successfully (auto-approved): {result}"
 
     async def _analyze_and_propose_action(self, user_request: str) -> ProposedAction:
         """Use LLM to analyze request and propose an action."""
@@ -69,6 +85,15 @@ For each request, you should:
 1. Determine what action needs to be taken
 2. Provide a clear description of the action
 3. Explain your reasoning for why this action addresses the request
+4. Assess whether this is a risky action that requires human approval
+
+Consider an action risky if it:
+- Could cause data loss or corruption
+- Could affect production systems or critical infrastructure
+- Could have financial or legal implications
+- Could impact user experience or system availability
+- Involves deleting, modifying, or overwriting important data
+- Could expose sensitive information or security vulnerabilities
 
 Be thorough and clear in your analysis.
 
@@ -77,7 +102,8 @@ Respond with a JSON string in this structure:
 {
   "action_type": "A short name for the action (e.g., \\"delete_test_data\\")",
   "description": "A clear description of what the action will do",
-  "reasoning": "Your explanation for why this action addresses the request"
+  "reasoning": "Your explanation for why this action addresses the request",
+  "risky_action": true or false indicating whether this action is considered risky
 }
 """
 

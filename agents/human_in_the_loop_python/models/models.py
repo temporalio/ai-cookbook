@@ -12,6 +12,7 @@ class ProposedAction(BaseModel):
     action_type: str
     description: str
     reasoning: str
+    risky_action: bool
 
 
 class ApprovalRequest(BaseModel):

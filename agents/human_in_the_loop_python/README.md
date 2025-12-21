@@ -6,8 +6,8 @@ This example demonstrates how to build an AI agent that requires human approval;
 
 The workflow implements the agent flow:
 1. Uses an LLM to analyze a user request and propose an action. 
-2. Pauses and waits for human approval via Temporal Signal
-3. Executes the action if approved, or cancels if rejected/timed out
+2. If the proposed action is deemed risky, pauses and waits for human approval via Temporal Signal
+3. Executes the action if auto-approved (if not risky) or human approved, or cancels if rejected/timed out
 
 Key features:
 - **Durable waiting**: Can wait for approval for hours, days or indefinitely; while waiting, the agent consumes no resources.
@@ -93,6 +93,21 @@ To test timeout behavior, simply don't send any approval signal. After 5 minutes
 
 ## Key Patterns
 
+We use a Temporal signal to inject information from the human into the waiting workflow. The signal is delivered from some UI (in this case the `send_approval.py` script) that uses a Temporal client to deliver the data.
+
+<img src="_assets/temporal_signal_handling.png">
+
+Within the agent implementation there are three main elements to the solution.
+
+### Local state within the workflow implementation
+This state will be written to via the signal handler and will be part of the condition that defines the wait point.
+```python
+@workflow.defn
+class HumanInTheLoopWorkflow:
+    def __init__(self):
+        self.current_decision: Optional[ApprovalDecision] = None
+        self.pending_request_id: Optional[str] = None
+```
 ### Signal Handler
 The workflow uses a signal handler to receive approval decisions asynchronously:
 ```python

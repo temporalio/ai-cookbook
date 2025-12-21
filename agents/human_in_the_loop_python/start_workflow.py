@@ -23,7 +23,7 @@ async def main():
     
     print(f"Starting workflow with ID: {workflow_id}")
     print(f"User request: {user_request}")
-    print("\nWorkflow will pause for approval. Watch the worker output for instructions.\n")
+    print("\nWorkflow may pause for approval. Watch the worker output for instructions.\n")
 
     # Submit the workflow for execution
     workflow_input = WorkflowInput(
