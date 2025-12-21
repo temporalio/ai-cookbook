@@ -5,6 +5,7 @@ import asyncio
 
 with workflow.unsafe.imports_passed_through():
     from models.models import WorkflowInput, ProposedAction, ApprovalRequest, ApprovalDecision
+    from models.agent_instructions import SYSTEM_INSTRUCTIONS
     from activities import openai_responses, execute_action, notify_approval_needed
 
 
@@ -79,39 +80,11 @@ class HumanInTheLoopWorkflow:
 
     async def _analyze_and_propose_action(self, user_request: str) -> ProposedAction:
         """Use LLM to analyze request and propose an action."""
-        system_instructions = """
-You are an AI assistant that analyzes user requests and proposes actions.
-For each request, you should:
-1. Determine what action needs to be taken
-2. Provide a clear description of the action
-3. Explain your reasoning for why this action addresses the request
-4. Assess whether this is a risky action that requires human approval
-
-Consider an action risky if it:
-- Could cause data loss or corruption
-- Could affect production systems or critical infrastructure
-- Could have financial or legal implications
-- Could impact user experience or system availability
-- Involves deleting, modifying, or overwriting important data
-- Could expose sensitive information or security vulnerabilities
-
-Be thorough and clear in your analysis.
-
-Respond with a JSON string in this structure:
-
-{
-  "action_type": "A short name for the action (e.g., \\"delete_test_data\\")",
-  "description": "A clear description of what the action will do",
-  "reasoning": "Your explanation for why this action addresses the request",
-  "risky_action": true or false indicating whether this action is considered risky
-}
-"""
-
         result = await workflow.execute_activity(
             openai_responses.create,
             openai_responses.OpenAIResponsesRequest(
                 model="gpt-4o-mini",
-                instructions=system_instructions,
+                instructions=SYSTEM_INSTRUCTIONS,
                 input=user_request,
             ),
             start_to_close_timeout=timedelta(seconds=30),
