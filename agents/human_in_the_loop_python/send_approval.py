@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 from temporalio.client import Client
 from temporalio.contrib.pydantic import pydantic_data_converter
-from models.approval import ApprovalDecision
+from models.models import ApprovalDecision
 
 
 async def main():

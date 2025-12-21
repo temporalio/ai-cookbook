@@ -1,5 +1,5 @@
 from temporalio import activity
-from models.approval import ProposedAction
+from models.models import ProposedAction
 import asyncio
 
 @activity.defn

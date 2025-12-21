@@ -1,9 +1,11 @@
 from temporalio import activity
-from models.approval import ApprovalRequest
+from models.models import ApprovalRequest
 
 @activity.defn
 async def notify_approval_needed(request: ApprovalRequest) -> None:
     """Notify external systems that human approval is needed.
+
+    In this sample, the notification comes in the form of messages printed in the terminal running the worker.
     
     In a real system, this would send notifications via:
     - Email

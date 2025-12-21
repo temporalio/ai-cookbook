@@ -6,6 +6,7 @@ from temporalio.client import Client
 
 from workflows.human_in_the_loop_workflow import HumanInTheLoopWorkflow
 from temporalio.contrib.pydantic import pydantic_data_converter
+from models.models import WorkflowInput
 
 
 async def main():
@@ -25,9 +26,13 @@ async def main():
     print("\nWorkflow will pause for approval. Watch the worker output for instructions.\n")
 
     # Submit the workflow for execution
+    workflow_input = WorkflowInput(
+        user_request=user_request,
+        approval_timeout_seconds=300
+    )
     result = await client.execute_workflow(
         HumanInTheLoopWorkflow.run,
-        args=[user_request, 300],  # user_request and approval timeout in seconds
+        args=[workflow_input],
         id=workflow_id,
         task_queue="human-in-the-loop-task-queue",
     )

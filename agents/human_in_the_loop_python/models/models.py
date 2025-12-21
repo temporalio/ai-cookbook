@@ -1,10 +1,18 @@
 from pydantic import BaseModel
 
+
+class WorkflowInput(BaseModel):
+    """Input structure for the HumanInTheLoopWorkflow."""
+    user_request: str
+    approval_timeout_seconds: int = 300
+
+
 class ProposedAction(BaseModel):
     """Action proposed by the AI agent for human review."""
     action_type: str
     description: str
     reasoning: str
+
 
 class ApprovalRequest(BaseModel):
     """Request sent to human reviewer."""
@@ -13,9 +21,11 @@ class ApprovalRequest(BaseModel):
     context: str
     requested_at: str
 
+
 class ApprovalDecision(BaseModel):
     """Decision received from human reviewer."""
     request_id: str
     approved: bool
     reviewer_notes: str | None = None
     decided_at: str
+

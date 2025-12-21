@@ -1,18 +1,18 @@
 # Human-in-the-Loop AI Agent
 
-This example demonstrates how to build an AI agent that requires human approval before executing certain actions using Temporal Signals.
+This example demonstrates how to build an AI agent that requires human approval; we use Temporal Signals to bring that user input into the agent.
 
 ## Overview
 
-The workflow:
-1. Uses an LLM to analyze a user request and propose an action
+The workflow implements the agent flow:
+1. Uses an LLM to analyze a user request and propose an action. 
 2. Pauses and waits for human approval via Temporal Signal
 3. Executes the action if approved, or cancels if rejected/timed out
 
 Key features:
-- **Durable waiting**: Can wait hours or days for approval without consuming resources
+- **Durable waiting**: Can wait for approval for hours, days or indefinitely; while waiting, the agent consumes no resources.
 - **Signal-based approval**: External systems send approval decisions via Temporal Signals
-- **Timeout handling**: Automatically handles cases where approval is not received
+- **Timeout handling**: Automatically handles cases where approval is not received within an alloted timeframe.
 - **Complete audit trail**: All decisions are logged for compliance
 
 ## Prerequisites
@@ -58,7 +58,7 @@ The workflow will start, analyze the request, and pause for approval. Watch the 
 
 ### Send Approval Decision
 
-The worker output will show the workflow ID and request ID. Use the `send_approval` script to approve or reject:
+The worker output will show the workflow ID and request ID. In another terminal, run the `send_approval` script to approve or reject:
 
 **To approve:**
 ```bash
@@ -76,11 +76,15 @@ To test timeout behavior, simply don't send any approval signal. After 5 minutes
 
 ## Architecture
 
-- **Models** (`models/approval.py`): Data structures for approval requests and decisions
+- **Models** (`models/models.py`): Data structures for workflow input, approval requests and decisions
 - **Activities**:
   - `openai_responses.py`: Generic LLM invocation activity
   - `execute_action.py`: Executes approved actions
+    - The "execution" of approved actions in this sample simply logs messages.
+    - In a realistic scenario, a set of tools will have been provided to the LLM and the result might be a recommended tool call. In this case, if approved, the agent would invoke the tool via an activity. See the [agentic loop with tool calling](https://docs.temporal.io/ai-cookbook/agentic-loop-tool-call-openai-python) for guidance on how to use dynamic activities, allowing the tools to be loosely coupled from the agent implementation.
   - `notify_approval_needed.py`: Notifies external systems of approval requests
+    - In this sample the notification comes in the form of messages printed in the terminal running the worker.
+    - In a realistic scenario, the notification activity may send emails, deliver messages to slack, etc.
 - **Workflow** (`workflows/human_in_the_loop_workflow.py`): Orchestrates the approval process
 - **Scripts**:
   - `worker.py`: Runs the Temporal worker
@@ -108,7 +112,7 @@ await workflow.wait_condition(
 ```
 
 ### Request Validation
-Each approval request has a unique ID to prevent confusion from stale or duplicate approvals.
+Each approval request has a unique ID to prevent confusion from stale or duplicate approvals. This request id can also be thought of as a proxy for authorization, ensuring that only the individual receiving the approval notification can provide the approval.
 
 ## Extensions
 
