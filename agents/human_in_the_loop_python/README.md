@@ -115,6 +115,7 @@ The workflow uses a signal handler to receive approval decisions asynchronously:
 async def approval_decision(self, decision: ApprovalDecision):
     if decision.request_id == self.pending_request_id:
         self.approval_decision = decision
+    ...
 ```
 
 ### Waiting with Timeout
