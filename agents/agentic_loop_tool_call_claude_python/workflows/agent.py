@@ -77,7 +77,9 @@ class AgentWorkflow:
                         "content": str(tool_result)
                     })
                 
-                # Add tool results as a user message
+                # Add tool results as a user message. Claude has only two message roles: user and assistant,
+                # and the user message role is used to send tool results back to Claude; in this case the content
+                # block includes the tool result.
                 print(f"\n[User - Tool Results]")
                 for result in tool_results:
                     print(f"  Tool result for {result['tool_use_id']}: {result['content'][:100]}...")

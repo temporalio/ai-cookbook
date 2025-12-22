@@ -36,11 +36,7 @@ def claude_tool_from_model(name: str, description: str, model: type[BaseModel] |
     return {
         "name": name,
         "description": description,
-        "input_schema": {
-            "type": "object",
-            "properties": schema.get("properties", {}),
-            "required": schema.get("required", [])
-        }
+        "input_schema": schema
     }
 
 HELPFUL_AGENT_SYSTEM_INSTRUCTIONS = """
