@@ -1,4 +1,10 @@
 import asyncio
+import os
+
+from braintrust import init_logger
+from braintrust.contrib.temporal import BraintrustPlugin
+
+init_logger(project=os.environ.get("BRAINTRUST_PROJECT", "deep-research"))
 
 from temporalio.client import Client
 from temporalio.worker import Worker
@@ -25,6 +31,7 @@ async def main():
         activities=[
             invoke_model.invoke_model,
         ],
+        plugins=[BraintrustPlugin()],
     )
 
     print("Starting Deep Research Worker...")

@@ -1,5 +1,6 @@
 from temporalio import activity
 from openai import AsyncOpenAI
+from braintrust import wrap_openai
 from typing import Optional, List, cast, Any, TypeVar, Generic
 from typing_extensions import Annotated
 from pydantic import BaseModel
@@ -65,7 +66,7 @@ class InvokeModelResponse(BaseModel, Generic[T]):
 
 @activity.defn
 async def invoke_model(request: InvokeModelRequest[T]) -> InvokeModelResponse[T]:
-    client = AsyncOpenAI(max_retries=0)
+    client = wrap_openai(AsyncOpenAI(max_retries=0))
 
     kwargs: dict[str, Any] = {
         "model": request.model,

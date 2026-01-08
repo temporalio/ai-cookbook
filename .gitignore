@@ -107,4 +107,5 @@ __pypackages__/
 # Keep lockfiles tracked in this repo (uv.lock is committed), so do NOT ignore them.
 # uv: no special ignores required beyond virtualenvs above
 
-
+# ignore local working files
+BRAINTRUST INTEGRATION GUIDE.md

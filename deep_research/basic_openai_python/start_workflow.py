@@ -4,6 +4,11 @@ import uuid
 import os
 from datetime import datetime
 
+from braintrust import init_logger, start_span
+from braintrust.contrib.temporal import BraintrustPlugin
+
+init_logger(project=os.environ.get("BRAINTRUST_PROJECT", "deep-research"))
+
 from temporalio.client import Client
 from temporalio.contrib.pydantic import pydantic_data_converter
 
@@ -15,6 +20,7 @@ async def main():
     client = await Client.connect(
         "localhost:7233",
         data_converter=pydantic_data_converter,
+        plugins=[BraintrustPlugin()],
     )
 
     # Get research query from command line or use default
@@ -34,13 +40,18 @@ async def main():
     print(f"📋 Workflow ID: {workflow_id}")
 
     try:
-        # Execute the deep research workflow
-        result = await client.execute_workflow(
-            DeepResearchWorkflow.run,
-            research_query,
-            id=workflow_id,
-            task_queue="deep-research-task-queue",
-        )
+        # Execute the deep research workflow with Braintrust tracing
+        with start_span(name="deep-research-request", type="task") as span:
+            span.log(input={"query": research_query, "workflow_id": workflow_id})
+
+            result = await client.execute_workflow(
+                DeepResearchWorkflow.run,
+                research_query,
+                id=workflow_id,
+                task_queue="deep-research-task-queue",
+            )
+
+            span.log(output={"result": result})
 
         print("📋 RESEARCH COMPLETED!")
         print("=" * 80)

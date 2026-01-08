@@ -6,7 +6,7 @@ authors = [{ name = "Temporal Technologies Inc", email = "sdk@temporal.io" }]
 requires-python = ">=3.10"
 readme = "README.md"
 license = "MIT"
-dependencies = ["temporalio>=1.15.0,<2", "openai>=1.40.0", "pydantic>=2.0.0"]
+dependencies = ["temporalio>=1.15.0,<2", "openai>=1.40.0", "pydantic>=2.0.0", "braintrust[temporal]"]
 
 [dependency-groups]
 dev = [
