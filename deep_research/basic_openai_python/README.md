@@ -38,6 +38,38 @@ It also uses OpenAI's
 which asks the model to generate outputs corresponding to desired data
 structures.
 
+## Prerequisites
+
+Set the required environment variables:
+
+```bash
+export OPENAI_API_KEY="your-openai-api-key"
+export BRAINTRUST_API_KEY="your-braintrust-api-key"      # optional, for observability
+export BRAINTRUST_PROJECT_NAME="your-project-name"       # optional, defaults to "deep-research"
+```
+
+## Running
+
+This example requires three terminal tabs.
+
+**Terminal 1** - Start the Temporal Dev Server:
+
+```bash
+temporal server start-dev
+```
+
+**Terminal 2** - Run the worker:
+
+```bash
+uv run python -m worker
+```
+
+**Terminal 3** - Start execution:
+
+```bash
+uv run python -m start_workflow "What's the best restaurant in San Francisco?"
+```
+
 ## Create the data structures
 
 We will use Python classes to ensure information passes between agents in a
@@ -497,30 +529,4 @@ class DeepResearchWorkflow:
 
 """
 
-```
-
-## Running
-
-Start the Temporal Dev Server:
-
-```bash
-temporal server start-dev
-```
-
-Run the worker:
-
-```bash
-uv run python -m worker
-```
-
-Start execution:
-
-```bash
-uv run python -m start_workflow
-```
-
-To start execution with a specific query:
-
-```bash
-uv run python -m start_workflow "What is the latest news on the stock market?"
 ```
