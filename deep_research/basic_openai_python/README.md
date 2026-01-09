@@ -44,7 +44,7 @@ Set the required environment variables:
 
 ```bash
 export OPENAI_API_KEY="your-openai-api-key"
-export BRAINTRUST_API_KEY="your-braintrust-api-key"      # optional, for observability
+export BRAINTRUST_API_KEY="your-braintrust-api-key"
 export BRAINTRUST_PROJECT_NAME="your-project-name"       # optional, defaults to "deep-research"
 ```
 
