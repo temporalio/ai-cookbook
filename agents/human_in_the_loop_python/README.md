@@ -10,9 +10,9 @@ The workflow implements the agent flow:
 3. Executes the action if auto-approved (if not risky) or human approved, or cancels if rejected/timed out
 
 Key features:
-- **Durable waiting**: Can wait for approval for hours, days or indefinitely; while waiting, the agent consumes no resources.
+- **Resource efficient waiting**: Can wait for approval for hours, days or indefinitely; while waiting, the agent consumes no compute resources.
 - **Signal-based approval**: External systems send approval decisions via Temporal Signals
-- **Timeout handling**: Automatically handles cases where approval is not received within an alloted timeframe.
+- **Durable timers**: Time limits placed on human int he loop steps survive any execution distruptions.
 - **Complete audit trail**: All decisions are logged for compliance
 
 ## Prerequisites
@@ -126,9 +126,6 @@ await workflow.wait_condition(
     timeout=timedelta(seconds=timeout_seconds),
 )
 ```
-
-### Request Validation
-Each approval request has a unique ID to prevent confusion from stale or duplicate approvals. This request id can also be thought of as a proxy for authorization, ensuring that only the individual receiving the approval notification can provide the approval.
 
 ## Extensions
 
