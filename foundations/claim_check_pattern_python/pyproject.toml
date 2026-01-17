@@ -11,7 +11,7 @@ dependencies = [
     "boto3>=1.34.0",
     "aioboto3>=12.0.0",
     "requests>=2.25.0",
-    "aiohttp>=3.8.0",
+    "aiohttp>=3.13.3",
     "openai>=1.44.0",
     "rank-bm25>=0.2.2",
 ]
