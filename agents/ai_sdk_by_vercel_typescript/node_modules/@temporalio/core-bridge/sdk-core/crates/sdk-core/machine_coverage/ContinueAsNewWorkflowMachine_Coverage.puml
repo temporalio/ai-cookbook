@@ -1,6 +1,0 @@
-@startuml
-Created -[#blue]-> ContinueAsNewWorkflowCommandCreated: Schedule
-ContinueAsNewWorkflowCommandCreated -[#blue]-> ContinueAsNewWorkflowCommandCreated: CommandContinueAsNewWorkflowExecution
-ContinueAsNewWorkflowCommandCreated --> ContinueAsNewWorkflowCommandRecorded: WorkflowExecutionContinuedAsNew
-ContinueAsNewWorkflowCommandRecorded --> [*]
-@enduml
