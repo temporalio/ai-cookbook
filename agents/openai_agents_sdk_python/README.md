@@ -1,8 +1,11 @@
 <!--
 description: Build a durable AI agent with OpenAI Agents SDK and Temporal that can intelligently choose tools to answer user questions
 tags: [agents, python, openai]
-priority: 5
+<<<<<<< HEAD
+priority: 750
 -->
+
+# Durable Agent using OpenAI Agents SDK
 
 # Hello World - Agent with Tools
 
@@ -181,6 +184,12 @@ Start the Temporal Dev Server:
 
 ```bash
 temporal server start-dev
+```
+
+Open a new terminal where you will run the agent worker. Set an OpenAI API key:
+
+```bash
+export OPENAI_API_KEY=sk...
 ```
 
 Run the worker:
