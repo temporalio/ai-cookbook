@@ -14,6 +14,8 @@ class ClaimCheckPlugin(Plugin):
         self.bucket_name = os.getenv("S3_BUCKET_NAME", "temporal-claim-check")
         self.endpoint_url = os.getenv("S3_ENDPOINT_URL")
         self.region_name = os.getenv("AWS_REGION", "us-east-1")
+        # Use AWS_PROFILE only if access keys are not set
+        self.aws_profile = os.getenv("AWS_PROFILE") if not os.getenv("AWS_ACCESS_KEY_ID") else None
         self._next_plugin = None
 
     def init_client_plugin(self, next_plugin: Plugin) -> None:
@@ -34,7 +36,8 @@ class ClaimCheckPlugin(Plugin):
         claim_check_codec = ClaimCheckCodec(
             bucket_name=self.bucket_name,
             endpoint_url=self.endpoint_url,
-            region_name=self.region_name
+            region_name=self.region_name,
+            aws_profile=self.aws_profile
         )
         
         config["data_converter"] = DataConverter(

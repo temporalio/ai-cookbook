@@ -10,8 +10,8 @@ This recipe demonstrates how to use the Claim Check pattern to offload data from
 
 This recipe includes:
 
-- A `PayloadCodec` that stores large payloads in S3 and replaces them with keys
-- A client plugin that wires the codec into the Temporal data converter
+- A `PayloadCodec` ([docs](https://docs.temporal.io/payload-codec)) that stores large payloads in S3 and replaces them with keys
+- A client [plugin](https://docs.temporal.io/develop/plugins-guide#plugins) that wires the codec into the Temporal data converter
 - A lightweight codec server for a better Web UI experience
 - An AI/RAG example workflow that demonstrates the pattern end-to-end
 
@@ -449,7 +449,15 @@ class AiRagWorkflow:
         return answer
 ```
 
-## Configuration
+## Running
+
+### Prerequisites
+
+- MinIO server (for local testing) or AWS S3 access (for production)
+- Temporal dev server
+- Python 3.9+
+
+### Configuration
 
 Set environment variables to configure S3 and OpenAI:
 
@@ -464,19 +472,15 @@ export AWS_REGION=us-east-1
 # For production AWS S3
 # export S3_BUCKET_NAME=your-bucket-name
 # export AWS_REGION=us-east-1
+# you may use access keys or...
 # export AWS_ACCESS_KEY_ID=your-access-key
 # export AWS_SECRET_ACCESS_KEY=your-secret-key
+# ... sso
+# export AWS_profile=your-profile
+# aws sso login --profile your-profile
 
 export OPENAI_API_KEY=your_key_here
 ```
-
-## Prerequisites
-
-- MinIO server (for local testing) or AWS S3 access (for production)
-- Temporal dev server
-- Python 3.9+
-
-## Running
 
 ### Option 1: MinIO (Recommended for Testing)
 
@@ -509,7 +513,7 @@ uv run python -m start_workflow
 ### Option 2: AWS S3 (Production)
 
 1. Create an S3 bucket in your AWS account
-2. Configure AWS credentials (via AWS CLI, environment variables, or IAM roles)
+2. Configure AWS credentials (via AWS CLI, environment variables, IAM roles or sso)
 3. Set the environment variables for your bucket
 4. Follow steps 2-4 from Option 1
 

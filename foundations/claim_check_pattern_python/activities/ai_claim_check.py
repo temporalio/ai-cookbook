@@ -1,39 +1,8 @@
-from dataclasses import dataclass
-from typing import List, Dict, Any
+from typing import List
 
 from temporalio import activity
 
-from openai import AsyncOpenAI
-from rank_bm25 import BM25Okapi
-
-
-@dataclass
-class IngestRequest:
-    document_bytes: bytes
-    filename: str
-    mime_type: str
-    chunk_size: int = 1500
-    chunk_overlap: int = 200
-    embedding_model: str = "text-embedding-3-large"
-
-
-@dataclass
-class IngestResult:
-    chunk_texts: List[str]
-    metadata: Dict[str, Any]
-
-
-@dataclass
-class RagRequest:
-    question: str
-    top_k: int = 4
-    generation_model: str = "gpt-4o-mini"
-
-
-@dataclass
-class RagAnswer:
-    answer: str
-    sources: List[Dict[str, Any]]
+from shared.models import IngestRequest, IngestResult, RagRequest, RagAnswer
 
 
 def _split_text(text: str, chunk_size: int, overlap: int) -> List[str]:
@@ -69,6 +38,11 @@ async def ingest_document(req: IngestRequest) -> IngestResult:
 
 @activity.defn
 async def rag_answer(req: RagRequest, ingest_result: IngestResult) -> RagAnswer:
+    # Import heavy dependencies inside the function, not at module level
+    # This prevents NumPy from being loaded into the workflow sandbox
+    from openai import AsyncOpenAI
+    from rank_bm25 import BM25Okapi
+    
     client = AsyncOpenAI(max_retries=0)
 
     # Lexical retrieval using BM25 over chunk texts

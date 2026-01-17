@@ -1,14 +1,8 @@
 from temporalio import workflow
 from datetime import timedelta
 
-from activities.ai_claim_check import (
-    IngestRequest,
-    IngestResult,
-    RagRequest,
-    RagAnswer,
-    ingest_document,
-    rag_answer,
-)
+from shared.models import IngestRequest, IngestResult, RagRequest, RagAnswer
+from activities.ai_claim_check import ingest_document, rag_answer
 
 
 @workflow.defn
