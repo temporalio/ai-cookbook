@@ -1,13 +1,10 @@
 <!--
 description: Build a durable AI agent with OpenAI Agents SDK and Temporal that can intelligently choose tools to answer user questions
 tags: [agents, python, openai]
-<<<<<<< HEAD
 priority: 750
 -->
 
-# Durable Agent using OpenAI Agents SDK
-
-# Hello World - Agent with Tools
+# Durable Agent - OpenAI Agents SDK
 
 In this example, we show you how to build a Durable Agent using the [OpenAI Agents SDK Integration for Temporal](https://github.com/temporalio/sdk-python/tree/main/temporalio/contrib/openai_agents). The AI agent we build will have access to [tools](https://github.com/temporalio/sdk-python/tree/main/temporalio/contrib/openai_agents#tool-calling) (Temporal Activities) to answer user questions. The agent can determine which tools to use based on the user's input and execute them as needed.
 
