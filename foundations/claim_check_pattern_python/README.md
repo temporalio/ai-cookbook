@@ -11,7 +11,7 @@ This recipe demonstrates how to use the Claim Check pattern to offload data from
 This recipe includes:
 
 - A `PayloadCodec` ([docs](https://docs.temporal.io/payload-codec)) that stores large payloads in S3 and replaces them with keys
-- A client [plugin](https://docs.temporal.io/develop/plugins-guide#plugins) that wires the codec into the Temporal data converter
+- A client [plugin](https://docs.temporal.io/develop/plugins-guide) that wires the codec into the Temporal data converter
 - A lightweight codec server for a better Web UI experience
 - An AI/RAG example workflow that demonstrates the pattern end-to-end
 
