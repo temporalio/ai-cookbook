@@ -107,4 +107,41 @@ __pypackages__/
 # Keep lockfiles tracked in this repo (uv.lock is committed), so do NOT ignore them.
 # uv: no special ignores required beyond virtualenvs above
 
+# For node projects
+# Dependencies
+node_modules/
 
+# Package manager artifacts
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build output
+dist/
+build/
+out/
+
+# TypeScript
+*.tsbuildinfo
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+
+# Coverage
+coverage/
