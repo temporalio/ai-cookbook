@@ -1,3 +1,8 @@
+<!--
+description: Support human in the loop (HITL) in agentic flows.
+tags: [agents, python]
+priority: 750
+-->
 # Human-in-the-Loop AI Agent
 
 This example demonstrates how to build an AI agent that requires human approval; we use Temporal Signals to bring that user input into the agent.
