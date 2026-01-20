@@ -1,7 +1,7 @@
 <!-- 
-description: Use the Claim Check pattern to keep large payloads out of Temporal Event History by storing them in S3 and referencing them with keys, with optional codec server support for a better Web UI experience.
+description: Use the Claim Check pattern to handle large payloads to workflows and activities.
 tags:[foundations, claim-check, python, s3]
-priority: 999
+priority: 400
 -->
 
 # Claim Check Pattern with Temporal
