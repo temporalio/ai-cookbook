@@ -38,7 +38,7 @@ class ClaimCheckCodec(PayloadCodec):
         self.region_name = region_name
         self.max_inline_bytes = max_inline_bytes
         self.session = aioboto3.Session()
-        
+
         # Ensure bucket exists
         self._bucket_created = False
 

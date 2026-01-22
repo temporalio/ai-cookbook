@@ -50,13 +50,15 @@ class ClaimCheckCodec(PayloadCodec):
     of large payload data.
     """
 
-    def __init__(self, 
-                 bucket_name: str = "temporal-claim-check",
-                 endpoint_url: str = None,
-                 region_name: str = "us-east-1",
-                 max_inline_bytes: int = 20 * 1024):
+    def __init__(
+        self,
+        bucket_name: str = "temporal-claim-check",
+        endpoint_url: str = None,
+        region_name: str = "us-east-1",
+        max_inline_bytes: int = 20 * 1024,
+    ):
         """Initialize the claim check codec with S3 connection details.
-        
+
         Args:
             bucket_name: S3 bucket name for storing claim check data
             endpoint_url: S3 endpoint URL (for MinIO or other S3-compatible services)
@@ -67,10 +69,8 @@ class ClaimCheckCodec(PayloadCodec):
         self.endpoint_url = endpoint_url
         self.region_name = region_name
         self.max_inline_bytes = max_inline_bytes
-        
-        # Initialize aioboto3 session
         self.session = aioboto3.Session()
-        
+
         # Ensure bucket exists
         self._bucket_created = False
 
