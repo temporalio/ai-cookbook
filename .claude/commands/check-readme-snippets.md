@@ -15,12 +15,14 @@ Verify that code snippets in README files match their source files.
    - List any mismatches found
    - Show a brief diff or summary of what changed
 
-4. If discrepancies are found, ask the user:
-   "Found X mismatches. Would you like me to update the README snippets to match the source files?"
+4. If discrepancies are found, ask the user which direction to sync:
+   - **Update README** → make README match the source file (source is correct)
+   - **Update source** → make source file match the README (README is correct, source has unwanted changes)
 
-5. If user agrees, update the README files:
-   - Replace the code snippet content with the current source file content
-   - Preserve the markdown structure (annotations, fences, surrounding text)
+5. Based on user choice, make the appropriate updates:
+   - If updating README: replace snippet content with current source file content
+   - If updating source: replace source file content with the README snippet
+   - Preserve markdown structure when editing README
 
 ## Scope
 
@@ -37,5 +39,7 @@ foundations/claim_check_pattern_python/README.md:
   - codec/plugin.py: MISMATCH (source has 23 lines, snippet has 21 lines)
   - codec/claim_check.py: OK
 
-Found 1 mismatch. Would you like me to update the README snippets to match the source files?
+Found 1 mismatch. Which direction should I sync?
+  1. Update README to match source (source is correct)
+  2. Update source to match README (revert source changes)
 ```
