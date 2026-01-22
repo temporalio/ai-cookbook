@@ -71,7 +71,6 @@ class ClaimCheckCodec(PayloadCodec):
         self.max_inline_bytes = max_inline_bytes
         self.session = aioboto3.Session()
 
-        # Ensure bucket exists
         self._bucket_created = False
 
     async def _ensure_bucket_exists(self):
