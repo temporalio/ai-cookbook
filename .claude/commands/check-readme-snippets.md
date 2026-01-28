@@ -26,9 +26,9 @@ Verify that code snippets in README files match their source files.
 
 ## Scope
 
-By default, check only READMEs in directories containing recently modified Python files (use `git status` to find them).
+By default, check **all** READMEs in the repository that contain file annotations (`*File: ...*` patterns).
 
-If the user specifies a path or `--all`, check that scope instead.
+If the user specifies a path, check only READMEs in that directory.
 
 ## Example Output
 

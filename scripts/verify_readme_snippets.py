@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 """Verify README code snippets match actual source files.
 
-Used as a Claude hook to block commits when README snippets are out of sync.
+Used as a Claude hook to warn/block when README snippets are out of sync.
+
+Modes:
+- PostToolUse on Edit/Write for .py: Warns if edited file's README snippet is stale
+- PostToolUse on Edit/Write for .md: Warns if README snippets don't match sources
+- PreToolUse on Bash with git commit: Blocks if staged files have stale snippets
 
 Exit codes:
-    0: All snippets match (or not a git commit)
-    2: Mismatch found (blocks the commit)
+    0: All snippets match (or warning printed for post-edit)
+    2: Mismatch found (blocks pre-commit)
 """
 
 import json
@@ -25,10 +30,25 @@ def get_tool_input():
         return {}
 
 
+def get_tool_name() -> str:
+    """Get the tool name from environment variable."""
+    return os.environ.get("TOOL_NAME", "")
+
+
+def is_post_edit_hook() -> bool:
+    """Check if running as PostToolUse hook on Edit or Write."""
+    return get_tool_name() in ("Edit", "Write")
+
+
+def is_pre_bash_hook() -> bool:
+    """Check if running as PreToolUse hook on Bash."""
+    return get_tool_name() == "Bash"
+
+
 def is_git_commit(tool_input: dict) -> bool:
     """Check if the bash command is a git commit."""
     command = tool_input.get("command", "")
-    return "git commit" in command and "git commit" not in command.replace("git commit", "")
+    return "git commit" in command
 
 
 def get_staged_python_files() -> list[str]:
@@ -120,15 +140,41 @@ def compare_snippet(snippet: dict, repo_root: Path) -> tuple[bool, str]:
         return False, f"Full file mismatch for {file_path}"
 
 
+def check_single_file(filepath: str, repo_root: Path) -> list[str]:
+    """Check a single file against README snippets. Returns list of errors."""
+    errors = []
+    readme = find_readme_for_file(filepath)
+    if not readme:
+        return errors
+
+    snippets = extract_snippets(readme)
+    file_basename = Path(filepath).name
+
+    for snippet in snippets:
+        snippet_basename = Path(snippet["file_path"]).name
+        if file_basename == snippet_basename or filepath.endswith(snippet["file_path"]):
+            matches, error = compare_snippet(snippet, repo_root)
+            if not matches:
+                errors.append(f"{readme}: {error}")
+
+    return errors
+
+
+def check_readme_snippets(readme_path: Path, repo_root: Path) -> list[str]:
+    """Check all snippets in a README against their source files."""
+    errors = []
+    snippets = extract_snippets(readme_path)
+
+    for snippet in snippets:
+        matches, error = compare_snippet(snippet, repo_root)
+        if not matches:
+            errors.append(f"{readme_path}: {error}")
+
+    return errors
+
+
 def main():
     tool_input = get_tool_input()
-
-    if not is_git_commit(tool_input):
-        sys.exit(0)
-
-    staged_files = get_staged_python_files()
-    if not staged_files:
-        sys.exit(0)
 
     repo_root = Path(subprocess.run(
         ["git", "rev-parse", "--show-toplevel"],
@@ -136,33 +182,73 @@ def main():
         text=True,
     ).stdout.strip())
 
-    errors = []
-    checked_readmes = set()
+    # Post-edit hook: warn but don't block
+    if is_post_edit_hook():
+        file_path = tool_input.get("file_path", "")
+        if not file_path:
+            sys.exit(0)
 
-    for staged_file in staged_files:
-        readme = find_readme_for_file(staged_file)
-        if not readme or readme in checked_readmes:
-            continue
+        # Python file edited: check if its README snippet is stale
+        if file_path.endswith(".py"):
+            errors = check_single_file(file_path, repo_root)
+            if errors:
+                print("Warning: README snippet may be out of sync:")
+                for error in errors:
+                    print(f"  - {error}")
+                print("Run /check-readme-snippets to verify and sync.")
+            sys.exit(0)
 
-        checked_readmes.add(readme)
-        snippets = extract_snippets(readme)
+        # README edited: check if its snippets match source files
+        if file_path.endswith(".md") and Path(file_path).name == "README.md":
+            errors = check_readme_snippets(Path(file_path), repo_root)
+            if errors:
+                print("Warning: README snippets may be out of sync with source:")
+                for error in errors:
+                    print(f"  - {error}")
+                print("Run /check-readme-snippets to verify and sync.")
+            sys.exit(0)
 
-        for snippet in snippets:
-            staged_basename = Path(staged_file).name
-            snippet_basename = Path(snippet["file_path"]).name
+        sys.exit(0)
 
-            if staged_basename == snippet_basename or staged_file.endswith(snippet["file_path"]):
-                matches, error = compare_snippet(snippet, repo_root)
-                if not matches:
-                    errors.append(f"{readme}: {error}")
+    # Pre-commit hook: block if staged files have mismatched snippets
+    if is_pre_bash_hook():
+        if not is_git_commit(tool_input):
+            sys.exit(0)
 
-    if errors:
-        print("README snippet verification failed:")
-        for error in errors:
-            print(f"  - {error}")
-        print("\nUpdate the README to match the source file, or mark as (excerpt) if partial.")
-        sys.exit(2)
+        staged_files = get_staged_python_files()
+        if not staged_files:
+            sys.exit(0)
 
+        errors = []
+        checked_readmes = set()
+
+        for staged_file in staged_files:
+            readme = find_readme_for_file(staged_file)
+            if not readme or readme in checked_readmes:
+                continue
+
+            checked_readmes.add(readme)
+            snippets = extract_snippets(readme)
+
+            for snippet in snippets:
+                staged_basename = Path(staged_file).name
+                snippet_basename = Path(snippet["file_path"]).name
+
+                if staged_basename == snippet_basename or staged_file.endswith(snippet["file_path"]):
+                    matches, error = compare_snippet(snippet, repo_root)
+                    if not matches:
+                        errors.append(f"{readme}: {error}")
+
+        if errors:
+            print("README snippet verification failed:")
+            for error in errors:
+                print(f"  - {error}")
+            print("\nUpdate the README or run /check-readme-snippets to sync.")
+            sys.exit(2)
+
+        sys.exit(0)
+
+    # Manual invocation (no TOOL_NAME): this shouldn't happen in normal use
     sys.exit(0)
 
 
