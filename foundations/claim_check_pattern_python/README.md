@@ -34,12 +34,15 @@ The `ClaimCheckCodec` implements `PayloadCodec` and adds an inline threshold to 
 
 ```python
 import uuid
+import logging
 from typing import Iterable, List
 import aioboto3
 from botocore.exceptions import ClientError
 
 from temporalio.api.common.v1 import Payload
 from temporalio.converter import PayloadCodec
+
+logger = logging.getLogger(__name__)
 
 
 class ClaimCheckCodec(PayloadCodec):
@@ -71,7 +74,6 @@ class ClaimCheckCodec(PayloadCodec):
         self.max_inline_bytes = max_inline_bytes
         self.session = aioboto3.Session()
 
-        # Ensure bucket exists
         self._bucket_created = False
 
     async def _ensure_bucket_exists(self):
@@ -255,18 +257,13 @@ class ClaimCheckPlugin(SimplePlugin):
 
 This example ingests a large text, performs lightweight lexical retrieval, and answers a question with an LLM. Large intermediates (chunks, scores) are kept out of Temporal payloads via the Claim Check codec. Only the small final answer is returned inline.
 
-### Activities
+### Shared Models
 
-*File: activities/ai_claim_check.py*
+*File: shared/models.py*
 
 ```python
 from dataclasses import dataclass
 from typing import List, Dict, Any
-
-from temporalio import activity
-
-from openai import AsyncOpenAI
-from rank_bm25 import BM25Okapi
 
 
 @dataclass
@@ -296,6 +293,18 @@ class RagRequest:
 class RagAnswer:
     answer: str
     sources: List[Dict[str, Any]]
+```
+
+### Activities
+
+*File: activities/ai_claim_check.py*
+
+```python
+from typing import List
+
+from temporalio import activity
+
+from shared.models import IngestRequest, IngestResult, RagRequest, RagAnswer
 
 
 def _split_text(text: str, chunk_size: int, overlap: int) -> List[str]:
@@ -331,6 +340,11 @@ async def ingest_document(req: IngestRequest) -> IngestResult:
 
 @activity.defn
 async def rag_answer(req: RagRequest, ingest_result: IngestResult) -> RagAnswer:
+    # Import heavy dependencies inside the function, not at module level
+    # This prevents NumPy from being loaded into the workflow sandbox
+    from openai import AsyncOpenAI
+    from rank_bm25 import BM25Okapi
+    
     client = AsyncOpenAI(max_retries=0)
 
     # Lexical retrieval using BM25 over chunk texts
@@ -369,14 +383,8 @@ async def rag_answer(req: RagRequest, ingest_result: IngestResult) -> RagAnswer:
 from temporalio import workflow
 from datetime import timedelta
 
-from activities.ai_claim_check import (
-    IngestRequest,
-    IngestResult,
-    RagRequest,
-    RagAnswer,
-    ingest_document,
-    rag_answer,
-)
+from shared.models import IngestRequest, IngestResult, RagRequest, RagAnswer
+from activities.ai_claim_check import ingest_document, rag_answer
 
 
 @workflow.defn
