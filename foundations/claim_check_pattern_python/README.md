@@ -34,12 +34,15 @@ The `ClaimCheckCodec` implements `PayloadCodec` and adds an inline threshold to 
 
 ```python
 import uuid
+import logging
 from typing import Iterable, List
 import aioboto3
 from botocore.exceptions import ClientError
 
 from temporalio.api.common.v1 import Payload
 from temporalio.converter import PayloadCodec
+
+logger = logging.getLogger(__name__)
 
 
 class ClaimCheckCodec(PayloadCodec):
@@ -50,13 +53,15 @@ class ClaimCheckCodec(PayloadCodec):
     of large payload data.
     """
 
-    def __init__(self, 
-                 bucket_name: str = "temporal-claim-check",
-                 endpoint_url: str = None,
-                 region_name: str = "us-east-1",
-                 max_inline_bytes: int = 20 * 1024):
+    def __init__(
+        self,
+        bucket_name: str = "temporal-claim-check",
+        endpoint_url: str = None,
+        region_name: str = "us-east-1",
+        max_inline_bytes: int = 20 * 1024,
+    ):
         """Initialize the claim check codec with S3 connection details.
-        
+
         Args:
             bucket_name: S3 bucket name for storing claim check data
             endpoint_url: S3 endpoint URL (for MinIO or other S3-compatible services)
@@ -67,11 +72,8 @@ class ClaimCheckCodec(PayloadCodec):
         self.endpoint_url = endpoint_url
         self.region_name = region_name
         self.max_inline_bytes = max_inline_bytes
-        
-        # Initialize aioboto3 session
         self.session = aioboto3.Session()
-        
-        # Ensure bucket exists
+
         self._bucket_created = False
 
     async def _ensure_bucket_exists(self):
@@ -222,94 +224,46 @@ class ClaimCheckCodec(PayloadCodec):
 
 ## Claim Check Plugin
 
-The `ClaimCheckPlugin` integrates the codec with the Temporal client configuration and supports plugin chaining.
+The `ClaimCheckPlugin` integrates the codec with the Temporal client configuration.
 
 *File: codec/plugin.py*
 
 ```python
 import os
-from temporalio.client import Plugin, ClientConfig
+from temporalio.plugin import SimplePlugin
 from temporalio.converter import DataConverter
-from temporalio.service import ConnectConfig, ServiceClient
 
 from .claim_check import ClaimCheckCodec
 
 
-class ClaimCheckPlugin(Plugin):
+class ClaimCheckPlugin(SimplePlugin):
     """Temporal plugin that integrates the Claim Check codec with client configuration."""
 
     def __init__(self):
         """Initialize the plugin with S3 connection configuration."""
-        self.bucket_name = os.getenv("S3_BUCKET_NAME", "temporal-claim-check")
-        self.endpoint_url = os.getenv("S3_ENDPOINT_URL")
-        self.region_name = os.getenv("AWS_REGION", "us-east-1")
-        self._next_plugin = None
-
-    def init_client_plugin(self, next_plugin: Plugin) -> None:
-        """Initialize this plugin in the client plugin chain."""
-        self._next_plugin = next_plugin
-
-    def configure_client(self, config: ClientConfig) -> ClientConfig:
-        """Apply the claim check configuration to the client.
-        
-        Args:
-            config: Temporal client configuration
-            
-        Returns:
-            Updated client configuration with claim check data converter
-        """
-        # Configure the data converter with claim check codec
-        default_converter_class = config["data_converter"].payload_converter_class
-        claim_check_codec = ClaimCheckCodec(
-            bucket_name=self.bucket_name,
-            endpoint_url=self.endpoint_url,
-            region_name=self.region_name
+        super().__init__(
+            name="claim-check",
+            data_converter=DataConverter(
+                payload_codec=ClaimCheckCodec(
+                    bucket_name=os.getenv("S3_BUCKET_NAME", "temporal-claim-check"),
+                    endpoint_url=os.getenv("S3_ENDPOINT_URL"),
+                    region_name=os.getenv("AWS_REGION", "us-east-1"),
+                ),
+            ),
         )
-        
-        config["data_converter"] = DataConverter(
-            payload_converter_class=default_converter_class,
-            payload_codec=claim_check_codec
-        )
-        
-        # Delegate to next plugin if it exists
-        if self._next_plugin:
-            return self._next_plugin.configure_client(config)
-        return config
-
-    async def connect_service_client(self, config: ConnectConfig) -> ServiceClient:
-        """Connect to the Temporal service.
-        
-        Args:
-            config: Service connection configuration
-            
-        Returns:
-            Connected service client
-        """
-        # Delegate to next plugin if it exists
-        if self._next_plugin:
-            return await self._next_plugin.connect_service_client(config)
-        
-        # If no next plugin, use default connection
-        from temporalio.service import ServiceClient
-        return await ServiceClient.connect(config)
 ```
 
 ## Example: AI / RAG Workflow using Claim Check
 
 This example ingests a large text, performs lightweight lexical retrieval, and answers a question with an LLM. Large intermediates (chunks, scores) are kept out of Temporal payloads via the Claim Check codec. Only the small final answer is returned inline.
 
-### Activities
+### Shared Models
 
-*File: activities/ai_claim_check.py*
+*File: shared/models.py*
 
 ```python
 from dataclasses import dataclass
 from typing import List, Dict, Any
-
-from temporalio import activity
-
-from openai import AsyncOpenAI
-from rank_bm25 import BM25Okapi
 
 
 @dataclass
@@ -339,6 +293,18 @@ class RagRequest:
 class RagAnswer:
     answer: str
     sources: List[Dict[str, Any]]
+```
+
+### Activities
+
+*File: activities/ai_claim_check.py*
+
+```python
+from typing import List
+
+from temporalio import activity
+
+from shared.models import IngestRequest, IngestResult, RagRequest, RagAnswer
 
 
 def _split_text(text: str, chunk_size: int, overlap: int) -> List[str]:
@@ -374,6 +340,11 @@ async def ingest_document(req: IngestRequest) -> IngestResult:
 
 @activity.defn
 async def rag_answer(req: RagRequest, ingest_result: IngestResult) -> RagAnswer:
+    # Import heavy dependencies inside the function, not at module level
+    # This prevents NumPy from being loaded into the workflow sandbox
+    from openai import AsyncOpenAI
+    from rank_bm25 import BM25Okapi
+    
     client = AsyncOpenAI(max_retries=0)
 
     # Lexical retrieval using BM25 over chunk texts
@@ -412,14 +383,8 @@ async def rag_answer(req: RagRequest, ingest_result: IngestResult) -> RagAnswer:
 from temporalio import workflow
 from datetime import timedelta
 
-from activities.ai_claim_check import (
-    IngestRequest,
-    IngestResult,
-    RagRequest,
-    RagAnswer,
-    ingest_document,
-    rag_answer,
-)
+from shared.models import IngestRequest, IngestResult, RagRequest, RagAnswer
+from activities.ai_claim_check import ingest_document, rag_answer
 
 
 @workflow.defn
