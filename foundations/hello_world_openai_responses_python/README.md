@@ -104,6 +104,7 @@ import asyncio
 
 from temporalio.client import Client
 from temporalio.worker import Worker
+from temporalio.envconfig import ClientConfig
 
 from workflows.hello_world_workflow import HelloWorld
 from activities import openai_responses
@@ -111,8 +112,10 @@ from temporalio.contrib.pydantic import pydantic_data_converter
 
 
 async def main():
+    config = ClientConfig.load_client_connect_config()
+    config.setdefault("target_host", "localhost:7233")
     client = await Client.connect(
-        "localhost:7233",
+        **config,
         data_converter=pydantic_data_converter,
     )
 
@@ -144,14 +147,17 @@ It uses the `pydantic_data_converter` to match the Worker configuration.
 import asyncio
 
 from temporalio.client import Client
+from temporalio.envconfig import ClientConfig
 
 from workflows.hello_world_workflow import HelloWorld
 from temporalio.contrib.pydantic import pydantic_data_converter
 
 
 async def main():
+    config = ClientConfig.load_client_connect_config()
+    config.setdefault("target_host", "localhost:7233")
     client = await Client.connect(
-        "localhost:7233",
+        **config,
         data_converter=pydantic_data_converter,
     )
 
@@ -169,6 +175,24 @@ if __name__ == "__main__":
     asyncio.run(main())
 
 ```
+
+## Configuration
+
+This recipe uses Temporal's environment configuration system to connect to Temporal. By default, it connects to a local Temporal server. To use Temporal Cloud:
+
+1. Set the `TEMPORAL_PROFILE` environment variable to use the cloud profile:
+   ```bash
+   export TEMPORAL_PROFILE=cloud
+   ```
+
+2. Configure the cloud profile using the Temporal CLI:
+   ```bash
+   temporal config set --profile cloud --prop address --value "<your temporal cloud endpoint>"
+   temporal config set --profile cloud --prop namespace --value "<your temporal cloud namespace>"
+   temporal config set --profile cloud --prop api_key --value "<your temporal cloud api key>"
+   ```
+
+   For TLS certificate authentication instead of API key, refer to the [Temporal environment configuration documentation](https://docs.temporal.io/develop/environment-configuration) for details.
 
 ## Running
 
