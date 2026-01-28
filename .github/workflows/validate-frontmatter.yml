@@ -1,0 +1,47 @@
+name: Validate Recipe Front Matter
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '**/README.md'
+      - '.github/scripts/validate-frontmatter.js'
+      - '.github/workflows/validate-frontmatter.yml'
+
+concurrency:
+  group: validate-frontmatter-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Check Recipe Front Matter
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout ai-cookbook repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Make validation script executable
+        run: chmod +x .github/scripts/validate-frontmatter.js
+
+      - name: Validate front matter in recipe READMEs
+        run: node .github/scripts/validate-frontmatter.js
+
+      - name: Report success
+        if: success()
+        run: |
+          echo "✅ All recipe READMEs have valid front matter"
+          echo ""
+          echo "This validates that all top-level recipe READMEs contain required front matter fields."
