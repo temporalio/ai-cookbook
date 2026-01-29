@@ -19,7 +19,7 @@ class AgentWorkflow:
         while True:
 
             print(80 * "=")
-                
+
             # consult the LLM
             result = await workflow.execute_activity(
                 openai_responses.create,
@@ -38,11 +38,11 @@ class AgentWorkflow:
             item = result.output[0]
 
             # Now process the LLM output to either call a tool or respond with a message.
-            
+
             # if the result is a tool call, call the tool
             if item.type == "function_call":
                 result = await self._handle_function_call(item, result, input_list)
-                
+
                 # add the tool call result to the input list for context
                 input_list.append({"type": "function_call_output",
                                     "call_id": item.call_id,
@@ -73,4 +73,3 @@ class AgentWorkflow:
         print(f"Made a tool call to {item.name}")
 
         return result
- 

@@ -209,7 +209,7 @@ def get_tools() -> list[dict[str, Any]]:
 
 # OR use random tools instead
 # from .random_stuff import get_random_number, RANDOM_NUMBER_TOOL_CLAUDE
-# 
+#
 # def get_tools() -> list[dict[str, Any]]:
 #     return [RANDOM_NUMBER_TOOL_CLAUDE]
 ```

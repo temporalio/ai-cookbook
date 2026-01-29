@@ -5,7 +5,7 @@ import json
 def claude_tool_from_model(name: str, description: str, model: type[BaseModel] | None) -> dict[str, Any]:
     """
     Convert a Pydantic model to Claude's tool format.
-    
+
     Claude's tool format structure:
     {
         "name": "tool_name",
@@ -28,10 +28,10 @@ def claude_tool_from_model(name: str, description: str, model: type[BaseModel] |
                 "required": []
             }
         }
-    
+
     # Get the JSON schema from the Pydantic model
     schema = model.model_json_schema()
-    
+
     # Claude expects an input_schema field instead of parameters
     return {
         "name": name,

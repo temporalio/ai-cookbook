@@ -1,4 +1,4 @@
-<!-- 
+<!--
 description: Build a simple deep research system embodying the standard
 deep research architecture.
 tags: [agents, toolcalling, python]
@@ -134,13 +134,13 @@ priorities, identifies expected source types, and defines success criteria.
 *File: agents/research_planning.py*
 
 ```python
-from .models import ResearchPlan
+from .shared import ResearchPlan, today_str
 from .config import COMPLEX_REASONING_MODEL
 from activities.invoke_model import invoke_model, InvokeModelRequest
 from temporalio import workflow
 from datetime import timedelta
 
-RESEARCH_PLANNING_INSTRUCTIONS = """
+RESEARCH_PLANNING_INSTRUCTIONS = f"""
 You are a research planning specialist who creates focused research strategies.
 
 CORE RESPONSIBILITIES:
@@ -158,6 +158,8 @@ OUTPUT REQUIREMENTS:
 - expected_sources: Types of sources likely to contain relevant information
 - search_strategy: High-level approach for information gathering
 - success_criteria: Specific indicators of research completeness
+
+TODAY'S DATE: {today_str()}
 """
 
 
@@ -185,13 +187,13 @@ case studies, recent news) with varied search styles and temporal modifiers.
 *File: agents/research_query_generation.py*
 
 ```python
-from .models import QueryPlan, ResearchPlan
+from .shared import QueryPlan, ResearchPlan, today_str
 from .config import EFFICIENT_PROCESSING_MODEL
 from activities.invoke_model import invoke_model, InvokeModelRequest
 from temporalio import workflow
 from datetime import timedelta
 
-QUERY_GENERATION_INSTRUCTIONS = """
+QUERY_GENERATION_INSTRUCTIONS = f"""
 You are a search query specialist who crafts effective web searches.
 
 CORE RESPONSIBILITIES:
@@ -210,6 +212,8 @@ OUTPUT REQUIREMENTS:
   - rationale: Why this query addresses research needs
   - expected_info_type: One of "factual_data", "expert_analysis", "case_studies", "recent_news"
   - priority: 1-5 (5 highest priority)
+
+TODAY'S DATE: {today_str()}
 """
 
 
@@ -250,13 +254,13 @@ and provides proper citations with reliability assessments.
 *File: agents/research_web_search.py*
 
 ```python
-from .models import SearchResult, SearchQuery
+from .shared import SearchResult, SearchQuery, today_str
 from .config import EFFICIENT_PROCESSING_MODEL
 from activities.invoke_model import invoke_model, InvokeModelRequest
 from temporalio import workflow
 from datetime import timedelta
 
-WEB_SEARCH_INSTRUCTIONS = """
+WEB_SEARCH_INSTRUCTIONS = f"""
 You are a web research specialist who finds and evaluates information from web sources.
 
 CORE RESPONSIBILITIES:
@@ -277,6 +281,8 @@ OUTPUT REQUIREMENTS:
 - key_findings: Synthesized information relevant to research question (2-4 paragraphs)
 - relevance_score: 0.0-1.0 assessment of how well results address the query
 - citations: Formatted sources with URLs
+
+TODAY'S DATE: {today_str()}
 """
 
 
@@ -317,11 +323,11 @@ follow-up research questions.
 from typing import List
 from temporalio import workflow
 from datetime import timedelta
-from .models import ResearchReport, ResearchPlan, SearchResult
+from .shared import ResearchReport, ResearchPlan, SearchResult, today_str
 from .config import COMPLEX_REASONING_MODEL
 from activities.invoke_model import invoke_model, InvokeModelRequest
 
-REPORT_SYNTHESIS_INSTRUCTIONS = """
+REPORT_SYNTHESIS_INSTRUCTIONS = f"""
 You are a research synthesis expert who creates comprehensive research reports.
 
 CORE RESPONSIBILITIES:
@@ -352,6 +358,8 @@ OUTPUT REQUIREMENTS:
 - confidence_assessment: Assessment of finding reliability
 - citations: All sources referenced
 - follow_up_questions: 3-5 specific questions for further research
+
+TODAY'S DATE: {today_str()}
 """
 
 
@@ -419,7 +427,7 @@ from agents.research_planning import plan_research
 from agents.research_query_generation import generate_queries
 from agents.research_web_search import search_web
 from agents.research_report_synthesis import generate_synthesis
-from agents.models import SearchResult
+from agents.shared import SearchResult
 
 
 @workflow.defn

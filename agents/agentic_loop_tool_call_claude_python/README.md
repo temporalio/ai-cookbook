@@ -40,7 +40,7 @@ Each time through the loop:
 - Claude is called with the accumulated conversation history that is made up of the initial user input and any previous assistant responses and tool outputs.
 - The Workflow checks if Claude returned any tool calls (content blocks with `type: "tool_use"`).
 - If tool calls are present, the assistant's complete response (including all content blocks) is appended to the messages array, then all tools are executed, and their results are added as a user message.
-- If no tool has been called, the text response is returned. 
+- If no tool has been called, the text response is returned.
 
 *File: workflows/agent.py*
 
@@ -58,14 +58,14 @@ with workflow.unsafe.imports_passed_through():
 class AgentWorkflow:
     @workflow.run
     async def run(self, input: str) -> str:
-        
+
         # Initialize messages list with user input
         messages = [{"role": "user", "content": input}]
+        print(f"\n[User] {input}")
 
         # The agentic loop
         while True:
-            print(80 * "=")
-                
+
             # Consult Claude
             result = await workflow.execute_activity(
                 claude_responses.create,
@@ -81,7 +81,7 @@ class AgentWorkflow:
 
             # Claude returns content blocks - check if any are tool_use
             tool_use_blocks = [block for block in result.content if block.type == "tool_use"]
-            
+
             if tool_use_blocks:
                 # We have tool calls to handle
                 # First, add the assistant's response to messages
@@ -91,61 +91,52 @@ class AgentWorkflow:
                     if block.type == "text":
                         assistant_content.append({"type": "text", "text": block.text})
                     elif block.type == "tool_use":
+                        print(f"[Agent] Calling tool: {block.name}")
                         assistant_content.append({
                             "type": "tool_use",
                             "id": block.id,
                             "name": block.name,
                             "input": block.input
                         })
-                
+
                 messages.append({"role": "assistant", "content": assistant_content})
-                
+
                 # Execute all tool calls and collect results
                 tool_results = []
                 for block in tool_use_blocks:
-                    print(f"[Agent] Tool call: {block.name}({block.input})")
-                    
                     # Execute the tool
                     tool_result = await self._execute_tool(block.name, block.input)
-                    
-                    print(f"[Agent] Tool result: {tool_result}")
-                    
+
                     # Add tool result in Claude's expected format
                     tool_results.append({
                         "type": "tool_result",
                         "tool_use_id": block.id,
                         "content": str(tool_result)
                     })
-                
-                # Add tool results as a user message
+
+                # Add tool results as a user message. Claude has only two message roles: user and assistant,
+                # and the user message role is used to send tool results back to Claude; in this case the content
+                # block includes the tool result.
                 messages.append({"role": "user", "content": tool_results})
             else:
                 # No tool calls - extract the text response and return
                 text_blocks = [block for block in result.content if block.type == "text"]
                 if text_blocks:
                     response_text = text_blocks[0].text
-                    print(f"[Agent] Final response: {response_text}")
+                    print(f"[Agent] Final response: {response_text}\n")
                     return response_text
                 else:
                     return "No text response from Claude"
-```
 
-### Create the tool execution handler
-
-The tool execution handler is invoked by the main agentic loop when Claude has chosen tools. Because the Activity implementation is dynamic, the arguments are passed to the Activity as a dictionary. The Activity invocation is the same as any non-dynamic Activity invocation, passing the name of the Activity, the arguments, and any Activity configurations.
-
-*File: workflows/agent.py*
-
-```python
     async def _execute_tool(self, tool_name: str, tool_input: dict) -> str:
         """
         Execute a tool dynamically.
-        
+
         Args:
             tool_name: Name of the tool to execute
             tool_input: Dictionary of input parameters
         """
-        # Execute dynamic Activity with the tool name and arguments
+        # Execute dynamic activity with the tool name and arguments
         result = await workflow.execute_activity(
             tool_name,
             tool_input,
@@ -153,6 +144,10 @@ The tool execution handler is invoked by the main agentic loop when Claude has c
         )
         return result
 ```
+
+### The tool execution handler
+
+The `_execute_tool` method is invoked by the main agentic loop when Claude has chosen tools. Because the Activity implementation is dynamic, the arguments are passed to the Activity as a dictionary. The Activity invocation is the same as any non-dynamic Activity invocation, passing the name of the Activity, the arguments, and any Activity configurations.
 
 ## Create the Activity for Claude invocations
 
@@ -217,7 +212,7 @@ async def dynamic_tool_activity(args: Sequence[RawValue]) -> dict:
     from tools import get_handler
 
     # the name of the tool to execute - this is passed in via the execute_activity call in the Workflow
-    tool_name = activity.info().activity_type 
+    tool_name = activity.info().activity_type
     tool_args = activity.payload_converter().from_payload(args[0].payload, dict)
     activity.logger.info(f"Running dynamic tool '{tool_name}' with args: {tool_args}")
 
@@ -257,7 +252,7 @@ import json
 def claude_tool_from_model(name: str, description: str, model: type[BaseModel] | None) -> dict[str, Any]:
     """
     Convert a Pydantic model to Claude's tool format.
-    
+
     Claude's tool format structure:
     {
         "name": "tool_name",
@@ -280,24 +275,17 @@ def claude_tool_from_model(name: str, description: str, model: type[BaseModel] |
                 "required": []
             }
         }
-    
+
     # Get the JSON schema from the Pydantic model
     schema = model.model_json_schema()
-    
-    # Claude expects an input_schema field
+
+    # Claude expects an input_schema field instead of parameters
     return {
         "name": name,
         "description": description,
-        "input_schema": {
-            "type": "object",
-            "properties": schema.get("properties", {}),
-            "required": schema.get("required", [])
-        }
+        "input_schema": schema
     }
-```
 
-This file also holds the system instruction for the agent.
-```python
 HELPFUL_AGENT_SYSTEM_INSTRUCTIONS = """
 You are a helpful agent that can use tools to help the user.
 You will be given input from the user and a list of tools to use.
@@ -337,7 +325,7 @@ def get_handler(tool_name: str) -> ToolHandler:
 
 def get_tools() -> list[dict[str, Any]]:
     return [
-        get_weather.WEATHER_ALERTS_TOOL_CLAUDE, 
+        get_weather.WEATHER_ALERTS_TOOL_CLAUDE,
         get_location.GET_LOCATION_TOOL_CLAUDE,
         get_location.GET_IP_ADDRESS_TOOL_CLAUDE
     ]
@@ -357,9 +345,9 @@ import httpx
 from pydantic import BaseModel, Field
 from helpers import tool_helpers
 
-# For the location finder we use Pydantic to create a structure that encapsulates the input parameter 
-# (an IP address). 
-# This is used for both the location finding function and to craft the tool definitions that 
+# For the location finder we use Pydantic to create a structure that encapsulates the input parameter
+# (an IP address).
+# This is used for both the location finding function and to craft the tool definitions that
 # are passed to Claude.
 class GetLocationRequest(BaseModel):
     ipaddress: str = Field(description="An IP address")

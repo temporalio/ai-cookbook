@@ -97,7 +97,7 @@ class CleanDataWorkflow:
                 instructions="""Extract and clean business data with these specific rules:
 
 1. BUSINESS NAME: Extract the main business name, normalize capitalization (Title Case for proper nouns)
-2. EMAIL: 
+2. EMAIL:
    - Extract only ONE primary email address
    - If multiple emails, choose the one marked as "primary" or the first valid one
    - Validate format (must have @ and valid domain with .)

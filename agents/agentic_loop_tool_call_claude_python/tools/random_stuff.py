@@ -31,13 +31,13 @@ RANDOM_TEXT_TOOL_CLAUDE: dict[str, Any] = tool_helpers.claude_tool_from_model(
 
 async def generate_random_text(req: GenerateRandomTextRequest) -> str:
     """Generate random Lorem Ipsum text."""
-    words = ["lorem", "ipsum", "dolor", "sit", "amet", "consectetur", "adipiscing", 
-             "elit", "sed", "do", "eiusmod", "tempor", "incididunt", "ut", "labore", 
+    words = ["lorem", "ipsum", "dolor", "sit", "amet", "consectetur", "adipiscing",
+             "elit", "sed", "do", "eiusmod", "tempor", "incididunt", "ut", "labore",
              "et", "dolore", "magna", "aliqua"]
-    
+
     result = []
     for _ in range(req.length):
         result.append(random.choice(words))
-    
+
     return " ".join(result).capitalize() + "."
 

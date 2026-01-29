@@ -18,10 +18,10 @@ class HumanInTheLoopWorkflow:
     @workflow.run
     async def run(self, input: WorkflowInput) -> str:
         """Execute an AI agent workflow with human-in-the-loop approval.
-        
+
         Args:
             input: Workflow input containing user_request and approval_timeout_seconds
-            
+
         Returns:
             Result of the workflow execution
         """
@@ -29,7 +29,7 @@ class HumanInTheLoopWorkflow:
 
         # Step 1: AI analyzes the request and proposes an action
         proposed_action = await self._analyze_and_propose_action(input.user_request)
-        
+
         risk_status = "RISKY" if proposed_action.risky_action else "SAFE"
         workflow.logger.info(
             f"AI proposed action: {proposed_action.action_type} (Risk level: {risk_status})",
@@ -40,7 +40,7 @@ class HumanInTheLoopWorkflow:
         if proposed_action.risky_action:
             workflow.logger.info("Action is risky, requesting human approval")
             approval_result = await self._request_approval(
-                proposed_action, 
+                proposed_action,
                 input.user_request,
                 timeout_seconds=input.approval_timeout_seconds
             )
@@ -54,12 +54,12 @@ class HumanInTheLoopWorkflow:
                     start_to_close_timeout=timedelta(seconds=60),
                 )
                 return f"Action completed successfully: {result}"
-            
+
             elif approval_result == "rejected":
                 workflow.logger.info("Action rejected by human reviewer")
                 reviewer_notes = self.current_decision.reviewer_notes or 'None provided'
                 return f"Action rejected. Reviewer notes: {reviewer_notes}"
-            
+
             else:  # timeout
                 workflow.logger.warning("Approval request timed out")
                 timeout_msg = f"Action cancelled: approval request timed out after {input.approval_timeout_seconds} seconds"
@@ -94,20 +94,20 @@ class HumanInTheLoopWorkflow:
         return ProposedAction.model_validate_json(result)
 
     async def _request_approval(
-        self, 
-        proposed_action: ProposedAction, 
+        self,
+        proposed_action: ProposedAction,
         context: str,
         timeout_seconds: int
     ) -> str:
         """Request human approval and wait for response.
-        
+
         Returns:
             "approved", "rejected", or "timeout"
         """
         # Generate unique request ID using workflow's deterministic UUID
         self.current_decision = None
         self.pending_request_id = str(workflow.uuid4())
-        
+
         # Create approval request
         approval_request = ApprovalRequest(
             request_id=self.pending_request_id,
@@ -129,13 +129,13 @@ class HumanInTheLoopWorkflow:
                 lambda: self.current_decision is not None,
                 timeout=timedelta(seconds=timeout_seconds),
             )
-            
+
             # Decision received
             if self.current_decision.approved:
                 return "approved"
             else:
                 return "rejected"
-                
+
         except asyncio.TimeoutError:
             # Timeout waiting for approval
             return "timeout"

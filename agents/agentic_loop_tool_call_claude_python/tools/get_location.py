@@ -5,9 +5,9 @@ import httpx
 from pydantic import BaseModel, Field
 from helpers import tool_helpers
 
-# For the location finder we use Pydantic to create a structure that encapsulates the input parameter 
-# (an IP address). 
-# This is used for both the location finding function and to craft the tool definitions that 
+# For the location finder we use Pydantic to create a structure that encapsulates the input parameter
+# (an IP address).
+# This is used for both the location finding function and to craft the tool definitions that
 # are passed to Claude.
 class GetLocationRequest(BaseModel):
     ipaddress: str = Field(description="An IP address")

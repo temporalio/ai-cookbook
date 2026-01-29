@@ -30,14 +30,14 @@ async def _make_nws_request(url: str) -> dict[str, Any] | None:
 # that encapsulates the input parameters for both the weather alerts activity and the
 # tool definition that is passed to the OpenAI Responses API.
 
-# For the weather alerts tool we use Pydantic to create a structure that encapsulates 
+# For the weather alerts tool we use Pydantic to create a structure that encapsulates
 # the input parameter (a US state code).
-# This is used for both the weather alerts function and to craft the tool definition 
+# This is used for both the weather alerts function and to craft the tool definition
 # that is passed to the OpenAI Responses API.
 class GetWeatherAlertsRequest(BaseModel):
     state: str = Field(description="Two-letter US state code (e.g. CA, NY)")
 
-# Build the tool definition for the OpenAI Responses API. 
+# Build the tool definition for the OpenAI Responses API.
 WEATHER_ALERTS_TOOL_OAI: dict[str, Any] = tool_helpers.oai_responses_tool_from_model(
     "get_weather_alerts",
     "Get weather alerts for a US state.",

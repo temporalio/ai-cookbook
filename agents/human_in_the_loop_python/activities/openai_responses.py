@@ -19,5 +19,5 @@ async def create(request: OpenAIResponsesRequest) -> str:
         input=request.input,
         timeout=30,
     )
-    
+
     return resp.output_text

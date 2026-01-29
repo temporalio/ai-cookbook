@@ -16,11 +16,11 @@ class HelloWorldAgent:
             # Tools for the agent to use that are defined as activities
             tools=[
                 openai_agents.workflow.activity_as_tool(
-                    get_weather, 
+                    get_weather,
                     start_to_close_timeout=timedelta(seconds=10)
                 ),
                 openai_agents.workflow.activity_as_tool(
-                    calculate_circle_area, 
+                    calculate_circle_area,
                     start_to_close_timeout=timedelta(seconds=10)
                 )
             ]

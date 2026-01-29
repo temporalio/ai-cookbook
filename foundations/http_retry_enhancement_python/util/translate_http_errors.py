@@ -76,18 +76,18 @@ def _should_retry(response: Response) -> Tuple[bool, str]:
 
 def http_response_to_application_error(response: Response) -> ApplicationError:
     """Transform HTTP response into Temporal ApplicationError for retry handling.
-    
+
     This function implements generic HTTP retry logic based on status codes and headers.
-    
+
     Args:
         response: The httpx.Response from a failed HTTP request
-        
+
     Returns:
         ApplicationError: Always returns an ApplicationError configured for Temporal's retry system:
             - non_retryable: False for retryable errors, True for non-retryable
             - next_retry_delay: Server-provided delay hint (if valid)
-            
-    Note: 
+
+    Note:
         Even when x-should-retry=true, this function returns an ApplicationError with
         non_retryable=False rather than raising an exception, for cleaner functional style.
     """
@@ -99,12 +99,12 @@ def http_response_to_application_error(response: Response) -> ApplicationError:
         if retry_after is not None and 0 < retry_after <= 60:
             retry_after = timedelta(seconds=retry_after)
         else:
-            retry_after = None 
-        
+            retry_after = None
+
         # Add delay info for rate limits
         if response.status_code == 429 and retry_after is not None:
             retry_message = f"HTTP rate limit exceeded (429) (server requested {retry_after.total_seconds():.1f}s delay), will retry with backoff"
-        
+
         return ApplicationError(
             retry_message,
             non_retryable=False,

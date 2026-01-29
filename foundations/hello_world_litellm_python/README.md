@@ -1,4 +1,4 @@
-<!-- 
+<!--
 description: Integrate LiteLLM into a Temporal Workflow in Python.
 tags:[python, litellm, provider-neutral]
 priority: 920

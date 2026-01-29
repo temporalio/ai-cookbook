@@ -6,7 +6,7 @@ async def notify_approval_needed(request: ApprovalRequest) -> None:
     """Notify external systems that human approval is needed.
 
     In this sample, the notification comes in the form of messages printed in the terminal running the worker.
-    
+
     In a real system, this would send notifications via:
     - Email
     - Slack/Teams messages
@@ -15,12 +15,12 @@ async def notify_approval_needed(request: ApprovalRequest) -> None:
     """
     # Get workflow ID from activity context
     workflow_id = activity.info().workflow_id
-    
+
     activity.logger.info(
         f"Approval needed for request: {request.request_id}",
         extra={"request": request.model_dump()}
     )
-    
+
     # In a real implementation, you would call notification services here
     risk_indicator = "⚠️  RISKY ACTION" if request.proposed_action.risky_action else "✓ Safe Action"
     print(f"\n{'='*60}")

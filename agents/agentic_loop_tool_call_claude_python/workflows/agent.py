@@ -11,14 +11,14 @@ with workflow.unsafe.imports_passed_through():
 class AgentWorkflow:
     @workflow.run
     async def run(self, input: str) -> str:
-        
+
         # Initialize messages list with user input
         messages = [{"role": "user", "content": input}]
         print(f"\n[User] {input}")
 
         # The agentic loop
         while True:
-                
+
             # Consult Claude
             result = await workflow.execute_activity(
                 claude_responses.create,
@@ -34,7 +34,7 @@ class AgentWorkflow:
 
             # Claude returns content blocks - check if any are tool_use
             tool_use_blocks = [block for block in result.content if block.type == "tool_use"]
-            
+
             if tool_use_blocks:
                 # We have tool calls to handle
                 # First, add the assistant's response to messages
@@ -51,22 +51,22 @@ class AgentWorkflow:
                             "name": block.name,
                             "input": block.input
                         })
-                
+
                 messages.append({"role": "assistant", "content": assistant_content})
-                
+
                 # Execute all tool calls and collect results
                 tool_results = []
                 for block in tool_use_blocks:
                     # Execute the tool
                     tool_result = await self._execute_tool(block.name, block.input)
-                    
+
                     # Add tool result in Claude's expected format
                     tool_results.append({
                         "type": "tool_result",
                         "tool_use_id": block.id,
                         "content": str(tool_result)
                     })
-                
+
                 # Add tool results as a user message. Claude has only two message roles: user and assistant,
                 # and the user message role is used to send tool results back to Claude; in this case the content
                 # block includes the tool result.
@@ -84,7 +84,7 @@ class AgentWorkflow:
     async def _execute_tool(self, tool_name: str, tool_input: dict) -> str:
         """
         Execute a tool dynamically.
-        
+
         Args:
             tool_name: Name of the tool to execute
             tool_input: Dictionary of input parameters

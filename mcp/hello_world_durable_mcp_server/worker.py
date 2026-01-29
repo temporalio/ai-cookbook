@@ -7,7 +7,7 @@ from workflows.weather_workflows import GetAlerts, GetForecast
 from activities.weather_activities import make_nws_request
 
 async def main():
-    # Connect to Temporal server 
+    # Connect to Temporal server
     config = ClientConfig.load_client_connect_config()
     config.setdefault("target_host", "localhost:7233")
     client = await Client.connect(
@@ -15,7 +15,7 @@ async def main():
         data_converter=pydantic_data_converter,
     )
 
-    # Register both Workflows and the Activity 
+    # Register both Workflows and the Activity
     worker = Worker(
         client,
         task_queue="weather-task-queue",

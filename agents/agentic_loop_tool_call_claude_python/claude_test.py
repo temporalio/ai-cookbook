@@ -58,15 +58,15 @@ for block in message.content:
     elif block.type == "tool_use":
         print(f"Tool call: {block.name}")
         print(f"Arguments: {block.input}")
-        
+
         # Simulate tool execution
         result = block.input["left"] + block.input["right"]
         print(f"Tool result: {result}")
-        
+
         # Send result back to Claude
         print("\n" + "=" * 80)
         print("Sending tool result back to Claude...")
-        
+
         final_message = client.messages.create(
             model="claude-sonnet-4-20250514",
             max_tokens=1024,
@@ -86,7 +86,7 @@ for block in message.content:
                 }
             ],
         )
-        
+
         print("\nClaude's final response:")
         for final_block in final_message.content:
             if final_block.type == "text":

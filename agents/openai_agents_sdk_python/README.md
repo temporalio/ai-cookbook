@@ -39,6 +39,8 @@ class Weather:
 @activity.defn
 async def get_weather(city: str) -> Weather:
     """Get the weather for a given city."""
+    # introduce a bug
+    raise Exception("This is a test error")
     return Weather(city=city, temperature_range="14-20C", conditions="Sunny with wind.")
 
 @activity.defn
@@ -80,6 +82,7 @@ class HelloWorldAgent:
                     start_to_close_timeout=timedelta(seconds=10)
                 )
             ]
+
         )
 
         result = await Runner.run(agent, prompt)
@@ -101,8 +104,10 @@ from temporalio.client import Client
 from temporalio.worker import Worker
 from temporalio.contrib.openai_agents import OpenAIAgentsPlugin, ModelActivityParameters
 
+
 from workflows.hello_world_workflow import HelloWorldAgent
 from activities.tools import get_weather, calculate_circle_area
+
 
 async def worker_main():
     # Use the plugin to configure Temporal for use with OpenAI Agents SDK
@@ -125,6 +130,7 @@ async def worker_main():
     )
     await worker.run()
 
+
 if __name__ == "__main__":
     asyncio.run(worker_main())
 ```
@@ -140,6 +146,7 @@ It uses the `OpenAIAgentsPlugin` to match the Worker configuration.
 import asyncio
 
 from temporalio.client import Client
+
 from temporalio.common import WorkflowIDReusePolicy
 from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
 from workflows.hello_world_workflow import HelloWorldAgent
@@ -150,9 +157,6 @@ async def main():
         # Use the plugin to configure Temporal for use with OpenAI Agents SDK
         plugins=[OpenAIAgentsPlugin()],
     )
-
-    # Start workflow
-    print( 80 * "-" )
 
     # Get user input
     user_input = input("Enter a question: ")
@@ -166,10 +170,6 @@ async def main():
         id_reuse_policy=WorkflowIDReusePolicy.TERMINATE_IF_RUNNING,
     )
     print(f"Result: {result}")
-
-    # End of workflow
-    print( 80 * "-" )
-    print("Workflow completed")
 
 if __name__ == "__main__":
     asyncio.run(main())

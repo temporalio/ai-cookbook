@@ -1,4 +1,4 @@
-<!-- 
+<!--
 description: Simple example demonstrating how to call an LLM from Temporal using the OpenAI Python API library.
 tags:[foundations, openai, python]
 priority: 999
@@ -159,7 +159,7 @@ async def main():
     result = await client.execute_workflow(
         HelloWorld.run,
         "Tell me about recursion in programming.",
-        id="my-workflow-id",
+        id="my-workflow-id-2",
         task_queue="hello-world-python-task-queue",
     )
     print(f"Result: {result}")

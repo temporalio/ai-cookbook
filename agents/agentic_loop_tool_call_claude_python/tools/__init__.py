@@ -19,7 +19,7 @@ def get_handler(tool_name: str) -> ToolHandler:
 
 def get_tools() -> list[dict[str, Any]]:
     return [
-        get_weather.WEATHER_ALERTS_TOOL_CLAUDE, 
+        get_weather.WEATHER_ALERTS_TOOL_CLAUDE,
         get_location.GET_LOCATION_TOOL_CLAUDE,
         get_location.GET_IP_ADDRESS_TOOL_CLAUDE
     ]

@@ -28,7 +28,7 @@ class ToolCallingWorkflow:
             ),
             start_to_close_timeout=timedelta(seconds=30),
         )
-        
+
         # For this simple example, we only have one item in the output list
         item = result.output[0]
 
@@ -47,7 +47,7 @@ class ToolCallingWorkflow:
                     get_weather_alerts.GetWeatherAlertsRequest(state=json.loads(item.arguments)["state"]),
                     start_to_close_timeout=timedelta(seconds=30),
                 )
-                
+
                 # add the tool call result to the input list for context
                 input_list.append({"type": "function_call_output",
                                     "call_id": item.call_id,
@@ -67,4 +67,3 @@ class ToolCallingWorkflow:
         result = result.output_text
 
         return result
- 
