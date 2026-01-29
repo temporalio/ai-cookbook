@@ -4,43 +4,22 @@ Verify that code snippets in README files match their source files.
 
 ## Instructions
 
-1. **Run the verification script** to get a summary with diffs:
+**CRITICAL: You MUST run the verification script first. Do NOT manually explore or compare files.**
+
+1. Run the verification script:
    ```bash
    uv run python scripts/verify_readme_snippets.py
    ```
 
-2. **Review the output** - The script will show:
-   - Each README with file annotations
+2. Report the results to the user. The script shows:
    - OK/MISMATCH/MISSING status for each snippet
-   - Unified diffs for mismatches (truncated to 15 lines)
-   - Summary counts at the end
+   - Unified diffs for mismatches
+   - Summary counts
 
-3. **If mismatches are found**, ask the user which direction to sync:
-   - **Update README** → make README match the source file (source is correct)
-   - **Update source** → make source file match the README (README is correct, source has unwanted changes)
+3. If all snippets are OK, report success and stop.
 
-4. **Based on user choice**, make the appropriate updates:
-   - If updating README: replace snippet content with current source file content
-   - If updating source: replace source file content with the README snippet
-   - Preserve markdown structure when editing README
+4. If mismatches are found, ask the user which direction to sync:
+   - **Update README** → make README match the source file
+   - **Update source** → make source file match the README
 
-## Example Output
-
-```
-Checking README snippets...
-
-foundations/claim_check_pattern_python/README.md:
-  codec/claim_check.py: OK
-  codec/plugin.py: MISMATCH
-    --- README:codec/plugin.py
-    +++ source:codec/plugin.py
-    @@ -1,5 +1,6 @@
-     import os
-    +from temporalio.plugin import SimplePlugin
-     from temporalio.converter import DataConverter
-
-============================================================
-Total: 12 snippets checked
-  OK: 11
-  MISMATCH: 1
-```
+5. Apply the user's chosen fix by editing the appropriate file(s).
