@@ -16,12 +16,12 @@ def build_codec_server() -> web.Application:
         endpoint_url=os.getenv("S3_ENDPOINT_URL"),
         region_name=os.getenv("AWS_REGION", "us-east-1")
     )
-    
+
     # Configure Web UI endpoint
     temporal_web_url = os.getenv("TEMPORAL_WEB_URL", "http://localhost:8233")
     # Configure codec server endpoint for viewing raw data
     codec_server_url = os.getenv("CODEC_SERVER_URL", "http://localhost:8081")
-    
+
     # CORS handler - needed because Temporal Web UI runs on a different port/domain
     # and the browser blocks cross-origin requests by default; CORS headers allow these requests
     async def cors_options(req: web.Request) -> web.Response:
@@ -36,7 +36,7 @@ def build_codec_server() -> web.Application:
     async def decode_with_urls(payloads: Iterable[Payload]) -> List[Payload]:
         """Decode claim check payloads and provide URLs to view the raw data."""
         out: List[Payload] = []
-        
+
         for payload in payloads:
             if payload.metadata.get("temporal.io/claim-check-codec", b"").decode() != "v1":
                 # Not a claim-checked payload, pass through unchanged
@@ -45,23 +45,23 @@ def build_codec_server() -> web.Application:
 
             # Get the S3 key
             s3_key = payload.data.decode("utf-8")
-            
+
             # Return simple text with link - no data reading
             link_text = f"Claim check data (key: {s3_key}) - View at: {codec_server_url}/view/{s3_key}"
-            
+
             summary_payload = Payload(
                 metadata={"encoding": b"json/plain"},
                 data=json.dumps({"text": link_text}).encode("utf-8")
             )
             out.append(summary_payload)
-        
+
         return out
 
     # Endpoint to view raw payload data
     async def view_raw_data(req: web.Request) -> web.Response:
         """View the raw payload data for a given S3 key."""
         s3_key = req.match_info['key']
-        
+
         try:
             stored_data = await codec.get_payload_from_s3(s3_key)
             if stored_data is None:
@@ -70,10 +70,10 @@ def build_codec_server() -> web.Application:
                     content_type="application/json",
                     status=404
                 )
-            
+
             # Parse and return the original payload
             original_payload = Payload.FromString(stored_data)
-            
+
             # Try to decode as text, fall back to base64 for binary data
             try:
                 data_text = original_payload.data.decode("utf-8")
@@ -88,7 +88,7 @@ def build_codec_server() -> web.Application:
                     text=f"Binary data (base64):\n{data_b64}",
                     content_type="text/plain"
                 )
-                
+
         except Exception as e:
             return web.Response(
                 text=json.dumps({"error": f"Failed to retrieve data: {str(e)}"}),
@@ -104,7 +104,7 @@ def build_codec_server() -> web.Application:
         assert req.content_type == "application/json"
         data = await req.read()
         payloads = json_format.Parse(data.decode("utf-8"), Payloads())
-        
+
         # Apply
         payloads = Payloads(payloads=await fn(payloads.payloads))
 

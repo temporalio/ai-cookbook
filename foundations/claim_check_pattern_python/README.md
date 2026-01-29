@@ -1,4 +1,4 @@
-<!-- 
+<!--
 description: Use the Claim Check pattern to handle large payloads to workflows and activities.
 tags:[foundations, claim-check, python, s3]
 priority: 400
@@ -47,7 +47,7 @@ logger = logging.getLogger(__name__)
 
 class ClaimCheckCodec(PayloadCodec):
     """PayloadCodec that implements the Claim Check pattern using S3 storage.
-    
+
     This codec stores large payloads in S3 and replaces them with unique keys,
     allowing Temporal workflows to operate with lightweight references instead
     of large payload data.
@@ -80,7 +80,7 @@ class ClaimCheckCodec(PayloadCodec):
         """Ensure the S3 bucket exists, creating it if necessary."""
         if self._bucket_created:
             return
-            
+
         async with self.session.client(
             's3',
             endpoint_url=self.endpoint_url,
@@ -99,20 +99,20 @@ class ClaimCheckCodec(PayloadCodec):
                             raise create_error
                 elif error_code not in ['403', 'Forbidden']:
                     raise e
-        
+
         self._bucket_created = True
 
     async def encode(self, payloads: Iterable[Payload]) -> List[Payload]:
         """Replace large payloads with keys and store original data in S3.
-        
+
         Args:
             payloads: Iterable of payloads to encode
-            
+
         Returns:
             List of encoded payloads (keys for claim-checked payloads)
         """
         await self._ensure_bucket_exists()
-        
+
         out: List[Payload] = []
         for payload in payloads:
             # Leave small payloads inline to improve debuggability and avoid unnecessary indirection
@@ -127,18 +127,18 @@ class ClaimCheckCodec(PayloadCodec):
 
     async def decode(self, payloads: Iterable[Payload]) -> List[Payload]:
         """Retrieve original payloads from S3 using stored keys.
-        
+
         Args:
             payloads: Iterable of payloads to decode
-            
+
         Returns:
             List of decoded payloads (original data retrieved from S3)
-            
+
         Raises:
             ValueError: If a claim check key is not found in S3
         """
         await self._ensure_bucket_exists()
-        
+
         out: List[Payload] = []
         for payload in payloads:
             if payload.metadata.get("temporal.io/claim-check-codec", b"").decode() != "v1":
@@ -150,25 +150,25 @@ class ClaimCheckCodec(PayloadCodec):
             stored_data = await self.get_payload_from_s3(s3_key)
             if stored_data is None:
                 raise ValueError(f"Claim check key not found in S3: {s3_key}")
-            
+
             original_payload = Payload.FromString(stored_data)
             out.append(original_payload)
         return out
 
     async def encode_payload(self, payload: Payload) -> Payload:
         """Store payload in S3 and return a key-based payload.
-        
+
         Args:
             payload: Original payload to store
-            
+
         Returns:
             Payload containing only the S3 key
         """
         await self._ensure_bucket_exists()
-        
+
         key = str(uuid.uuid4())
         serialized_data = payload.SerializeToString()
-        
+
         # Store the original payload data in S3
         async with self.session.client(
             's3',
@@ -180,7 +180,7 @@ class ClaimCheckCodec(PayloadCodec):
                 Key=key,
                 Body=serialized_data
             )
-        
+
         # Return a lightweight payload containing only the key
         return Payload(
             metadata={
@@ -192,10 +192,10 @@ class ClaimCheckCodec(PayloadCodec):
 
     async def get_payload_from_s3(self, s3_key: str) -> bytes:
         """Retrieve payload data from S3.
-        
+
         Args:
             s3_key: S3 object key
-            
+
         Returns:
             Raw payload data bytes, or None if not found
         """
@@ -344,7 +344,7 @@ async def rag_answer(req: RagRequest, ingest_result: IngestResult) -> RagAnswer:
     # This prevents NumPy from being loaded into the workflow sandbox
     from openai import AsyncOpenAI
     from rank_bm25 import BM25Okapi
-    
+
     client = AsyncOpenAI(max_retries=0)
 
     # Lexical retrieval using BM25 over chunk texts
@@ -511,12 +511,12 @@ def build_codec_server() -> web.Application:
         endpoint_url=os.getenv("S3_ENDPOINT_URL"),
         region_name=os.getenv("AWS_REGION", "us-east-1")
     )
-    
+
     # Configure Web UI endpoint
     temporal_web_url = os.getenv("TEMPORAL_WEB_URL", "http://localhost:8233")
     # Configure codec server endpoint for viewing raw data
     codec_server_url = os.getenv("CODEC_SERVER_URL", "http://localhost:8081")
-    
+
     # CORS handler - needed because Temporal Web UI runs on a different port/domain
     # and the browser blocks cross-origin requests by default; CORS headers allow these requests
     async def cors_options(req: web.Request) -> web.Response:
@@ -531,7 +531,7 @@ def build_codec_server() -> web.Application:
     async def decode_with_urls(payloads: Iterable[Payload]) -> List[Payload]:
         """Decode claim check payloads and provide URLs to view the raw data."""
         out: List[Payload] = []
-        
+
         for payload in payloads:
             if payload.metadata.get("temporal.io/claim-check-codec", b"").decode() != "v1":
                 # Not a claim-checked payload, pass through unchanged
@@ -540,23 +540,23 @@ def build_codec_server() -> web.Application:
 
             # Get the S3 key
             s3_key = payload.data.decode("utf-8")
-            
+
             # Return simple text with link - no data reading
             link_text = f"Claim check data (key: {s3_key}) - View at: {codec_server_url}/view/{s3_key}"
-            
+
             summary_payload = Payload(
                 metadata={"encoding": b"json/plain"},
                 data=json.dumps({"text": link_text}).encode("utf-8")
             )
             out.append(summary_payload)
-        
+
         return out
 
     # Endpoint to view raw payload data
     async def view_raw_data(req: web.Request) -> web.Response:
         """View the raw payload data for a given S3 key."""
         s3_key = req.match_info['key']
-        
+
         try:
             stored_data = await codec.get_payload_from_s3(s3_key)
             if stored_data is None:
@@ -565,10 +565,10 @@ def build_codec_server() -> web.Application:
                     content_type="application/json",
                     status=404
                 )
-            
+
             # Parse and return the original payload
             original_payload = Payload.FromString(stored_data)
-            
+
             # Try to decode as text, fall back to base64 for binary data
             try:
                 data_text = original_payload.data.decode("utf-8")
@@ -583,7 +583,7 @@ def build_codec_server() -> web.Application:
                     text=f"Binary data (base64):\n{data_b64}",
                     content_type="text/plain"
                 )
-                
+
         except Exception as e:
             return web.Response(
                 text=json.dumps({"error": f"Failed to retrieve data: {str(e)}"}),
@@ -599,7 +599,7 @@ def build_codec_server() -> web.Application:
         assert req.content_type == "application/json"
         data = await req.read()
         payloads = json_format.Parse(data.decode("utf-8"), Payloads())
-        
+
         # Apply
         payloads = Payloads(payloads=await fn(payloads.payloads))
 

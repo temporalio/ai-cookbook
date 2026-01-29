@@ -44,6 +44,7 @@ The MCP server is implemented using FastMCP and exposes tools via the `@mcp.tool
 
 ```python
 from temporalio.client import Client
+from temporalio.envconfig import ClientConfig
 from fastmcp import FastMCP
 
 # Initialize FastMCP server
@@ -79,11 +80,11 @@ async def get_alerts(state: str) -> str:
 
 @mcp.tool
 async def get_forecast(latitude: float, longitude: float) -> str:
-    """Get weather forecast for a US location.
+    """Get weather forecast for a location.
 
     Args:
-        latitude: Latitude of the location (must be within the US)
-        longitude: Longitude of the location (must be within the US)
+        latitude: Latitude of the location
+        longitude: Longitude of the location
     """
     # The business logic has been moved into the Temporal Workflow, the MCP tool kicks off the Workflow
     client = await get_temporal_client()
@@ -108,12 +109,14 @@ The Workflows contain the business logic for fetching weather data. They orchest
 
 The `GetAlerts` workflow fetches active weather alerts for a US state.
 
-*File: workflows/weather_workflows.py*
+*File: workflows/weather_workflows.py (excerpt)*
 
 ```python
 from datetime import timedelta
 from temporalio import workflow
 from temporalio.common import RetryPolicy
+import json
+import asyncio
 
 retry_policy = RetryPolicy(
     maximum_attempts=0,  # Infinite retries
@@ -124,10 +127,12 @@ retry_policy = RetryPolicy(
 
 # Constants
 NWS_API_BASE = "https://api.weather.gov"
+USER_AGENT = "weather-app/1.0"
 
-# Import Activities, passing them through the sandbox
+# Import Activities and models, passing them through the sandbox
 with workflow.unsafe.imports_passed_through():
     from activities.weather_activities import make_nws_request
+
 
 def format_alert(feature: dict) -> str:
     """Format an alert feature into a readable string."""
@@ -160,29 +165,26 @@ class GetAlerts:
         if not data or "features" not in data:
             return "Unable to fetch alerts or no alerts found."
 
-        if not data["features"]:
-            return "No active alerts for this state."
-
         alerts = [format_alert(feature) for feature in data["features"]]
         return "\n---\n".join(alerts)
 ```
 
 ### GetForecast Workflow
 
-The `GetForecast` workflow demonstrates a multi-step operation: it first fetches the forecast grid endpoint for a location, then uses that information to fetch the detailed forecast. 
+The `GetForecast` workflow demonstrates a multi-step operation: it first fetches the forecast grid endpoint for a location, then uses that information to fetch the detailed forecast.
 
-*File: workflows/weather_workflows.py*
+*File: workflows/weather_workflows.py (excerpt)*
 
 ```python
 @workflow.defn
 class GetForecast:
     @workflow.run
     async def get_forecast(self, latitude: float, longitude: float) -> str:
-        """Get weather forecast for a US location.
+        """Get weather forecast for a location.
 
         Args:
-            latitude: Latitude of the location (must be within the US)
-            longitude: Longitude of the location (must be within the US)
+            latitude: Latitude of the location
+            longitude: Longitude of the location
         """
         # First get the forecast grid endpoint
         points_url = f"{NWS_API_BASE}/points/{latitude},{longitude}"
@@ -244,6 +246,7 @@ async def make_nws_request(url: str) -> dict[str, Any] | None:
         "Accept": "application/geo+json"
     }
     async with httpx.AsyncClient() as client:
+
         response = await client.get(url, headers=headers, timeout=5.0)
         response.raise_for_status()
         return response.json()
@@ -251,19 +254,21 @@ async def make_nws_request(url: str) -> dict[str, Any] | None:
 
 ## Create the Worker
 
-The Worker is the process that excutes Activities and Workflows. 
+The Worker is the process that excutes Activities and Workflows.
 
 *File: worker.py*
 
 ```python
 import asyncio
 from temporalio.client import Client
+from temporalio.envconfig import ClientConfig
 from temporalio.worker import Worker
 
 from workflows.weather_workflows import GetAlerts, GetForecast
 from activities.weather_activities import make_nws_request
 
 async def main():
+    # Connect to Temporal server
     config = ClientConfig.load_client_connect_config()
     config.setdefault("target_host", "localhost:7233")
     client = await Client.connect(
@@ -271,7 +276,7 @@ async def main():
         data_converter=pydantic_data_converter,
     )
 
-    # Register both Workflows and the Activity 
+    # Register both Workflows and the Activity
     worker = Worker(
         client,
         task_queue="weather-task-queue",
@@ -294,17 +299,17 @@ For this example, we are using Claude Desktop as the MCP Client. To use this MCP
 
 ```json
 {
-    "mcpServers": {
-        "weather": {
-        "command": "uv",
-        "args": [
-            "--directory",
-            "<full path to the directory containing the weather.py>",
-            "run",
-            "mcp_servers/weather.py"
-        ]
-        }
+  "mcpServers": {
+    "weather": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "<full path to the directory containing the weather.py>",
+        "run",
+        "weather.py"
+      ]
     }
+  }
 }
 ```
 
@@ -355,6 +360,6 @@ Once configured, you should see the tool appear under the slider icon underneath
 You can now ask Claude something like `What is the weather like in San Francisco, CA?`. Claude Desktop will understand that it needs to use the `get_forecast` tool in the Weather MCP server that you just configured.
 
 > [!NOTE]
-> The National Weather Service API only supports US locations. Asking about weather in non-US locations (e.g., "What is the weather in London?") will result in a 404 error from the API. 
+> The National Weather Service API only supports US locations. Asking about weather in non-US locations (e.g., "What is the weather in London?") will result in a 404 error from the API.
 
 After tool execution, Claude Desktop will send the result over to the LLM (with other context) for human formating, and then returns that result to the user. You can see these and other MCP-related actions in the `mcp_server.log`.

@@ -16,7 +16,7 @@ async def main():
 
     query = sys.argv[1] if len(sys.argv) > 1 else "Tell me about recursion"
 
-    # Submit the agent workflow for execution
+    # Submit the agent Workflow for execution
     result = await client.execute_workflow(
         AgentWorkflow.run,
         query,

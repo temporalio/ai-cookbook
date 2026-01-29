@@ -42,7 +42,7 @@ async def rag_answer(req: RagRequest, ingest_result: IngestResult) -> RagAnswer:
     # This prevents NumPy from being loaded into the workflow sandbox
     from openai import AsyncOpenAI
     from rank_bm25 import BM25Okapi
-    
+
     client = AsyncOpenAI(max_retries=0)
 
     # Lexical retrieval using BM25 over chunk texts

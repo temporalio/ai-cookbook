@@ -17,7 +17,7 @@ OUTPUT REQUIREMENTS:
 - research_question: Clarified version of the original query
 - key_aspects: Specific areas requiring investigation, each with:
   - aspect: The research area name
-  - priority: 1-5 ranking (5 highest priority)  
+  - priority: 1-5 ranking (5 highest priority)
   - description: What needs to be investigated
 - expected_sources: Types of sources likely to contain relevant information
 - search_strategy: High-level approach for information gathering

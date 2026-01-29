@@ -1,5 +1,5 @@
 <!--
-description: Build a simple, non-looping agent that gives agency to the LLM to choose tools, and then invokes chosen tools. 
+description: Build a simple, non-looping agent that gives agency to the LLM to choose tools, and then invokes chosen tools.
 tags: [agents, python]
 priority: 775
 -->
@@ -157,7 +157,7 @@ def oai_responses_tool_from_model(name: str, description: str, model: type[BaseM
 
 ## Create the Agent
 
-The agent is implemented as a Temporal workflow that orchestrates 
+The agent is implemented as a Temporal workflow that orchestrates
 - the intial LLM call with the initial user input and guidance to the LLM that they should respond in haiku when the user input doesn't lead to a tool call,
 - the invocation of the function, if the LLM has chosen one
 - and if a function has been called, the result is appended to the context that is then sent back to the LLM for interpretation (the LLM is instructed to format the tool response).
@@ -194,7 +194,7 @@ class ToolCallingWorkflow:
             ),
             start_to_close_timeout=timedelta(seconds=30),
         )
-        
+
         # For this simple example, we only have one item in the output list
         item = result.output[0]
 
@@ -213,7 +213,7 @@ class ToolCallingWorkflow:
                     get_weather_alerts.GetWeatherAlertsRequest(state=json.loads(item.arguments)["state"]),
                     start_to_close_timeout=timedelta(seconds=30),
                 )
-                
+
                 # add the tool call result to the input list for context
                 input_list.append({"type": "function_call_output",
                                     "call_id": item.call_id,

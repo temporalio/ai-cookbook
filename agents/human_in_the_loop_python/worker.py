@@ -32,7 +32,7 @@ async def main():
             notify_approval_needed,
         ],
     )
-    
+
     await worker.run()
 
 

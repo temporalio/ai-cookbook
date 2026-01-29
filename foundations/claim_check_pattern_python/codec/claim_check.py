@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 class ClaimCheckCodec(PayloadCodec):
     """PayloadCodec that implements the Claim Check pattern using S3 storage.
-    
+
     This codec stores large payloads in S3 and replaces them with unique keys,
     allowing Temporal workflows to operate with lightweight references instead
     of large payload data.
@@ -45,7 +45,7 @@ class ClaimCheckCodec(PayloadCodec):
         """Ensure the S3 bucket exists, creating it if necessary."""
         if self._bucket_created:
             return
-            
+
         async with self.session.client(
             's3',
             endpoint_url=self.endpoint_url,
@@ -64,20 +64,20 @@ class ClaimCheckCodec(PayloadCodec):
                             raise create_error
                 elif error_code not in ['403', 'Forbidden']:
                     raise e
-        
+
         self._bucket_created = True
 
     async def encode(self, payloads: Iterable[Payload]) -> List[Payload]:
         """Replace large payloads with keys and store original data in S3.
-        
+
         Args:
             payloads: Iterable of payloads to encode
-            
+
         Returns:
             List of encoded payloads (keys for claim-checked payloads)
         """
         await self._ensure_bucket_exists()
-        
+
         out: List[Payload] = []
         for payload in payloads:
             # Leave small payloads inline to improve debuggability and avoid unnecessary indirection
@@ -92,18 +92,18 @@ class ClaimCheckCodec(PayloadCodec):
 
     async def decode(self, payloads: Iterable[Payload]) -> List[Payload]:
         """Retrieve original payloads from S3 using stored keys.
-        
+
         Args:
             payloads: Iterable of payloads to decode
-            
+
         Returns:
             List of decoded payloads (original data retrieved from S3)
-            
+
         Raises:
             ValueError: If a claim check key is not found in S3
         """
         await self._ensure_bucket_exists()
-        
+
         out: List[Payload] = []
         for payload in payloads:
             if payload.metadata.get("temporal.io/claim-check-codec", b"").decode() != "v1":
@@ -115,25 +115,25 @@ class ClaimCheckCodec(PayloadCodec):
             stored_data = await self.get_payload_from_s3(s3_key)
             if stored_data is None:
                 raise ValueError(f"Claim check key not found in S3: {s3_key}")
-            
+
             original_payload = Payload.FromString(stored_data)
             out.append(original_payload)
         return out
 
     async def encode_payload(self, payload: Payload) -> Payload:
         """Store payload in S3 and return a key-based payload.
-        
+
         Args:
             payload: Original payload to store
-            
+
         Returns:
             Payload containing only the S3 key
         """
         await self._ensure_bucket_exists()
-        
+
         key = str(uuid.uuid4())
         serialized_data = payload.SerializeToString()
-        
+
         # Store the original payload data in S3
         async with self.session.client(
             's3',
@@ -145,7 +145,7 @@ class ClaimCheckCodec(PayloadCodec):
                 Key=key,
                 Body=serialized_data
             )
-        
+
         # Return a lightweight payload containing only the key
         return Payload(
             metadata={
@@ -157,10 +157,10 @@ class ClaimCheckCodec(PayloadCodec):
 
     async def get_payload_from_s3(self, s3_key: str) -> bytes:
         """Retrieve payload data from S3.
-        
+
         Args:
             s3_key: S3 object key
-            
+
         Returns:
             Raw payload data bytes, or None if not found
         """

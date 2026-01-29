@@ -20,7 +20,7 @@ APPROACH:
 OUTPUT REQUIREMENTS:
 - queries: Search queries, each with:
   - query: The actual search string
-  - rationale: Why this query addresses research needs  
+  - rationale: Why this query addresses research needs
   - expected_info_type: One of "factual_data", "expert_analysis", "case_studies", "recent_news"
   - priority: 1-5 (5 highest priority)
 

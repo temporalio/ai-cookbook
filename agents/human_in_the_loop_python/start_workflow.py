@@ -17,10 +17,10 @@ async def main():
 
     default_request = "Delete all test data from the production database"
     user_request = sys.argv[1] if len(sys.argv) > 1 else default_request
-    
+
     # Use a unique workflow ID so you can run multiple instances
     workflow_id = f"human-in-the-loop-{uuid.uuid4()}"
-    
+
     print(f"Starting workflow with ID: {workflow_id}")
     print(f"User request: {user_request}")
     print("\nWorkflow may pause for approval. Watch the worker output for instructions.\n")
@@ -36,7 +36,7 @@ async def main():
         id=workflow_id,
         task_queue="human-in-the-loop-task-queue",
     )
-    
+
     print(f"\nWorkflow completed!")
     print(f"Result: {result}")
 

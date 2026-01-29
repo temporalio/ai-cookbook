@@ -10,7 +10,7 @@ This example demonstrates how to build an AI agent that requires human approval;
 ## Overview
 
 The workflow implements the agent flow:
-1. Uses an LLM to analyze a user request and propose an action. 
+1. Uses an LLM to analyze a user request and propose an action.
 2. If the proposed action is deemed risky, pauses and waits for human approval via Temporal Signal
 3. Executes the action if auto-approved (if not risky) or human approved, or cancels if rejected/timed out
 
