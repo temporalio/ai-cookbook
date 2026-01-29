@@ -4,31 +4,25 @@ Verify that code snippets in README files match their source files.
 
 ## Instructions
 
-1. Find all README.md files in the repository that contain code snippets with file annotations like `*File: path/to/file.py*`
+1. **Run the verification script** to get a summary with diffs:
+   ```bash
+   uv run python scripts/verify_readme_snippets.py
+   ```
 
-2. For each annotated snippet:
-   - Extract the code between the ``` fences
-   - Read the actual source file
-   - Compare them (exact match for full files, substring for excerpts marked with `(excerpt)`)
+2. **Review the output** - The script will show:
+   - Each README with file annotations
+   - OK/MISMATCH/MISSING status for each snippet
+   - Unified diffs for mismatches (truncated to 15 lines)
+   - Summary counts at the end
 
-3. Report findings:
-   - List any mismatches found
-   - Show a brief diff or summary of what changed
-
-4. If discrepancies are found, ask the user which direction to sync:
+3. **If mismatches are found**, ask the user which direction to sync:
    - **Update README** → make README match the source file (source is correct)
    - **Update source** → make source file match the README (README is correct, source has unwanted changes)
 
-5. Based on user choice, make the appropriate updates:
+4. **Based on user choice**, make the appropriate updates:
    - If updating README: replace snippet content with current source file content
    - If updating source: replace source file content with the README snippet
    - Preserve markdown structure when editing README
-
-## Scope
-
-By default, check **all** READMEs in the repository that contain file annotations (`*File: ...*` patterns).
-
-If the user specifies a path, check only READMEs in that directory.
 
 ## Example Output
 
@@ -36,10 +30,17 @@ If the user specifies a path, check only READMEs in that directory.
 Checking README snippets...
 
 foundations/claim_check_pattern_python/README.md:
-  - codec/plugin.py: MISMATCH (source has 23 lines, snippet has 21 lines)
-  - codec/claim_check.py: OK
+  codec/claim_check.py: OK
+  codec/plugin.py: MISMATCH
+    --- README:codec/plugin.py
+    +++ source:codec/plugin.py
+    @@ -1,5 +1,6 @@
+     import os
+    +from temporalio.plugin import SimplePlugin
+     from temporalio.converter import DataConverter
 
-Found 1 mismatch. Which direction should I sync?
-  1. Update README to match source (source is correct)
-  2. Update source to match README (revert source changes)
+============================================================
+Total: 12 snippets checked
+  OK: 11
+  MISMATCH: 1
 ```

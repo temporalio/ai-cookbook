@@ -1,18 +1,21 @@
 #!/usr/bin/env python3
 """Verify README code snippets match actual source files.
 
-Used as a Claude hook to warn/block when README snippets are out of sync.
+Standalone usage:
+    python scripts/verify_readme_snippets.py [--check-all]
 
-Modes:
+Hook usage (Claude Code):
 - PostToolUse on Edit/Write for .py: Warns if edited file's README snippet is stale
 - PostToolUse on Edit/Write for .md: Warns if README snippets don't match sources
 - PreToolUse on Bash with git commit: Blocks if staged files have stale snippets
 
 Exit codes:
     0: All snippets match (or warning printed for post-edit)
+    1: Mismatches found (standalone mode)
     2: Mismatch found (blocks pre-commit)
 """
 
+import difflib
 import json
 import os
 import re
@@ -109,6 +112,46 @@ def extract_snippets(readme_path: Path) -> list[dict]:
     return snippets
 
 
+def generate_diff(snippet_code: str, source_code: str, file_path: str, max_lines: int = 15) -> str:
+    """Generate a unified diff between snippet and source.
+
+    Args:
+        snippet_code: Code from README snippet
+        source_code: Code from source file
+        file_path: Path for diff header
+        max_lines: Maximum diff lines to show (0 = unlimited)
+
+    Returns:
+        Formatted diff string, truncated if needed
+    """
+    snippet_lines = snippet_code.strip().splitlines(keepends=True)
+    source_lines = source_code.strip().splitlines(keepends=True)
+
+    # Ensure lines end with newline for clean diff
+    if snippet_lines and not snippet_lines[-1].endswith('\n'):
+        snippet_lines[-1] += '\n'
+    if source_lines and not source_lines[-1].endswith('\n'):
+        source_lines[-1] += '\n'
+
+    diff = list(difflib.unified_diff(
+        snippet_lines, source_lines,
+        fromfile=f"README:{file_path}",
+        tofile=f"source:{file_path}",
+        lineterm=''
+    ))
+
+    if not diff:
+        return ""
+
+    if max_lines and len(diff) > max_lines:
+        truncated = diff[:max_lines]
+        remaining = len(diff) - max_lines
+        truncated.append(f"\n    ... ({remaining} more lines)\n")
+        return ''.join(truncated)
+
+    return ''.join(diff)
+
+
 def compare_snippet(snippet: dict, repo_root: Path) -> tuple[bool, str]:
     """Compare a snippet against its source file.
 
@@ -138,6 +181,38 @@ def compare_snippet(snippet: dict, repo_root: Path) -> tuple[bool, str]:
         if code.strip() == source_content.strip():
             return True, ""
         return False, f"Full file mismatch for {file_path}"
+
+
+def compare_snippet_with_diff(snippet: dict, repo_root: Path) -> tuple[bool, str, str]:
+    """Compare a snippet against its source file, with diff output.
+
+    Returns:
+        (matches, error_message, diff_output)
+    """
+    file_path = snippet["file_path"]
+    code = snippet["code"]
+    is_excerpt = snippet["is_excerpt"]
+
+    # Resolve relative to README location
+    readme_dir = snippet["readme"].parent
+    full_path = readme_dir / file_path
+    if not full_path.exists():
+        full_path = repo_root / file_path
+
+    if not full_path.exists():
+        return False, f"Source file not found: {file_path}", ""
+
+    source_content = full_path.read_text()
+
+    if is_excerpt:
+        if code.strip() in source_content:
+            return True, "", ""
+        return False, f"Excerpt not found in source", ""
+    else:
+        if code.strip() == source_content.strip():
+            return True, "", ""
+        diff = generate_diff(code, source_content, file_path)
+        return False, "Content mismatch", diff
 
 
 def check_single_file(filepath: str, repo_root: Path) -> list[str]:
@@ -173,7 +248,85 @@ def check_readme_snippets(readme_path: Path, repo_root: Path) -> list[str]:
     return errors
 
 
+def check_all_readmes(repo_root: Path) -> int:
+    """Check all READMEs in the repo for snippet mismatches.
+
+    Returns:
+        Exit code (0 = all OK, 1 = mismatches found)
+    """
+    total_snippets = 0
+    total_ok = 0
+    total_mismatch = 0
+    total_missing = 0
+
+    # Find all READMEs with file annotations
+    for readme_path in repo_root.rglob("README.md"):
+        try:
+            content = readme_path.read_text()
+        except Exception:
+            continue
+
+        if "*File:" not in content:
+            continue
+
+        snippets = extract_snippets(readme_path)
+        if not snippets:
+            continue
+
+        # Print README header
+        rel_readme = readme_path.relative_to(repo_root)
+        print(f"\n{rel_readme}:")
+
+        for snippet in snippets:
+            total_snippets += 1
+            file_path = snippet["file_path"]
+            matches, error, diff = compare_snippet_with_diff(snippet, repo_root)
+
+            if matches:
+                total_ok += 1
+                print(f"  {file_path}: OK")
+            elif "not found" in error.lower():
+                total_missing += 1
+                print(f"  {file_path}: MISSING - {error}")
+            else:
+                total_mismatch += 1
+                print(f"  {file_path}: MISMATCH")
+                if diff:
+                    # Indent diff output
+                    for line in diff.splitlines():
+                        print(f"    {line}")
+
+    # Summary
+    print(f"\n{'='*60}")
+    print(f"Total: {total_snippets} snippets checked")
+    print(f"  OK: {total_ok}")
+    if total_mismatch:
+        print(f"  MISMATCH: {total_mismatch}")
+    if total_missing:
+        print(f"  MISSING: {total_missing}")
+
+    if total_mismatch or total_missing:
+        return 1
+    return 0
+
+
 def main():
+    # Check for standalone invocation
+    if len(sys.argv) > 1 or not os.environ.get("TOOL_NAME"):
+        repo_root = Path(subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+        ).stdout.strip())
+
+        if not repo_root.exists():
+            print("Error: Not in a git repository", file=sys.stderr)
+            sys.exit(1)
+
+        print("Checking README snippets...")
+        sys.exit(check_all_readmes(repo_root))
+
+    # Hook mode
     tool_input = get_tool_input()
 
     repo_root = Path(subprocess.run(
@@ -247,9 +400,6 @@ def main():
             sys.exit(2)
 
         sys.exit(0)
-
-    # Manual invocation (no TOOL_NAME): this shouldn't happen in normal use
-    sys.exit(0)
 
 
 if __name__ == "__main__":
