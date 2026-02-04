@@ -14,5 +14,15 @@ dependencies = [
     "requests>=2.31.0",
 ]
 
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+]
+
 [tool.setuptools]
 py-modules = []  # No modules to install, just dependencies
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+pythonpath = ["."]
