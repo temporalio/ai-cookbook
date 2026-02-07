@@ -30,8 +30,8 @@ def get_handler(tool_name: str) -> ToolHandler:
 def get_tools() -> types.Tool:
     """Get the Tool object containing all available function declarations.
 
-    Uses FunctionDeclaration.from_callable() to generate tool definitions
-    from the handler functions. The result is cached to avoid repeated
+    Uses FunctionDeclaration.from_callable() from the Google GenAI SDK to generate 
+    tool definitions from the handler functions. The result is cached to avoid repeated
     client creation.
     """
     global _tools_cache
