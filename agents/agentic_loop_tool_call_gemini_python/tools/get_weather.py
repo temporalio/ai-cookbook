@@ -7,8 +7,6 @@ from typing import Any
 import httpx
 from pydantic import BaseModel, Field
 
-from helpers import tool_helpers
-
 # Constants
 NWS_API_BASE = "https://api.weather.gov"
 USER_AGENT = "weather-app/1.0"
@@ -30,20 +28,13 @@ class GetWeatherAlertsRequest(BaseModel):
     state: str = Field(description="Two-letter US state code (e.g. CA, NY)")
 
 
-# Build the tool definition for the Gemini API
-WEATHER_ALERTS_TOOL_GEMINI = tool_helpers.gemini_tool_from_model(
-    "get_weather_alerts",
-    "Get weather alerts for a US state.",
-    GetWeatherAlertsRequest,
-)
-
-
-async def get_weather_alerts(weather_alerts_request: GetWeatherAlertsRequest) -> str:
+async def get_weather_alerts(request: GetWeatherAlertsRequest) -> str:
     """Get weather alerts for a US state.
 
     Args:
-        weather_alerts_request: Request containing the two-letter US state code.
+        request: The request object containing:
+            - state: Two-letter US state code (e.g. CA, NY)
     """
-    url = f"{NWS_API_BASE}/alerts/active/area/{weather_alerts_request.state}"
+    url = f"{NWS_API_BASE}/alerts/active/area/{request.state}"
     data = await _make_nws_request(url)
     return json.dumps(data)

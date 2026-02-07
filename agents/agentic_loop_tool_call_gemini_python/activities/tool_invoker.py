@@ -16,6 +16,10 @@ async def dynamic_tool_activity(args: Sequence[RawValue]) -> dict:
     This activity uses Temporal's dynamic activity feature. The activity name
     (passed via execute_activity) becomes the tool name, allowing tools to be
     added/removed without changing the workflow code.
+
+    Handles both:
+    - Tools with no parameters
+    - Tools with Pydantic model parameters (nested LLM output like {'request': {...}})
     """
     from tools import get_handler
 
@@ -26,23 +30,31 @@ async def dynamic_tool_activity(args: Sequence[RawValue]) -> dict:
 
     handler = get_handler(tool_name)
 
+    if not inspect.iscoroutinefunction(handler):
+        raise TypeError("Tool handler must be async (awaitable).")
+
     # Inspect the handler's signature to determine how to pass arguments
     sig = inspect.signature(handler)
     params = list(sig.parameters.values())
 
     if len(params) == 0:
-        call_args = []
+        # No parameters
+        result = await handler()
     else:
-        ann = params[0].annotation
-        if isinstance(tool_args, dict) and isinstance(ann, type) and issubclass(ann, BaseModel):
-            # Handler expects a Pydantic model - instantiate it
-            call_args = [ann(**tool_args)]
+        # Get the parameter name and annotation
+        param = params[0]
+        param_name = param.name
+        ann = param.annotation
+
+        if isinstance(ann, type) and issubclass(ann, BaseModel):
+            # Handler expects a Pydantic model
+            # LLM produces nested output like {'request': {'state': 'CA'}}
+            # Extract the nested dict using the parameter name
+            nested_args = tool_args.get(param_name, tool_args)
+            result = await handler(ann(**nested_args))
         else:
-            call_args = [tool_args]
+            # Plain parameters - unpack dict as keyword arguments
+            result = await handler(**tool_args)
 
-    if not inspect.iscoroutinefunction(handler):
-        raise TypeError("Tool handler must be async (awaitable).")
-
-    result = await handler(*call_args)
     activity.logger.info(f"Tool '{tool_name}' result: {result}")
     return result

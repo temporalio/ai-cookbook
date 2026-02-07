@@ -8,8 +8,6 @@ import uuid
 from temporalio.client import Client
 from temporalio.contrib.pydantic import pydantic_data_converter
 
-from workflows.agent import AgentWorkflow
-
 
 async def main():
     client = await Client.connect(
@@ -20,8 +18,10 @@ async def main():
     query = sys.argv[1] if len(sys.argv) > 1 else "Tell me about recursion"
 
     # Submit the agent workflow for execution
+    # Using string-based workflow name to avoid importing workflow module
+    # (which requires GOOGLE_API_KEY for tool generation)
     result = await client.execute_workflow(
-        AgentWorkflow.run,
+        "AgentWorkflow",
         query,
         id=f"gemini-agent-id-{uuid.uuid4()}",
         task_queue="gemini-agent-python-task-queue",

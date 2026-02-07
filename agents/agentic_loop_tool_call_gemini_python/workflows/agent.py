@@ -6,33 +6,15 @@ from datetime import timedelta
 from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
+    # Import pydantic internals early to avoid sandbox warnings
+    import pydantic_core  # noqa: F401
+    import annotated_types  # noqa: F401
+
+    from google.genai import types
+
     from activities import gemini_chat
-    from helpers import tool_helpers
+    from agent_config import prompts
     from tools import get_tools
-
-
-def _serialize_tool(tool) -> dict:
-    """Serialize a Tool object to a dict for passing to the activity."""
-    function_declarations = []
-    for fd in tool.function_declarations:
-        fd_dict = {
-            "name": fd.name,
-            "description": fd.description,
-        }
-        if fd.parameters:
-            properties = {}
-            for prop_name, prop_schema in (fd.parameters.properties or {}).items():
-                properties[prop_name] = {
-                    "type": prop_schema.type.name if prop_schema.type else "STRING",
-                    "description": prop_schema.description or "",
-                }
-            fd_dict["parameters"] = {
-                "type": "OBJECT",
-                "properties": properties,
-                "required": list(fd.parameters.required or []),
-            }
-        function_declarations.append(fd_dict)
-    return {"function_declarations": function_declarations}
 
 
 @workflow.defn
@@ -50,11 +32,12 @@ class AgentWorkflow:
             The final text response from the LLM.
         """
         # Initialize conversation history with the user's message
-        # Using Gemini's Content/Part structure (serialized for Temporal)
-        contents = [{"role": "user", "parts": [{"text": input}]}]
+        contents: list[types.Content] = [
+            types.Content(role="user", parts=[types.Part(text=input)])
+        ]
 
-        # Get tools and serialize for activity transport
-        tools = [_serialize_tool(get_tools())]
+        # Get tools (cached - initialized by worker at startup)
+        tools = [get_tools()]
 
         # The agentic loop
         while True:
@@ -64,8 +47,8 @@ class AgentWorkflow:
             result = await workflow.execute_activity(
                 gemini_chat.generate_content,
                 gemini_chat.GeminiChatRequest(
-                    model="gemini-flash-latest",
-                    system_instruction=tool_helpers.HELPFUL_AGENT_SYSTEM_INSTRUCTIONS,
+                    model="gemini-2.5-flash",
+                    system_instruction=prompts.SYSTEM_INSTRUCTIONS,
                     contents=contents,
                     tools=tools,
                 ),
@@ -75,7 +58,7 @@ class AgentWorkflow:
             # Check if there are function calls to handle
             if result.function_calls:
                 # Add the model's response (with function calls) to history
-                contents.append({"role": "model", "parts": result.raw_parts})
+                contents.append(types.Content(role="model", parts=result.raw_parts))
 
                 # Process each function call
                 for function_call in result.function_calls:
@@ -83,17 +66,15 @@ class AgentWorkflow:
 
                     # Add the function response to history
                     contents.append(
-                        {
-                            "role": "user",
-                            "parts": [
-                                {
-                                    "function_response": {
-                                        "name": function_call["name"],
-                                        "response": {"result": tool_result},
-                                    }
-                                }
+                        types.Content(
+                            role="user",
+                            parts=[
+                                types.Part.from_function_response(
+                                    name=function_call["name"],
+                                    response={"result": tool_result},
+                                )
                             ],
-                        }
+                        )
                     )
 
             # If no function calls, we have a final response

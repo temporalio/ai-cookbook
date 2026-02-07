@@ -15,6 +15,7 @@ This example demonstrates how to build a durable AI agent using Google's Gemini 
 - **Google GenAI SDK**: Uses Google's official `google-genai` Python SDK with native Content/Part abstractions
 - **Durable Execution**: Temporal ensures the agent can recover from failures at any point
 - **Dynamic Activities**: Tools are executed via Temporal's dynamic activity feature
+- **Pydantic Tool Parameters**: Tools use Pydantic models for parameters, following Temporal best practices
 
 ## Architecture
 
@@ -47,10 +48,12 @@ This example demonstrates how to build a durable AI agent using Google's Gemini 
    uv sync
    ```
 
-2. **Set your Google API key**:
+2. **Create a `.env` file** with your Google API key:
    ```bash
-   export GOOGLE_API_KEY="your-api-key-here"
+   echo "GOOGLE_API_KEY=your-api-key-here" > .env
    ```
+
+   Note: Only the worker needs the API key. The client does not require it.
 
 3. **Start the Temporal dev server** (in a separate terminal):
    ```bash
@@ -89,6 +92,7 @@ The agent has access to three tools:
 ```
 agentic_loop_tool_call_gemini_python/
 ├── pyproject.toml          # Dependencies
+├── .env                    # API key (create this, not checked in)
 ├── worker.py               # Temporal worker
 ├── start_workflow.py       # Client to start workflows
 ├── workflows/
@@ -96,40 +100,104 @@ agentic_loop_tool_call_gemini_python/
 ├── activities/
 │   ├── gemini_chat.py      # Gemini API activity
 │   └── tool_invoker.py     # Dynamic tool execution
-├── helpers/
-│   └── tool_helpers.py     # Tool definition helpers
+├── agent_config/
+│   └── prompts.py          # System prompts defining agent behavior
 └── tools/
-    ├── __init__.py         # Tool registry
+    ├── __init__.py         # Tool registry and generation
     ├── get_location.py     # Location tools
     └── get_weather.py      # Weather tool
 ```
 
 ## How It Works
 
-1. **User submits a query** via `start_workflow.py`
-2. **Workflow starts** the agentic loop with the user's message in conversation history
-3. **LLM activity** sends the conversation to Gemini with available tools
-4. **If Gemini requests a tool call**:
+1. **Worker starts** and initializes tool definitions (caches them)
+2. **User submits a query** via `start_workflow.py`
+3. **Workflow starts** the agentic loop with the user's message in conversation history
+4. **LLM activity** sends the conversation to Gemini with available tools
+5. **If Gemini requests a tool call**:
    - The tool is executed via a dynamic activity
    - The result is added to conversation history
    - Loop continues
-5. **If Gemini returns text** (no tool calls):
+6. **If Gemini returns text** (no tool calls):
    - The response is returned to the user
    - Workflow completes
 
-## Key Implementation Details
+## Key Design Decisions
 
-### Conversation History
+### Tool Definition Generation
 
-Uses Google's native `Content` and `Part` abstractions (serialized for Temporal):
+Tool definitions are generated using `FunctionDeclaration.from_callable()` from the Google GenAI SDK:
 
 ```python
-contents = [
-    {"role": "user", "parts": [{"text": "What's the weather?"}]},
-    {"role": "model", "parts": [{"function_call": {...}}]},
-    {"role": "user", "parts": [{"function_response": {...}}]},
-]
+types.FunctionDeclaration.from_callable(client=client, callable=get_weather_alerts)
 ```
+
+This approach:
+- Uses the SDK's built-in schema generation
+- Extracts function name and description from the callable
+- Generates parameter schemas from type annotations
+
+### Pydantic Models for Tool Parameters
+
+Tools use Pydantic models for parameters, following Temporal's best practice of single-parameter activities:
+
+```python
+class GetWeatherAlertsRequest(BaseModel):
+    state: str = Field(description="Two-letter US state code")
+
+async def get_weather_alerts(request: GetWeatherAlertsRequest) -> str:
+    ...
+```
+
+Benefits:
+- **Backward compatibility**: Add optional fields without breaking existing workflows
+- **Clear contracts**: Explicit parameter definitions
+- **Validation**: Pydantic validates inputs automatically
+
+### Parameter Descriptions in Docstrings
+
+Since `from_callable()` doesn't extract Pydantic `Field(description=...)` values, parameter descriptions are included in the function docstring:
+
+```python
+async def get_weather_alerts(request: GetWeatherAlertsRequest) -> str:
+    """Get weather alerts for a US state.
+
+    Args:
+        request: The request object containing:
+            - state: Two-letter US state code (e.g. CA, NY)
+    """
+```
+
+The entire docstring is passed to the LLM as the function description.
+
+### Nested LLM Output
+
+When using Pydantic model parameters, the LLM produces nested output:
+
+```python
+{"request": {"state": "CA"}}  # Not {"state": "CA"}
+```
+
+The `tool_invoker` handles this by extracting the nested dict using the parameter name.
+
+### Tool Caching and Initialization
+
+Tool definitions are generated once at worker startup and cached:
+
+```python
+# In worker.py
+from tools import get_tools
+get_tools()  # Populate cache before workflow import
+```
+
+This ensures:
+- Tools are generated once, not per-workflow
+- The client doesn't need the API key (uses string-based workflow execution)
+- Tool generation happens outside the workflow sandbox
+
+### Temporal Serialization
+
+`types.Tool` from the Google GenAI SDK is a Pydantic model, which Temporal's `pydantic_data_converter` can serialize directly. No manual serialization/deserialization needed.
 
 ### Automatic Function Calling Disabled
 
@@ -141,28 +209,31 @@ config = types.GenerateContentConfig(
 )
 ```
 
-### Dynamic Activities
-
-Tools are invoked using the tool name as the activity name:
-
-```python
-result = await workflow.execute_activity(
-    tool_name,  # e.g., "get_weather_alerts"
-    tool_args,
-    start_to_close_timeout=timedelta(seconds=30),
-)
-```
-
 ## Adding New Tools
 
 1. Create a new file in `tools/` with:
-   - A Pydantic model for parameters
-   - A `FunctionDeclaration` using `tool_helpers.gemini_tool_from_model()`
-   - An async handler function
+   - A Pydantic model for parameters (or no parameters)
+   - An async handler function with descriptive docstring
+
+   ```python
+   class MyToolRequest(BaseModel):
+       param1: str = Field(description="Description here")
+
+   async def my_tool(request: MyToolRequest) -> str:
+       """Brief description of what the tool does.
+
+       Args:
+           request: The request object containing:
+               - param1: Description of param1
+       """
+       # Implementation
+       return result
+   ```
 
 2. Register in `tools/__init__.py`:
-   - Add to `get_tools()` function declarations
+   - Import the handler function
    - Add to `get_handler()` mapping
+   - Add `FunctionDeclaration.from_callable()` call in `get_tools()`
 
 No changes to the workflow are needed.
 
