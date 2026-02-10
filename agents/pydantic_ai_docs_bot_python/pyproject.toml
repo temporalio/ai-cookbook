@@ -1,7 +1,7 @@
 [project]
 name = "pydantic-ai-docs-bot"
 version = "0.1.0"
-description = "Multi-agent documentation Q&A bot using PydanticAI and Temporal"
+description = "Documentation Q&A agent using PydanticAI and Temporal with autonomous tool calling"
 requires-python = ">=3.11"
 dependencies = [
     "pydantic-ai>=0.1.0",

@@ -1,13 +1,12 @@
-"""Temporal worker for Q&A workflows."""
+"""Temporal worker for documentation agent."""
 
 import asyncio
-import os
 from dotenv import load_dotenv
 from temporalio.client import Client
 from temporalio.worker import Worker
 from pydantic_ai.durable_exec.temporal import PydanticAIPlugin
 
-from workflow import QAWorkflow, load_docs
+from workflow import DocumentationAgent, load_docs
 
 load_dotenv()
 
@@ -22,14 +21,15 @@ async def main():
     )
 
     # Create and run worker
+    # Note: Tool activities are auto-registered by PydanticAIPlugin
     worker = Worker(
         client,
-        task_queue="docs-qa-queue",
-        workflows=[QAWorkflow],
+        task_queue="docs-agent-queue",
+        workflows=[DocumentationAgent],
         activities=[load_docs],
     )
 
-    print("Worker started. Waiting for questions...")
+    print("Worker started. Waiting for workflows...")
     await worker.run()
 
 

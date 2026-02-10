@@ -1,59 +1,57 @@
-"""Multi-agent system with dispatcher and documentation specialist."""
+"""PydanticAI agent with tools for documentation Q&A."""
 
 from dotenv import load_dotenv
 load_dotenv()
 
 import os
-from pydantic import BaseModel
-from pydantic_ai import Agent
-from typing import Literal
+import math
+from pydantic import BaseModel, Field
+from pydantic_ai import Agent, RunContext
+from dataclasses import dataclass
 
 # ============================================================================
-# Pydantic Models for Structured Outputs
+# Dependencies for Tools
 # ============================================================================
 
-class DirectAnswer(BaseModel):
-    """Answer simple questions directly without searching docs."""
-    type: Literal["direct"] = "direct"
-    answer: str
-    confidence: float  # 0.0-1.0
-
-
-class SearchDocs(BaseModel):
-    """Search documentation for detailed answer."""
-    type: Literal["search"] = "search"
-    query: str
-    keywords: list[str]  # 2-5 keywords for search
-
-
-# Union type for dispatcher decisions
-DispatcherDecision = DirectAnswer | SearchDocs
-
-
-class DocAnswer(BaseModel):
-    """Structured answer from documentation search."""
-    answer: str
-    sources: list[str]  # List of doc titles where answer was found
-    confidence: float
+@dataclass
+class DocsContext:
+    """Context passed to agent tools."""
+    docs: dict[str, str]
 
 
 # ============================================================================
-# PydanticAI Agents
+# Pydantic Models for Tool Results
 # ============================================================================
 
-# Auto-detect available API provider and select appropriate models
-def _select_models() -> tuple[str, str]:
-    """Select models based on available API keys.
+class SearchResult(BaseModel):
+    """Result from searching documentation."""
+    matching_docs: list[str] = Field(description="List of document titles that match")
+    total_matches: int = Field(description="Total number of matching documents")
+
+
+class WeatherInfo(BaseModel):
+    """Weather information for a city."""
+    city: str
+    temperature_range: str
+    conditions: str
+
+
+# ============================================================================
+# Agent Configuration
+# ============================================================================
+
+def _select_model() -> str:
+    """Select model based on available API keys.
 
     Returns:
-        (dispatcher_model, docs_model)
+        Model string for PydanticAI
     """
     if os.getenv("ANTHROPIC_API_KEY"):
-        return ("anthropic:claude-haiku-4-5", "anthropic:claude-sonnet-4-5")
+        return "anthropic:claude-sonnet-4-5"
     elif os.getenv("OPENAI_API_KEY"):
-        return ("openai:gpt-4o-mini", "openai:gpt-4o")
+        return "openai:gpt-4o"
     elif os.getenv("GOOGLE_API_KEY"):
-        return ("google:gemini-2.0-flash-exp", "google:gemini-2.0-flash-exp")
+        return "google:gemini-2.0-flash-exp"
     else:
         raise ValueError(
             "No API key found. Set one of:\n"
@@ -62,93 +60,122 @@ def _select_models() -> tuple[str, str]:
             "  GOOGLE_API_KEY=..."
         )
 
-_dispatcher_model, _docs_model = _select_models()
 
-# Dispatcher Agent - routes questions to appropriate handler
-dispatcher_agent = Agent(
-    _dispatcher_model,  # Fast, cheap model for routing
-    output_type=DispatcherDecision,
-    name='dispatcher',  # Required for Temporal
-    system_prompt="""You are a question routing agent for a documentation Q&A system.
+# ============================================================================
+# PydanticAI Agent with Tools
+# ============================================================================
 
-Your job is to decide how to handle each question:
+# Create agent with tools
+documentation_agent = Agent(
+    _select_model(),
+    deps_type=DocsContext,
+    name='documentation_agent',  # Required for Temporal
+    system_prompt="""You are a helpful documentation assistant that can answer questions about technical documentation.
 
-1. DirectAnswer: Use for simple, general questions that don't need documentation.
-   - Example: "What is Temporal?" → Direct answer
-   - Confidence should be 0.8+ if you're sure
+You have access to several tools:
+- search_documentation: Search through available documentation by keywords
+- list_available_docs: See what documentation is available
+- get_weather: Get weather information for a city (for demonstration)
+- calculate_circle_area: Calculate the area of a circle (for demonstration)
 
-2. SearchDocs: Use for questions requiring specific documentation details.
-   - Example: "How do I retry an activity?" → Search docs
-   - Extract 2-5 keywords for search
-
-Be conservative: when in doubt, search docs for accurate answers.""",
+Use these tools to help answer questions. You can call multiple tools in sequence if needed.
+For documentation questions, start by searching or listing available docs.
+Be clear, concise, and helpful in your answers.""",
 )
 
 
-# Documentation Agent - searches docs and provides detailed answers
-docs_agent = Agent(
-    _docs_model,  # More capable model for comprehension
-    output_type=DocAnswer,
-    name='docs_search',  # Required for Temporal
-    system_prompt="""You are a documentation search agent.
-
-Given documentation chunks and a search query, your job is to:
-1. Analyze the documentation for relevant information
-2. Formulate a clear, concise answer
-3. List which documentation sources you used
-4. Provide a confidence score (0.7-1.0)
-
-Be direct and practical in your answers.""",
-)
-
-
-async def route_question(question: str) -> DispatcherDecision:
-    """Route a question through the dispatcher agent.
+@documentation_agent.tool
+async def search_documentation(
+    ctx: RunContext[DocsContext],
+    keywords: list[str]
+) -> SearchResult:
+    """Search documentation by keywords.
 
     Args:
-        question: The question to route
+        ctx: Context containing documentation
+        keywords: List of keywords to search for
 
     Returns:
-        DispatcherDecision (either DirectAnswer or SearchDocs)
+        SearchResult with matching document titles
     """
-    result = await dispatcher_agent.run(question)
-    return result.output
+    print(f"🔍 Tool called: search_documentation(keywords={keywords})")
 
+    matching_docs = []
 
-async def search_documentation(query: str, keywords: list[str], docs: dict[str, str]) -> DocAnswer:
-    """Search documentation and generate answer.
-
-    Args:
-        query: The search query
-        keywords: Keywords to help find relevant docs
-        docs: Dictionary of {title: content} documentation
-
-    Returns:
-        DocAnswer with answer, sources, and confidence
-    """
-    # Simple keyword-based search
-    relevant_docs = {}
-    for title, content in docs.items():
+    for title, content in ctx.deps.docs.items():
         # Check if any keyword appears in the doc
         if any(keyword.lower() in content.lower() for keyword in keywords):
-            relevant_docs[title] = content
+            matching_docs.append(title)
 
-    if not relevant_docs:
-        relevant_docs = docs  # Fall back to all docs
+    result = SearchResult(
+        matching_docs=matching_docs,
+        total_matches=len(matching_docs)
+    )
 
-    # Format docs for the agent
-    docs_context = "\n\n---\n\n".join([
-        f"[{title}]\n{content[:500]}..."  # First 500 chars of each doc
-        for title, content in list(relevant_docs.items())[:3]  # Max 3 docs
-    ])
+    print(f"   ✓ Found {len(matching_docs)} matching documents")
+    return result
 
-    prompt = f"""Query: {query}
-Keywords: {', '.join(keywords)}
 
-Documentation:
-{docs_context}
+@documentation_agent.tool
+async def list_available_docs(ctx: RunContext[DocsContext]) -> list[str]:
+    """List all available documentation files.
 
-Based on these docs, provide a structured answer."""
+    Args:
+        ctx: Context containing documentation
 
-    result = await docs_agent.run(prompt)
-    return result.output
+    Returns:
+        List of document titles
+    """
+    print(f"📋 Tool called: list_available_docs()")
+
+    docs = list(ctx.deps.docs.keys())
+    print(f"   ✓ Found {len(docs)} documents: {', '.join(docs)}")
+
+    return docs
+
+
+@documentation_agent.tool
+async def get_weather(city: str) -> WeatherInfo:
+    """Get weather information for a city.
+
+    This is a demonstration tool showing how agents can call multiple different tools.
+
+    Args:
+        city: City name
+
+    Returns:
+        Weather information
+    """
+    print(f"🌤️  Tool called: get_weather(city='{city}')")
+
+    # Mock weather data
+    weather = WeatherInfo(
+        city=city,
+        temperature_range="14-20C",
+        conditions="Sunny with wind"
+    )
+
+    print(f"   ✓ Weather: {weather.temperature_range}, {weather.conditions}")
+    return weather
+
+
+@documentation_agent.tool
+async def calculate_circle_area(radius: float) -> float:
+    """Calculate the area of a circle given its radius.
+
+    This is a demonstration tool showing how agents can call mathematical tools.
+
+    Args:
+        radius: Circle radius
+
+    Returns:
+        Circle area
+    """
+    print(f"🔢 Tool called: calculate_circle_area(radius={radius})")
+
+    area = math.pi * radius ** 2
+    print(f"   ✓ Area: {area:.2f}")
+
+    return area
+
+
