@@ -14,17 +14,14 @@ console = Console()
 
 async def main():
     """Execute the documentation agent workflow."""
-    # Connect to Temporal with PydanticAI plugin
     console.print("\n[cyan]Connecting to Temporal...[/cyan]")
     client = await Client.connect(
         "localhost:7233",
         plugins=[PydanticAIPlugin()],
     )
 
-    # Get user input
     user_input = console.input("\n[bold yellow]Enter a question:[/bold yellow] ")
 
-    # Start the workflow
     console.print("\n[dim]Starting agent workflow...[/dim]")
     result = await client.execute_workflow(
         DocumentationAgent.run,
@@ -34,7 +31,6 @@ async def main():
         id_reuse_policy=WorkflowIDReusePolicy.TERMINATE_IF_RUNNING,
     )
 
-    # Display result
     console.print()
     console.print(Panel(
         result,

@@ -65,7 +65,6 @@ def _select_model() -> str:
 # PydanticAI Agent with Tools
 # ============================================================================
 
-# Create agent with tools
 documentation_agent = Agent(
     _select_model(),
     deps_type=DocsContext,
@@ -89,93 +88,39 @@ async def search_documentation(
     ctx: RunContext[DocsContext],
     keywords: list[str]
 ) -> SearchResult:
-    """Search documentation by keywords.
-
-    Args:
-        ctx: Context containing documentation
-        keywords: List of keywords to search for
-
-    Returns:
-        SearchResult with matching document titles
-    """
-    print(f"🔍 Tool called: search_documentation(keywords={keywords})")
-
+    """Search documentation by keywords."""
     matching_docs = []
-
     for title, content in ctx.deps.docs.items():
-        # Check if any keyword appears in the doc
         if any(keyword.lower() in content.lower() for keyword in keywords):
             matching_docs.append(title)
 
-    result = SearchResult(
+    return SearchResult(
         matching_docs=matching_docs,
         total_matches=len(matching_docs)
     )
 
-    print(f"   ✓ Found {len(matching_docs)} matching documents")
-    return result
-
 
 @documentation_agent.tool
 async def list_available_docs(ctx: RunContext[DocsContext]) -> list[str]:
-    """List all available documentation files.
-
-    Args:
-        ctx: Context containing documentation
-
-    Returns:
-        List of document titles
-    """
-    print(f"📋 Tool called: list_available_docs()")
-
-    docs = list(ctx.deps.docs.keys())
-    print(f"   ✓ Found {len(docs)} documents: {', '.join(docs)}")
-
-    return docs
+    """List all available documentation files."""
+    return list(ctx.deps.docs.keys())
 
 
 @documentation_agent.tool
-async def get_weather(city: str) -> WeatherInfo:
-    """Get weather information for a city.
-
-    This is a demonstration tool showing how agents can call multiple different tools.
-
-    Args:
-        city: City name
-
-    Returns:
-        Weather information
-    """
-    print(f"🌤️  Tool called: get_weather(city='{city}')")
-
-    # Mock weather data
-    weather = WeatherInfo(
+async def get_weather(_ctx: RunContext[DocsContext], city: str) -> WeatherInfo:
+    """Get weather information for a city."""
+    # introduce a bug
+    raise Exception("This is a test error")
+    return WeatherInfo(
         city=city,
         temperature_range="14-20C",
         conditions="Sunny with wind"
     )
 
-    print(f"   ✓ Weather: {weather.temperature_range}, {weather.conditions}")
-    return weather
-
 
 @documentation_agent.tool
-async def calculate_circle_area(radius: float) -> float:
-    """Calculate the area of a circle given its radius.
-
-    This is a demonstration tool showing how agents can call mathematical tools.
-
-    Args:
-        radius: Circle radius
-
-    Returns:
-        Circle area
-    """
-    print(f"🔢 Tool called: calculate_circle_area(radius={radius})")
-
-    area = math.pi * radius ** 2
-    print(f"   ✓ Area: {area:.2f}")
-
-    return area
+async def calculate_circle_area(_ctx: RunContext[DocsContext], radius: float) -> float:
+    """Calculate the area of a circle given its radius."""
+    return math.pi * radius ** 2
 
 

@@ -16,7 +16,7 @@ This recipe highlights key implementation patterns:
 - **Tool integration**: Tools are registered with the `@agent.tool` decorator and automatically converted to Temporal Activities by the `TemporalAgent` wrapper
 - **Durable execution**: The agent's state and execution are managed by Temporal, providing reliability and observability
 - **Plugin configuration**: Uses the `PydanticAIPlugin` to configure Temporal for PydanticAI integration
-- **Optional dependencies**: Tools can optionally receive context through PydanticAI's `RunContext` parameter - only include it if the tool needs it
+- **Context injection**: Tools receive context through PydanticAI's `RunContext` parameter - prefix with underscore for tools that don't use it
 
 ## Prerequisites
 
@@ -49,7 +49,7 @@ Use these tools to help answer questions. You can call multiple tools
 in sequence if needed.""",
 )
 
-# Tools that need context include the RunContext parameter
+# Tools that use the context
 @documentation_agent.tool
 async def search_documentation(
     ctx: RunContext[DocsContext],
@@ -65,10 +65,10 @@ async def search_documentation(
         total_matches=len(matching_docs)
     )
 
-# Tools that don't need context can omit the RunContext parameter
+# Tools that don't use context still need the parameter (prefix with _ to indicate unused)
 @documentation_agent.tool
-async def calculate_circle_area(radius: float) -> float:
-    """Calculate the area of a circle."""
+async def calculate_circle_area(_ctx: RunContext[DocsContext], radius: float) -> float:
+    """Calculate the area of a circle given its radius."""
     return math.pi * radius ** 2
 ```
 

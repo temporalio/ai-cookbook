@@ -13,15 +13,12 @@ load_dotenv()
 
 async def main():
     """Start the Temporal worker."""
-    # API key validation happens in agents module
-    # Connect to Temporal with PydanticAI plugin
     client = await Client.connect(
         "localhost:7233",
         plugins=[PydanticAIPlugin()],
     )
 
-    # Create and run worker
-    # Note: Tool activities are auto-registered by PydanticAIPlugin
+    # Tool activities are auto-registered by PydanticAIPlugin
     worker = Worker(
         client,
         task_queue="docs-agent-queue",

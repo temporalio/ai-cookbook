@@ -67,13 +67,11 @@ class DocumentationAgent(PydanticAIWorkflow):
         Returns:
             Agent's final answer
         """
-        # Load documentation
         docs = await workflow.execute_activity(
             load_docs,
             start_to_close_timeout=timedelta(seconds=30),
         )
 
-        # Run agent - it will autonomously call tools as needed
         result = await temporal_agent.run(
             prompt,
             deps=DocsContext(docs=docs)
