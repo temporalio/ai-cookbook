@@ -78,6 +78,134 @@ The agent has access to four tools:
 - **`get_weather(city: str)`** - Get weather information (demonstration tool)
 - **`calculate_circle_area(radius: float)`** - Calculate circle area (demonstration tool)
 
+## How the Agentic Loop Works
+
+The agentic loop is an autonomous cycle where the AI agent makes decisions about what to do next based on its goal:
+
+**User gives goal → Agent analyzes → Agent calls tool → Agent receives result → Agent decides → Calls another tool OR returns final answer**
+
+The key is **autonomy** - you don't tell the agent which tools to call or when. You provide a goal and the agent figures out the rest.
+
+Here's what happens when you ask "What's the weather in Paris and what docs do you have?":
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│ User: "What's the weather in Paris and what docs do you have?" │
+└───────────────────────┬────────────────────────────────────────┘
+                        │
+                        ▼
+                ┌───────────────┐
+                │  LLM Call #1  │
+                │ Analyzes query│
+                │ Returns: TOOL │ ────┐
+                └───────────────┘     │
+                        ▲             │
+                        │             ▼
+                        │     ┌─────────────────────┐
+                        │     │ Execute Tool Call   │
+                        │     │ (Temporal Activity) │
+                        │     │                     │
+                        │     │ get_weather("Paris")│
+                        │     │ Returns:            │
+                        │     │ WeatherInfo(        │
+                        │     │   city="Paris",     │
+                        │     │   temp="14-20C",    │
+                        │     │   conditions="Sunny"│
+                        │     │ )                   │
+                        │     └──────────┬──────────┘
+                        │                │
+                        │                ▼
+                ┌───────┴────────────────────┐
+                │      LLM Call #2           │
+                │ Receives tool results      │
+                │ Returns: TOOL              │ ────┐
+                └────────────────────────────┘     │
+                        ▲                          │
+                        │                          ▼
+                        │          ┌─────────────────────┐
+                        │          │ Execute Tool Call   │
+                        │          │ (Temporal Activity) │
+                        │          │                     │
+                        │          │ list_available_docs()│
+                        │          │ Returns:            │
+                        │          │ ["workflows.md",    │
+                        │          │  "activities.md"]   │
+                        │          └──────────┬──────────┘
+                        │                     │
+                        │                     ▼
+                ┌───────┴────────────────────────┐
+                │      LLM Call #3               │
+                │ Receives both tool results     │
+                │ Returns: TEXT                  │
+                └───────────┬────────────────────┘
+                            │
+                            ▼
+            ┌────────────────────────────────────┐
+            │ "In Paris, it's currently 14-20C   │
+            │ and sunny. I have access to 2      │
+            │ documentation files:                │
+            │  - workflows.md                     │
+            │  - activities.md"                   │
+            └────────────────────────────────────┘
+```
+
+### What Happens Inside `temporal_agent.run()`
+
+When you call `temporal_agent.run(prompt, deps=DocsContext(docs))`, this entire loop happens in a single function call:
+
+**Loop Iteration 1:**
+- Agent receives the user prompt
+- Agent analyzes: "I need weather for Paris and a list of docs"
+- Agent decides to call `get_weather("Paris")` first
+- PydanticAI converts this to a Temporal activity and executes it
+- Tool returns `WeatherInfo(city="Paris", temp="14-20C", conditions="Sunny")`
+
+**Loop Iteration 2:**
+- Agent receives the weather result
+- Agent thinks: "Got weather. Now I need the docs list."
+- Agent calls `list_available_docs()`
+- PydanticAI executes this as another Temporal activity
+- Tool returns `["workflows.md", "activities.md"]`
+
+**Loop Iteration 3:**
+- Agent receives the docs list
+- Agent thinks: "I have both pieces of information. I can answer now."
+- Agent returns natural language text combining both results
+- Loop ends
+
+### How PydanticAI Makes This Work
+
+**Tool Registration**: When you use `@agent.tool`, PydanticAI:
+- Extracts the function signature (parameters and return types)
+- Uses the docstring to describe what the tool does
+- Converts this into a schema the LLM understands
+- The agent knows: "I have a tool that gets weather given a city name"
+
+**Autonomous Decision Making**: The LLM (GPT-4, Claude, Gemini) decides whether to:
+- Call a tool (returns TOOL with function name and parameters)
+- Return final answer (returns TEXT)
+
+**TemporalAgent Wrapper**: Intercepts tool calls and converts them to Temporal activities:
+
+```python
+temporal_agent = TemporalAgent(documentation_agent)
+```
+
+Each tool call becomes a durable Temporal activity with full observability in the Temporal Web UI.
+
+### Why This Matters
+
+**Flexibility**: The same code handles questions needing 0, 1, or multiple tools:
+- "What is Temporal?" → 0 tools (agent answers directly)
+- "List available docs" → 1 tool call
+- "Search for workflows and get weather in Paris" → 2 tools in sequence
+
+**Intelligence**: The agent chains tools logically based on the question.
+
+**Simplicity**: You write `agent.run(prompt)` instead of complex orchestration logic.
+
+**Durability**: With Temporal, each tool call is a durable activity that can retry on failure and provides full observability. 
+
 ## Create the Workflow
 
 The workflow wraps the PydanticAI agent with `TemporalAgent` to enable durable execution. The agent processes user input and autonomously decides which tools to use.
@@ -162,17 +290,23 @@ import asyncio
 from temporalio.client import Client
 from temporalio.common import WorkflowIDReusePolicy
 from pydantic_ai.durable_exec.temporal import PydanticAIPlugin
+from rich.console import Console
+from rich.panel import Panel
 
 from workflow import DocumentationAgent
 
+console = Console()
+
 async def main():
+    console.print("\n[cyan]Connecting to Temporal...[/cyan]")
     client = await Client.connect(
         "localhost:7233",
         plugins=[PydanticAIPlugin()],
     )
 
-    user_input = input("Enter a question: ")
+    user_input = console.input("\n[bold yellow]Enter a question:[/bold yellow] ")
 
+    console.print("\n[dim]Starting agent workflow...[/dim]")
     result = await client.execute_workflow(
         DocumentationAgent.run,
         user_input,
@@ -181,10 +315,18 @@ async def main():
         id_reuse_policy=WorkflowIDReusePolicy.TERMINATE_IF_RUNNING,
     )
 
-    print(f"Result: {result}")
+    console.print()
+    console.print(Panel(
+        result,
+        title="[bold green]Result[/bold green]",
+        border_style="green",
+    ))
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Cancelled by user[/yellow]")
 ```
 
 ## Running
