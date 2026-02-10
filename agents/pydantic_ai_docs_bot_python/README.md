@@ -151,60 +151,36 @@ Here's what happens when you ask "What's the weather in Paris and what docs do y
 
 ### What Happens Inside `temporal_agent.run()`
 
-When you call `temporal_agent.run(prompt, deps=DocsContext(docs))`, this entire loop happens in a single function call:
+When you call `temporal_agent.run(prompt, deps=DocsContext(docs))`, this entire loop happens in a single function call. PydanticAI handles the tool registration, decision making, and execution:
+
+**Tool Registration**: When you use `@agent.tool`, PydanticAI extracts the function signature and docstring to create a schema the LLM understands. The agent knows: "I have a tool that gets weather given a city name."
 
 **Loop Iteration 1:**
 - Agent receives the user prompt
 - Agent analyzes: "I need weather for Paris and a list of docs"
-- Agent decides to call `get_weather("Paris")` first
-- PydanticAI converts this to a Temporal activity and executes it
+- LLM (GPT-4, Claude, Gemini) decides to call `get_weather("Paris")` first
+- `TemporalAgent` wrapper intercepts and converts this to a Temporal activity
 - Tool returns `WeatherInfo(city="Paris", temp="14-20C", conditions="Sunny")`
 
 **Loop Iteration 2:**
 - Agent receives the weather result
 - Agent thinks: "Got weather. Now I need the docs list."
 - Agent calls `list_available_docs()`
-- PydanticAI executes this as another Temporal activity
+- Again converted to a Temporal activity with full observability in the Web UI
 - Tool returns `["workflows.md", "activities.md"]`
 
 **Loop Iteration 3:**
 - Agent receives the docs list
 - Agent thinks: "I have both pieces of information. I can answer now."
+- LLM decides to return final answer (returns TEXT instead of TOOL)
 - Agent returns natural language text combining both results
 - Loop ends
 
-### How PydanticAI Makes This Work
-
-**Tool Registration**: When you use `@agent.tool`, PydanticAI:
-- Extracts the function signature (parameters and return types)
-- Uses the docstring to describe what the tool does
-- Converts this into a schema the LLM understands
-- The agent knows: "I have a tool that gets weather given a city name"
-
-**Autonomous Decision Making**: The LLM (GPT-4, Claude, Gemini) decides whether to:
-- Call a tool (returns TOOL with function name and parameters)
-- Return final answer (returns TEXT)
-
-**TemporalAgent Wrapper**: Intercepts tool calls and converts them to Temporal activities:
-
-```python
-temporal_agent = TemporalAgent(documentation_agent)
-```
-
-Each tool call becomes a durable Temporal activity with full observability in the Temporal Web UI.
-
 ### Why This Matters
 
-**Flexibility**: The same code handles questions needing 0, 1, or multiple tools:
-- "What is Temporal?" → 0 tools (agent answers directly)
-- "List available docs" → 1 tool call
-- "Search for workflows and get weather in Paris" → 2 tools in sequence
+Write `agent.run(prompt)` instead of orchestration logic with if/else statements - the LLM decides which tools to call and when to stop. The same code handles questions needing zero tools, one tool, or multiple tools chained together. PydanticAI's structured outputs mean tools return type-safe Pydantic models instead of dictionaries, and you can swap between OpenAI, Anthropic, or Google without changing code.
 
-**Intelligence**: The agent chains tools logically based on the question.
-
-**Simplicity**: You write `agent.run(prompt)` instead of complex orchestration logic.
-
-**Durability**: With Temporal, each tool call is a durable activity that can retry on failure and provides full observability. 
+Temporal makes each tool call a durable activity with retry logic and full observability in the Web UI. The PydanticAI integration handles serialization across activity boundaries automatically, so your Pydantic models just work across the distributed execution.
 
 ## Create the Workflow
 
