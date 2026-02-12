@@ -1,10 +1,10 @@
 <!--
 description: Build a durable AI agent with OpenAI Agents SDK and Temporal that can intelligently choose tools to answer user questions
 tags: [agents, python, openai]
-priority: 5
+priority: 750
 -->
 
-# Hello World - Agent with Tools
+# Durable Agent with Tools - OpenAI Agents SDK
 
 In this example, we show you how to build a Durable Agent using the [OpenAI Agents SDK Integration for Temporal](https://github.com/temporalio/sdk-python/tree/main/temporalio/contrib/openai_agents). The AI agent we build will have access to [tools](https://github.com/temporalio/sdk-python/tree/main/temporalio/contrib/openai_agents#tool-calling) (Temporal Activities) to answer user questions. The agent can determine which tools to use based on the user's input and execute them as needed.
 
@@ -140,7 +140,7 @@ It uses the `OpenAIAgentsPlugin` to match the Worker configuration.
 import asyncio
 
 from temporalio.client import Client
-from temporalio.common import WorkflowIDReusePolicy
+from temporalio.common import WorkflowIDConflictPolicy
 from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
 from workflows.hello_world_workflow import HelloWorldAgent
 
@@ -163,7 +163,7 @@ async def main():
         user_input,
         id="my-workflow-id",
         task_queue="hello-world-openai-agent-task-queue",
-        id_reuse_policy=WorkflowIDReusePolicy.TERMINATE_IF_RUNNING,
+        id_conflict_policy=WorkflowIDConflictPolicy.TERMINATE_IF_RUNNING,
     )
     print(f"Result: {result}")
 
@@ -181,6 +181,12 @@ Start the Temporal Dev Server:
 
 ```bash
 temporal server start-dev
+```
+
+Open a new terminal where you will run the agent worker. Set an OpenAI API key:
+
+```bash
+export OPENAI_API_KEY=sk...
 ```
 
 Run the worker:
