@@ -36,7 +36,13 @@ async def generate_content(request: GeminiChatRequest) -> GeminiChatResponse:
     api_key = os.environ.get("GOOGLE_API_KEY")
     if not api_key:
         raise ValueError("GOOGLE_API_KEY environment variable is not set")
-    client = genai.Client(api_key=api_key)
+
+    client = genai.Client(
+        api_key=api_key,
+        http_options=types.HttpOptions(
+            retry_options=types.HttpRetryOptions(attempts=1),
+        ),
+    )
 
     # Configure the request with automatic function calling disabled
     # (Temporal handles tool execution, not the SDK)
