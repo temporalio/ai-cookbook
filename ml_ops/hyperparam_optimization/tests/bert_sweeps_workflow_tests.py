@@ -14,7 +14,7 @@ from temporalio import activity
 from temporalio.client import Client
 from temporalio.worker import Worker
 
-from src.workflows.train_tune.bert_sweeps.custom_types import (
+from ml_ops.hyperparam_optimization.custom_types import (
     BertEvalRequest,
     BertEvalResult,
     BertFineTuneConfig,
@@ -26,7 +26,7 @@ from src.workflows.train_tune.bert_sweeps.custom_types import (
     SweepRequest,
     SweepSpace,
 )
-from src.workflows.train_tune.bert_sweeps.workflows import (
+from ml_ops.hyperparam_optimization.workflows import (
     BertEvalWorkflow,
     CheckpointedBertTrainingWorkflow,
     CoordinatorWorkflow,

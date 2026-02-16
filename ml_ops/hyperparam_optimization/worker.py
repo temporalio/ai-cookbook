@@ -13,8 +13,8 @@ from temporalio.client import Client
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.worker import Worker
 
-from src.workflows.train_tune.bert_sweeps.bert_activities import BertEvalActivities, jitter_seed
-from src.workflows.train_tune.bert_sweeps.workflows import (
+from bert_activities import BertEvalActivities, jitter_seed
+from workflows import (
     BertEvalWorkflow,
     CheckpointedBertTrainingWorkflow,
     CoordinatorWorkflow,

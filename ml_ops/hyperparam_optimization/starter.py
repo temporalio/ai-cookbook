@@ -17,14 +17,14 @@ import uuid
 from temporalio.client import Client
 from temporalio.contrib.pydantic import pydantic_data_converter
 
-from src.workflows.train_tune.bert_sweeps.custom_types import (
+from custom_types import (
     BertEvalRequest,
     BertFineTuneConfig,
     CoordinatorWorkflowConfig,
     SweepRequest,
     SweepSpace,
 )
-from src.workflows.train_tune.bert_sweeps.workflows import (
+from workflows import (
     LadderSweepWorkflow,
 )
 

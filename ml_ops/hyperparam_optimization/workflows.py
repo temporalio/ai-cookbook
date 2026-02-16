@@ -28,7 +28,7 @@ from datetime import timedelta
 from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
-    from src.workflows.train_tune.bert_sweeps.custom_types import (
+    from custom_types import (
         BertEvalRequest,
         BertEvalResult,
         BertFineTuneConfig,

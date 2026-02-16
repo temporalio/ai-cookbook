@@ -33,7 +33,7 @@ from transformers import (
     set_seed,
 )
 
-from src.workflows.train_tune.bert_sweeps.custom_types import (
+from custom_types import (
     BertEvalRequest,
     BertEvalResult,
     BertFineTuneRequest,

@@ -1,77 +1,32 @@
+<!--
+description: Build durable custom hyperparameter
+optimzaiton that saves on GPU costs and improves performance.
+tags:[ML Ops, hyperparameter optimization, autoML, python]
+priority: 399
+-->
+
 # BERT Hyperparameter Sweeps (Temporal + Transformers)
+This folder contains a demo that uses Temporal to orchestrate **checkpoint‑aware BERT fine‑tuning, evaluation, and hyperparameter sweeps** on top of Hugging Face Transformers and Datasets.
 
-This folder contains a self-contained demo that uses Temporal to orchestrate
-checkpointed BERT fine-tuning, evaluation, and hyperparameter sweeps on top of
-Hugging Face Transformers and Datasets.
+It builds directly on the patterns from the durable training module for checkpoint-aware durable training 
+and adds **random and TPE‑style ladder sweeps** that explore a search space of hyperparameters in a durable, replay‑safe way.
 
-At a high level:
+---
 
-- **Activities** in `bert_activities.py` own all side effects: dataset loading,
-  tokenization, model training, checkpointing, and evaluation.
-- **Workflows** in `workflows.py` remain deterministic and focus purely on
-  orchestration:
-  - `CheckpointedBertTrainingWorkflow` runs a single fine-tuning job and emits
-    checkpoints.
-  - `BertEvalWorkflow` evaluates a fine-tuned checkpoint on a public dataset.
-  - `CoordinatorWorkflow` wires training + evaluation together.
-  - `SweepWorkflow` and `LadderSweepWorkflow` run hyperparameter sweeps.
-- **Workers** in `worker.py` and `training_worker.py` split orchestration and
-  heavy training onto separate task queues.
-- **`starter.py`** is a tiny CLI entrypoint that kicks off a ladder-style sweep
-  and prints a concise summary of results.
+## What this package demonstrates
 
-## Features
+- **Durable hyperparameter sweeps** where each trial is a full training + eval pipeline.
+- **Checkpoint‑aware training** with dataset snapshots and mid‑run checkpoint signals.
+- **Ladder + TPE‑style search** implemented as pure Temporal workflows.
+- **Separation of concerns** between:
+  - Training/snapshot activities on `bert-training-task-queue`.
+  - Evaluation / sweep orchestration workflows on `bert-eval-task-queue`.
 
-This workflow highlights Temporal capabilities, including:
-- **Resource Isolation**: isolating code for infra and science teams into dedicated activity classes, separate from orchestration workflows or worker code.
-- **Debug & Continue**: Debug crashes, bring down your workers, delpoy a new version, and continue right where your sweep left off without missing a beat
-- **Dataset Checkpointing**: Datasets are persisted before training, allowing you to reproduce a past run exactly using only the information captured by temporal and the snapshotted dataset. This also ensures reproducibility is not lost if the dataset is later updated.
-- **Flexible Sweeping System**: This system works arcross multiple models and datasets. Take a look at the sample configs in starter.py to see the different SLMs used during testing.
+---
 
-- **Live Updates**: Use signals to asynchronously update references to the latest checkpoints, dataset snapshots, etc during training. Here, we demonstrate how to do this by passing a ref to each new checkpoint to the Workflow, from the training activity. You can query this live or after workflow completion to locate the most up-to-date checkpoint.
+## Quickstart
 
-- **TPE Based Scaling Ladders**: See how Temporal takes the stress away during large experimentation runs as a context manager, ensuring large and complicated orchestration happens reliably and consistently. Temporal is not limited to acyclic workflows like DAGs, and can be used to code looping behaviors, including loops with human in the loop steps, with ease.
-
-This demo is just a starting point. Take a look and don't hesitate to ask questions.
-
-## Prerequisites
-
-- A running Temporal server (for local development, `temporal server start-dev`)
-- Project dependencies installed:
-
-  ```bash
-  uv sync --dev
-  ```
-
-  The root `pyproject.toml` includes the ML dependencies (`transformers`,
-  `datasets`, `torch`) required for this example.
-
-- Optional but recommended: a GPU or Apple Silicon/MPS device for faster
-  training. The example is configured to run on CPU as well, just more slowly.
-
-## Files at a Glance
-
-- `custom_types.py` – Pydantic models shared between workflows, activities,
-  and clients (training configs, eval configs, sweep requests/results, etc.).
-- `bert_activities.py` – Activities for:
-  - Creating reproducible dataset snapshots.
-  - Running checkpoint-aware BERT fine-tuning.
-  - Evaluating fine-tuned checkpoints on public datasets.
-- `workflows.py` – Temporal workflows for:
-  - Single-run training/eval orchestration.
-  - Random hyperparameter sweeps (`SweepWorkflow`).
-  - Ladder-style sweeps with a simple TPE-inspired sampler
-    (`LadderSweepWorkflow`).
-- `worker.py` – Worker hosting evaluation and sweep workflows on the
-  `bert-eval-task-queue`.
-- `training_worker.py` – Worker hosting training activities on the
-  `bert-training-task-queue`, suitable for GPU machines.
-- `starter.py` – CLI script that builds a `SweepRequest`, runs
-  `LadderSweepWorkflow`, and prints a table of results.
-
-## Running the Demo (Ladder Sweep)
-
-These steps assume you are in the project root (`temporal_training/`).
+From the project root (`hyperparam-optimization/`):
 
 1. **Start Temporal Server** (if not already running):
 
@@ -79,74 +34,112 @@ These steps assume you are in the project root (`temporal_training/`).
    temporal server start-dev
    ```
 
-2. **Start the training worker** (ideally on a machine with a GPU):
+2. **Start the training worker** (GPU / capable machine recommended):
 
    ```bash
-   uv run -m src.workflows.train_tune.bert_sweeps.training_worker
+   uv sync --dev
+   uv run -m training_worker
    ```
 
-3. **Start the evaluation/sweep worker** (CPU-only is fine):
+3. **Start the evaluation / sweep worker** (CPU is fine):
 
    ```bash
-   uv run -m src.workflows.train_tune.bert_sweeps.worker
+   uv run -m worker
    ```
 
-4. **Run the ladder sweep starter** in a third terminal:
+4. **Run the ladder sweep starter** in another terminal:
 
    ```bash
-   uv run -m src.workflows.train_tune.bert_sweeps.starter
+   uv run -m starter
    ```
 
    This:
 
-   - Connects to the Temporal server using the Pydantic data converter.
-   - Uses the sample `ladder_config_1` defined in `starter.py`, which targets
-     the SciBERT + SciCite combination by default.
-   - Starts a `LadderSweepWorkflow` execution on the `bert-eval-task-queue`.
-   - Prints a small table summarizing each evaluated run (dataset, split,
-     number of examples, accuracy).
+   - Builds a `SweepRequest` (`ladder_config_1`) with a base `CoordinatorWorkflowConfig`
+     and `SweepSpace` search ranges.
+   - Starts `LadderSweepWorkflow` on `bert-eval-task-queue`.
+   - Under the hood, each stage of the ladder:
+     - Calls `CoordinatorWorkflow`, which:
+       - Starts a `CheckpointedBertTrainingWorkflow` child for each config on `bert-training-task-queue`.
+       - After training, starts a `BertEvalWorkflow` child per config.
+     - Records `TrialResult` entries and uses them to propose new configs at later rungs.
+   - Prints a concise summary of the best runs (dataset, split, number of examples, accuracy).
 
-5. **Inspect checkpoints and snapshots**:
-
-   - Fine-tuned models and tokenizers are written under `./bert_runs/{run_id}`.
-   - Dataset snapshots (if enabled) are written under `./data_snapshots`.
+---
 
 ## Durability demo
 
-To exercise Temporal’s durability with this sweep:
+To see Temporal’s durability across sweeps:
 
-1. Start both workers (`training_worker` and `worker`) as described above.
-2. Launch the ladder sweep via `starter.py`.
-3. Once several trials are in flight, **kill the training worker** (Ctrl‑C).
-4. Restart the training worker:
+1. Start both workers and run the `starter` script as above.
+2. After several trials have started (you see logs from `BertFineTuneActivities`), **kill the training worker** (Ctrl‑C).
+3. Restart the training worker:
+
    ```bash
    uv run -m src.workflows.train_tune.bert_sweeps.training_worker
    ```
-5. Observe in Temporal Web and logs that workflows continue from their last recorded state, and the sweep still completes with a coherent set of results.
 
-Because all side effects live in activities, workflows can be safely replayed and retried without double‑applying updates.
+4. Observe in Temporal Web and logs that:
+   - In‑flight `checkpointed` training children resume from the latest checkpoint (using `CheckpointInfo` signals).
+   - The ladder sweep continues from the last completed trial, not from scratch.
+   - The final leaderboard is still coherent.
 
-## Customizing the Sweep
+Because all dataset/model I/O is inside activities and all orchestration logic is inside workflows, the system can be **replayed and evolved safely** while preserving correctness.
 
-- Edit `ladder_config_1` in `starter.py` to:
-  - Switch to a different base model or dataset.
-  - Change the search space (`SweepSpace`) for learning rate, batch size,
-    number of epochs, and sequence length.
-  - Adjust `num_trials` and `max_concurrency` for your hardware.
-- Tweak the `stages` list in `LadderSweepWorkflow.run` (see `workflows.py`) to
-  change how many rungs the ladder uses and how much data/epochs each rung
-  sees.
-- For a simpler baseline, you can wire up `SweepWorkflow` instead of
-  `LadderSweepWorkflow` to run a purely random sweep.
-
-Because all randomness flows through Temporal's deterministic RNG, you can
-re-run the same sweep with the same `SweepRequest.seed` and expect identical
-trial configurations and ordering, which makes this a good template for
-reproducible experimentation.
+---
 
 ## Why Temporal (for this example)
 
-- **Durable hyperparameter sweeps**: Long-running experiments survive crashes and worker restarts.
-- **Deterministic experimentation**: Sweeps are repeatable because randomness flows through Temporal’s deterministic APIs.
-- **Code-first orchestration**: Complex ladder/TPE behavior is expressed in Python workflows, not YAML.
-- **Clear separation of concerns**: Activities own ML logic; workflows own orchestration and experiment structure.
+Compared to traditional orchestration tools, Temporal is a strong fit for this kind of work:
+
+- **Durability semantics**
+  - Each trial is a workflow with exactly‑once state progression and automatic retries.
+  - Checkpointed training can resume from mid‑run checkpoints instead of restarting.
+- **Long‑running sweeps**
+  - Ladder sweeps can run for hours or days across many trials without losing state.
+  - Human‑in‑the‑loop or external signals could be added without changing the core design.
+- **Code‑first expressiveness**
+  - The ladder/TPE logic is plain Python (`LadderSweepWorkflow`), not YAML or static DAGs.
+  - Complex branching and adaptive search strategies are easy to express and test.
+- **Deterministic replay**
+  - All randomness in the sweep uses Temporal’s deterministic RNG (`workflow.random()`).
+  - Workflows can be replayed for debugging or auditing without re‑running ML workloads.
+- **Portability & scaling**
+  - Workers are plain Python processes; you can run them locally, on Kubernetes, or on managed Temporal.
+  - Training and eval workers can be scaled independently, including to GPU pools.
+
+For a broader, rubric‑style comparison with alternatives, see
+`src/workflows/train_tune/bert_sweeps/docs/competitive-comparison.md`.
+
+---
+
+## Repo map (local to this folder)
+
+- `custom_types.py` – Pydantic models for:
+  - Dataset snapshots and checkpoints (`DatasetSnapshot*`, `CheckpointInfo`).
+  - Training/eval configs and results (`BertFineTuneConfig`, `BertEvalRequest`, `BertEvalResult`).
+  - Inference types (if you later add inference flows).
+  - Coordinator and sweep types (`CoordinatorWorkflowConfig`, `CoordinatorWorkflowInput`, `SweepSpace`, `SweepRequest`, `SweepResult`, `TrialResult`).
+- `bert_activities.py` – Activities for:
+  - Snapshotting datasets into content‑addressed directories.
+  - Schema‑aware, checkpoint‑aware fine‑tuning (`BertFineTuneActivities`).
+  - Dataset evaluation of fine‑tuned checkpoints (`BertEvalActivities`).
+  - Utility activities such as `set_seed` for reproducible experiments.
+- `workflows.py` – Temporal workflows:
+  - `CheckpointedBertTrainingWorkflow` – checkpoint‑aware training with dataset snapshots.
+  - `BertEvalWorkflow` – evaluation of a fine‑tuned run on a dataset split.
+  - `CoordinatorWorkflow` – orchestrates training + eval for one or more configs.
+  - `SweepWorkflow` – simple random hyperparameter sweep.
+  - `LadderSweepWorkflow` – staged, TPE‑style ladder sweep over `SweepSpace`.
+- `worker.py` – Worker hosting orchestration workflows (`BertEvalWorkflow`, `CoordinatorWorkflow`, `CheckpointedBertTrainingWorkflow`, `SweepWorkflow`, `LadderSweepWorkflow`) plus evaluation activities on `bert-eval-task-queue`.
+- `training_worker.py` – Worker hosting training and snapshot activities on `bert-training-task-queue`.
+- `starter.py` – CLI entrypoint that kicks off `LadderSweepWorkflow` with a sample configuration and prints results.
+- `tests/` – Workflow tests using Temporal’s `WorkflowEnvironment` to validate determinism and orchestration behavior.
+
+For a deeper architectural breakdown, see:
+
+- `src/workflows/train_tune/bert_sweeps/docs/architecture.md`
+
+For a competitive comparison with other orchestrators, see:
+
+- `src/workflows/train_tune/bert_sweeps/docs/competitive-comparison.md`
