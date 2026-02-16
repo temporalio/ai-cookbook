@@ -1,8 +1,7 @@
 <!--
-description: Build durable custom hyperparameter
-optimzaiton that saves on GPU costs and improves performance.
-tags:[ML Ops, hyperparameter optimization, autoML, python]
-priority: 399
+description: Build durable custom hyperparameter optimization to save money
+tags: [ML Ops, HPO, autoML, python]
+priority: 700
 -->
 
 # BERT Hyperparameter Sweeps (Temporal + Transformers)
@@ -76,7 +75,7 @@ To see Temporal’s durability across sweeps:
 3. Restart the training worker:
 
    ```bash
-   uv run -m src.workflows.train_tune.bert_sweeps.training_worker
+   uv run -m training_worker
    ```
 
 4. Observe in Temporal Web and logs that:
@@ -109,37 +108,14 @@ Compared to traditional orchestration tools, Temporal is a strong fit for this k
   - Training and eval workers can be scaled independently, including to GPU pools.
 
 For a broader, rubric‑style comparison with alternatives, see
-`src/workflows/train_tune/bert_sweeps/docs/competitive-comparison.md`.
+`/docs/competitive-comparison.md`.
 
 ---
 
-## Repo map (local to this folder)
-
-- `custom_types.py` – Pydantic models for:
-  - Dataset snapshots and checkpoints (`DatasetSnapshot*`, `CheckpointInfo`).
-  - Training/eval configs and results (`BertFineTuneConfig`, `BertEvalRequest`, `BertEvalResult`).
-  - Inference types (if you later add inference flows).
-  - Coordinator and sweep types (`CoordinatorWorkflowConfig`, `CoordinatorWorkflowInput`, `SweepSpace`, `SweepRequest`, `SweepResult`, `TrialResult`).
-- `bert_activities.py` – Activities for:
-  - Snapshotting datasets into content‑addressed directories.
-  - Schema‑aware, checkpoint‑aware fine‑tuning (`BertFineTuneActivities`).
-  - Dataset evaluation of fine‑tuned checkpoints (`BertEvalActivities`).
-  - Utility activities such as `set_seed` for reproducible experiments.
-- `workflows.py` – Temporal workflows:
-  - `CheckpointedBertTrainingWorkflow` – checkpoint‑aware training with dataset snapshots.
-  - `BertEvalWorkflow` – evaluation of a fine‑tuned run on a dataset split.
-  - `CoordinatorWorkflow` – orchestrates training + eval for one or more configs.
-  - `SweepWorkflow` – simple random hyperparameter sweep.
-  - `LadderSweepWorkflow` – staged, TPE‑style ladder sweep over `SweepSpace`.
-- `worker.py` – Worker hosting orchestration workflows (`BertEvalWorkflow`, `CoordinatorWorkflow`, `CheckpointedBertTrainingWorkflow`, `SweepWorkflow`, `LadderSweepWorkflow`) plus evaluation activities on `bert-eval-task-queue`.
-- `training_worker.py` – Worker hosting training and snapshot activities on `bert-training-task-queue`.
-- `starter.py` – CLI entrypoint that kicks off `LadderSweepWorkflow` with a sample configuration and prints results.
-- `tests/` – Workflow tests using Temporal’s `WorkflowEnvironment` to validate determinism and orchestration behavior.
-
 For a deeper architectural breakdown, see:
 
-- `src/workflows/train_tune/bert_sweeps/docs/architecture.md`
+- `/docs/architecture.md`
 
 For a competitive comparison with other orchestrators, see:
 
-- `src/workflows/train_tune/bert_sweeps/docs/competitive-comparison.md`
+- `/docs/competitive-comparison.md`
