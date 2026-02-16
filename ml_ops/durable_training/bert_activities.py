@@ -23,7 +23,7 @@ from typing import Final
 
 from temporalio import activity
 
-from src.workflows.train_tune.bert_checkpointing.custom_types import (
+from custom_types import (
     BertFineTuneRequest,
     BertFineTuneResult,
     BertInferenceRequest,

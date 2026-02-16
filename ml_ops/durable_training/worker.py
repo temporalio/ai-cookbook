@@ -7,12 +7,12 @@ from temporalio.client import Client
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.worker import Worker
 
-from src.workflows.train_tune.bert_checkpointing.bert_activities import (
+from bert_activities import (
     BertCheckpointingActivities,
     BertFineTuneActivities,
     BertInferenceActivities,
 )
-from src.workflows.train_tune.bert_checkpointing.workflow import (
+from workflows import (
     BertInferenceWorkflow,
     CheckpointedBertTrainingWorkflow,
 )

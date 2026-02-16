@@ -16,7 +16,7 @@ from datetime import timedelta
 from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
-    from src.workflows.train_tune.bert_checkpointing.custom_types import (
+    from custom_types import (
         BertFineTuneConfig,
         BertFineTuneRequest,
         BertFineTuneResult,

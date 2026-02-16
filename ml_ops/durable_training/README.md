@@ -1,3 +1,9 @@
+<!--
+description: build a simple, durable pytorch training run powered by temporal.
+tags: [machine learning, pytorch, python]
+priority: 700
+-->
+
 # BERT Checkpointed Training (Temporal + Transformers)
 
 This folder contains a demo that uses Temporal to orchestrate **checkpoint‑aware BERT fine‑tuning** and **resumable inference** on top of Hugging Face Transformers and Datasets.
@@ -23,13 +29,13 @@ From the project root (`temporal_training/`):
 2. **Start the checkpointed BERT worker**:
 
    ```bash
-   uv run -m src.workflows.train_tune.bert_checkpointing.worker
+   uv run -m worker
    ```
 
 3. **Run the end-to-end checkpointed training + inference demo** in another terminal:
 
    ```bash
-   uv run -m src.workflows.train_tune.bert_checkpointing.starter
+   uv run -m starter
    ```
 
    This:
@@ -50,7 +56,7 @@ This example is designed to demonstrate Temporal’s durability around long‑ru
 4. Restart the worker:
 
    ```bash
-   uv run -m src.workflows.train_tune.bert_checkpointing.worker
+   uv run -m worker
    ```
 
 5. Observe in Temporal Web (or logs) that the workflow **resumes** from the last recorded checkpoint rather than starting from scratch.
@@ -73,15 +79,13 @@ The `CheckpointedBertTrainingWorkflow` tracks the latest checkpoint path via sig
 - `starter.py` – CLI entrypoint that runs a full training + inference demo.
 - `tests/` – Unit and workflow tests for checkpointing behavior.
 
-For broader project troubleshooting and Temporal background, see the root `README.md` and `docs/` directory.
-
-For a step‑by‑step build guide showing how to assemble this module from scratch, see `src/workflows/train_tune/bert_checkpointing/CREATE_BERT_CHECKPOINTING.md`.
+For broader project troubleshooting and Temporal background, see the `docs/` directory.
 
 ## Architecture
 
 For a detailed breakdown of how checkpointed training is structured, see:
 
-- `src/workflows/train_tune/bert_checkpointing/docs/architecture.md`
+- `/docs/architecture.md`
 
 That document covers:
 
@@ -93,6 +97,6 @@ That document covers:
 
 To compare this checkpoint‑aware Temporal pattern against alternative orchestrators, see:
 
-- `src/workflows/train_tune/bert_checkpointing/docs/competitive-comparison.md`
+- `/docs/competitive-comparison.md`
 
 It evaluates this design against AWS Step Functions, Azure Durable Functions, Airflow, Dagster/Prefect, and others with respect to durability, long‑running workflows, replayability, portability, and operational ergonomics.

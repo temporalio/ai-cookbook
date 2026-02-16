@@ -13,11 +13,11 @@ import random
 from temporalio.client import Client
 from temporalio.contrib.pydantic import pydantic_data_converter
 
-from src.workflows.train_tune.bert_checkpointing.custom_types import (
+from custom_types import (
     BertFineTuneConfig,
     BertInferenceRequest,
 )
-from src.workflows.train_tune.bert_checkpointing.workflow import (
+from workflows import (
     BertInferenceWorkflow,
     CheckpointedBertTrainingWorkflow,
 )
