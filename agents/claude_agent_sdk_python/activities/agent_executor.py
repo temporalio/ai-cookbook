@@ -8,6 +8,7 @@ Key patterns demonstrated:
 1. Background heartbeats — keeps Temporal informed during long-running tool calls
 2. Staleness guard — stops heartbeating when the agent appears hung
 3. Response deduplication — only accumulates text from AssistantMessage events
+4. Session resumption — captures session_id and supports resuming conversations
 """
 
 import asyncio
@@ -59,7 +60,9 @@ async def execute_agent_activity(input_data: AgentInput) -> AgentOutput:
     # Lazy import — avoids loading the SDK at module level, which keeps the
     # Temporal worker startup fast and avoids sandbox issues.
     from claude_agent_sdk import query
-    from claude_agent_sdk.types import ClaudeAgentOptions, AssistantMessage, ResultMessage
+    from claude_agent_sdk.types import (
+        ClaudeAgentOptions, AssistantMessage, ResultMessage, SystemMessage,
+    )
 
     activity.logger.info(
         f"Starting agent execution: prompt_length={len(input_data.prompt)}, "
@@ -83,6 +86,14 @@ async def execute_agent_activity(input_data: AgentInput) -> AgentOutput:
         )
         if input_data.system_prompt:
             options.system_prompt = input_data.system_prompt
+
+        # Session resumption: if a previous session_id is provided, tell the
+        # SDK to resume from that session's JSONL file on disk.
+        if input_data.resume_session_id:
+            options.resume = input_data.resume_session_id
+            activity.logger.info(
+                f"Resuming session: {input_data.resume_session_id}"
+            )
 
         # Heartbeat state shared between the event loop and the background task.
         heartbeat_state = {
@@ -123,10 +134,11 @@ async def execute_agent_activity(input_data: AgentInput) -> AgentOutput:
 
         heartbeat_task = asyncio.create_task(_heartbeat_loop())
 
-        # Collect response and events
+        # Collect response, events, and session ID
         response_text = ""
         total_tokens = 0
         event_count = 0
+        session_id = None
 
         try:
             async for event in query(
@@ -136,6 +148,19 @@ async def execute_agent_activity(input_data: AgentInput) -> AgentOutput:
                 event_count += 1
                 heartbeat_state["event_count"] = event_count
                 heartbeat_state["last_event_time"] = time.time()
+
+                # Capture session_id from the init SystemMessage.
+                # The SDK emits a SystemMessage with subtype='init' at the
+                # start of a session.  Its data dict contains the session_id
+                # which can be used to resume this conversation later.
+                if isinstance(event, SystemMessage):
+                    subtype = getattr(event, "subtype", None)
+                    data = getattr(event, "data", None)
+                    if subtype == "init" and isinstance(data, dict):
+                        sid = data.get("session_id")
+                        if sid:
+                            session_id = sid
+                            activity.logger.info(f"Captured session_id: {sid}")
 
                 # Response deduplication: The SDK emits both StreamEvent
                 # (incremental chunks) and AssistantMessage (complete blocks).
@@ -175,6 +200,7 @@ async def execute_agent_activity(input_data: AgentInput) -> AgentOutput:
             total_tokens=total_tokens,
             num_events=event_count,
             processing_time_seconds=processing_time,
+            session_id=session_id,
         )
 
     except Exception as e:

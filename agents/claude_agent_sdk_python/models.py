@@ -28,6 +28,12 @@ class AgentInput(BaseModel):
         default="bypassPermissions",
         description="Claude Code permission mode (e.g. 'bypassPermissions', 'default')",
     )
+    resume_session_id: Optional[str] = Field(
+        default=None,
+        description="Session ID to resume a previous conversation. "
+        "The SDK stores sessions as JSONL files on disk; passing this "
+        "resumes from where the last session left off.",
+    )
 
 
 class AgentOutput(BaseModel):
@@ -44,4 +50,8 @@ class AgentOutput(BaseModel):
     )
     error_message: Optional[str] = Field(
         default=None, description="Error details if status is 'error'"
+    )
+    session_id: Optional[str] = Field(
+        default=None,
+        description="Session ID from the SDK, used to resume this conversation later",
     )

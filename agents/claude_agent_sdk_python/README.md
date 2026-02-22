@@ -15,6 +15,7 @@ This recipe highlights the following key design decisions:
 - **Background heartbeats**: An `asyncio.create_task()` sends Temporal heartbeats every 60 seconds, independent of the SDK event stream. This is critical because the SDK may execute long-running tools (e.g., git operations, file reads) that emit no events for extended periods.
 - **Staleness guard**: If no SDK events arrive for 15 minutes, the heartbeat loop exits. Temporal's `heartbeat_timeout` (10 min) then fires, killing a truly hung agent instead of letting it block the full 30-minute `start_to_close_timeout`.
 - **Response deduplication**: The Claude Agent SDK emits both `StreamEvent` (incremental text chunks) and `AssistantMessage` (complete text blocks). Both contain the same text, so we only accumulate from `AssistantMessage` to avoid doubling the response.
+- **Session resumption**: The SDK stores sessions as JSONL files on disk. The activity captures the `session_id` from the `SystemMessage(init)` event and returns it in the output. Subsequent calls can pass this ID to resume from where the previous session left off.
 - **Errors modeled as completions**: Agent failures are returned as `AgentOutput(status="error", ...)` rather than raising exceptions, giving the workflow full control over retry/notification logic.
 
 ## Application Components
@@ -44,6 +45,7 @@ class AgentInput(BaseModel):
     system_prompt: Optional[str] = Field(default=None)
     max_turns: int = Field(default=30)
     permission_mode: str = Field(default="bypassPermissions")
+    resume_session_id: Optional[str] = Field(default=None)
 
 
 class AgentOutput(BaseModel):
@@ -54,6 +56,7 @@ class AgentOutput(BaseModel):
     num_events: int = Field(default=0)
     processing_time_seconds: Optional[float] = Field(default=None)
     error_message: Optional[str] = Field(default=None)
+    session_id: Optional[str] = Field(default=None)
 ```
 
 ## Create the Activity
@@ -67,6 +70,8 @@ The core activity wraps `query()` from the Claude Agent SDK and streams events. 
 2. **Staleness guard** — If no events arrive for 15 minutes, the heartbeat loop exits. This prevents a truly hung agent from blocking the full 30-minute `start_to_close_timeout`.
 
 3. **Response deduplication** — Only `AssistantMessage` events are used for response text. `StreamEvent` contains the same text as incremental chunks and must be skipped.
+
+4. **Session resumption** — The SDK emits a `SystemMessage(subtype='init')` with a `session_id` at the start of each session. We capture this and return it in the output. To resume, pass the session_id as `resume_session_id` in the next request — the SDK picks up from where it left off.
 
 *File: activities/agent_executor.py*
 
@@ -84,7 +89,9 @@ MAX_IDLE_SECONDS = 15 * 60  # 15 minutes
 @activity.defn
 async def execute_agent_activity(input_data: AgentInput) -> AgentOutput:
     from claude_agent_sdk import query
-    from claude_agent_sdk.types import ClaudeAgentOptions, AssistantMessage, ResultMessage
+    from claude_agent_sdk.types import (
+        ClaudeAgentOptions, AssistantMessage, ResultMessage, SystemMessage,
+    )
 
     start_time = datetime.now(timezone.utc)
 
@@ -96,6 +103,10 @@ async def execute_agent_activity(input_data: AgentInput) -> AgentOutput:
         )
         if input_data.system_prompt:
             options.system_prompt = input_data.system_prompt
+
+        # Session resumption: tell the SDK to resume from a previous session
+        if input_data.resume_session_id:
+            options.resume = input_data.resume_session_id
 
         # Shared state between event loop and heartbeat task
         heartbeat_state = {
@@ -129,6 +140,7 @@ async def execute_agent_activity(input_data: AgentInput) -> AgentOutput:
         response_text = ""
         total_tokens = 0
         event_count = 0
+        session_id = None
 
         try:
             async for event in query(
@@ -138,6 +150,13 @@ async def execute_agent_activity(input_data: AgentInput) -> AgentOutput:
                 event_count += 1
                 heartbeat_state["event_count"] = event_count
                 heartbeat_state["last_event_time"] = time.time()
+
+                # Capture session_id from the init SystemMessage
+                if isinstance(event, SystemMessage):
+                    if getattr(event, "subtype", None) == "init":
+                        data = getattr(event, "data", None)
+                        if isinstance(data, dict):
+                            session_id = data.get("session_id") or session_id
 
                 # DEDUP: Only use AssistantMessage for response text.
                 # StreamEvent contains the same text as incremental chunks.
@@ -165,6 +184,7 @@ async def execute_agent_activity(input_data: AgentInput) -> AgentOutput:
             total_tokens=total_tokens,
             num_events=event_count,
             processing_time_seconds=processing_time,
+            session_id=session_id,
         )
 
     except Exception as e:
@@ -303,8 +323,16 @@ async def main():
         data_converter=pydantic_data_converter,
     )
 
-    prompt = sys.argv[1] if len(sys.argv) > 1 else "Tell me about recursion"
-    input_data = AgentInput(prompt=prompt)
+    # Parse arguments: --resume SESSION_ID is optional
+    args = sys.argv[1:]
+    resume_session_id = None
+
+    if len(args) >= 2 and args[0] == "--resume":
+        resume_session_id = args[1]
+        args = args[2:]
+
+    prompt = args[0] if args else "Tell me about recursion"
+    input_data = AgentInput(prompt=prompt, resume_session_id=resume_session_id)
 
     result = await client.execute_workflow(
         AgentExecutionWorkflow.run,
@@ -313,10 +341,12 @@ async def main():
         task_queue="claude-agent-sdk-task-queue",
     )
 
-    print(f"\nStatus: {result.status}")
-    print(f"Tokens: {result.total_tokens}")
-    print(f"Events: {result.num_events}")
-    print(f"Time:   {result.processing_time_seconds:.2f}s")
+    print(f"\nStatus:     {result.status}")
+    print(f"Tokens:     {result.total_tokens}")
+    print(f"Events:     {result.num_events}")
+    print(f"Time:       {result.processing_time_seconds:.2f}s")
+    if result.session_id:
+        print(f"Session ID: {result.session_id}")
     print(f"\nResponse:\n{result.response}")
 
 
@@ -366,6 +396,21 @@ uv run python -m start_workflow "write a Python function to check if a number is
 uv run python -m start_workflow "tell me about recursion"
 ```
 
+### Resume a session
+
+The agent returns a `session_id` in the output. Pass it back with `--resume` to continue the conversation:
+
+```bash
+# First interaction — note the session_id in the output
+uv run python -m start_workflow "explain binary search"
+# Output: Session ID: sess-abc-123
+
+# Follow-up — the agent remembers the previous context
+uv run python -m start_workflow --resume sess-abc-123 "now implement it in Python"
+```
+
+The SDK stores sessions as JSONL files on the worker's filesystem. When `--resume` is passed, the SDK loads the previous session and continues from where it left off, preserving the full conversation history including tool calls and results.
+
 ## Testing
 
 The example includes tests for both the workflow (with mocked activities) and the activity (with mocked SDK events). Tests use Temporal's `WorkflowEnvironment` and `ActivityEnvironment` — no real Temporal server or Claude API calls needed.
@@ -384,11 +429,14 @@ uv run pytest tests/ -v
   - Successful execution flows through both steps (execute + log)
   - Agent errors are returned as completions (not exceptions)
   - Input parameters (system_prompt, model) pass through correctly
+  - Session resumption: `resume_session_id` passes through, `session_id` is returned
 
 - **`test_activity.py`** — Activity-level tests with mock SDK events:
   - Response deduplication: `StreamEvent` text is skipped, only `AssistantMessage` is used
   - Error handling: SDK exceptions are caught and returned as `AgentOutput(status="error")`
   - Token usage captured from `ResultMessage`
+  - Session ID captured from `SystemMessage(subtype='init')`
+  - Resume option set on SDK options when `resume_session_id` is provided
 
 ## Comparison with Basic Agentic Loop
 
@@ -401,4 +449,5 @@ uv run pytest tests/ -v
 | Timeout | 30 seconds | 30 minutes |
 | Staleness detection | N/A | 15-min idle guard |
 | Response dedup | N/A | AssistantMessage only |
+| Session resumption | Not supported | Built-in via session_id |
 | Best for | Simple tool calling | Long-running autonomous agents |

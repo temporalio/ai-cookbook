@@ -35,6 +35,7 @@ async def mock_execute_agent_activity(input_data: AgentInput) -> AgentOutput:
         total_tokens=150,
         num_events=5,
         processing_time_seconds=1.23,
+        session_id="sess-mock-123",
     )
 
 
@@ -85,6 +86,7 @@ async def test_workflow_success():
             assert result.total_tokens == 150
             assert result.num_events == 5
             assert result.processing_time_seconds == 1.23
+            assert result.session_id == "sess-mock-123"
 
 
 @pytest.mark.asyncio
@@ -154,3 +156,45 @@ async def test_workflow_with_system_prompt():
             assert len(captured_inputs) == 1
             assert captured_inputs[0].system_prompt == "You are a helpful assistant."
             assert captured_inputs[0].model == "claude-sonnet-4-5-20250929"
+
+
+@pytest.mark.asyncio
+async def test_workflow_session_resumption():
+    """Test that resume_session_id is passed through and session_id is returned."""
+    captured_inputs = []
+
+    @activity.defn(name="execute_agent_activity")
+    async def capture_resume_activity(input_data: AgentInput) -> AgentOutput:
+        captured_inputs.append(input_data)
+        return AgentOutput(
+            status="success",
+            response="Resumed conversation",
+            processing_time_seconds=0.5,
+            session_id="sess-new-456",
+        )
+
+    async with await WorkflowEnvironment.start_time_skipping(
+        data_converter=pydantic_data_converter,
+    ) as env:
+        async with Worker(
+            env.client,
+            task_queue="test-queue",
+            workflows=[AgentExecutionWorkflow],
+            activities=[capture_resume_activity, mock_log_result_activity],
+        ):
+            input_data = AgentInput(
+                prompt="Continue from before",
+                resume_session_id="sess-abc-123",
+            )
+
+            result = await env.client.execute_workflow(
+                AgentExecutionWorkflow.run,
+                input_data,
+                id=f"test-{uuid.uuid4()}",
+                task_queue="test-queue",
+            )
+
+            assert result.status == "success"
+            assert result.session_id == "sess-new-456"
+            assert len(captured_inputs) == 1
+            assert captured_inputs[0].resume_session_id == "sess-abc-123"

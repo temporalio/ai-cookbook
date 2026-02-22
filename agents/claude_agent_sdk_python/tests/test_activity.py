@@ -47,6 +47,13 @@ class MockResultMessage:
     total_tokens: int = 200
 
 
+@dataclass
+class MockSystemMessage:
+    """Simulates claude_agent_sdk.types.SystemMessage"""
+    subtype: str = ""
+    data: dict = None
+
+
 # ---------------------------------------------------------------------------
 # Mock SDK query generators
 # ---------------------------------------------------------------------------
@@ -71,6 +78,16 @@ async def mock_sdk_query_with_stream_events(prompt, options):
     yield MockResultMessage(total_tokens=100)
 
 
+async def mock_sdk_query_with_session(prompt, options):
+    """Mock SDK that yields a SystemMessage with session_id.
+
+    This tests session_id capture from the init SystemMessage.
+    """
+    yield MockSystemMessage(subtype="init", data={"session_id": "sess-abc-123"})
+    yield MockAssistantMessage(content=[MockTextBlock(text="Resumed!")])
+    yield MockResultMessage(total_tokens=50)
+
+
 async def mock_sdk_query_error(prompt, options):
     """Mock SDK that raises an exception."""
     raise RuntimeError("SDK connection failed")
@@ -87,12 +104,13 @@ def _create_sdk_mock(query_fn):
 
     The activity imports:
         from claude_agent_sdk import query
-        from claude_agent_sdk.types import ClaudeAgentOptions, AssistantMessage, ResultMessage
+        from claude_agent_sdk.types import ClaudeAgentOptions, AssistantMessage, ResultMessage, SystemMessage
     """
     mock_types = MagicMock()
     mock_types.ClaudeAgentOptions = lambda **kwargs: MagicMock()
     mock_types.AssistantMessage = MockAssistantMessage
     mock_types.ResultMessage = MockResultMessage
+    mock_types.SystemMessage = MockSystemMessage
 
     mock_sdk = MagicMock()
     mock_sdk.query = query_fn
@@ -169,6 +187,65 @@ async def test_log_result_activity_success():
 
     # Should not raise
     await env.run(log_result_activity, output)
+
+
+@pytest.mark.asyncio
+async def test_session_id_captured():
+    """Test that session_id is captured from SystemMessage init event."""
+    env = ActivityEnvironment()
+
+    with patch.dict("sys.modules", _create_sdk_mock(mock_sdk_query_with_session)):
+        input_data = AgentInput(prompt="Hello")
+        result = await env.run(execute_agent_activity, input_data)
+
+    assert result.status == "success"
+    assert result.session_id == "sess-abc-123"
+    assert result.response == "Resumed!"
+
+
+@pytest.mark.asyncio
+async def test_resume_session_id_passed():
+    """Test that resume_session_id is set on options when provided."""
+    captured_options = []
+
+    async def mock_sdk_query_capture_resume(prompt, options):
+        captured_options.append(options)
+        yield MockSystemMessage(subtype="init", data={"session_id": "sess-new-456"})
+        yield MockAssistantMessage(content=[MockTextBlock(text="Continued")])
+        yield MockResultMessage(total_tokens=75)
+
+    # Create a custom mock that captures the options object
+    mock_types = MagicMock()
+    # Use a real MagicMock for options so we can inspect .resume
+    mock_types.ClaudeAgentOptions = MagicMock
+    mock_types.AssistantMessage = MockAssistantMessage
+    mock_types.ResultMessage = MockResultMessage
+    mock_types.SystemMessage = MockSystemMessage
+
+    mock_sdk = MagicMock()
+    mock_sdk.query = mock_sdk_query_capture_resume
+    mock_sdk.types = mock_types
+
+    sdk_mock = {
+        "claude_agent_sdk": mock_sdk,
+        "claude_agent_sdk.types": mock_types,
+    }
+
+    env = ActivityEnvironment()
+
+    with patch.dict("sys.modules", sdk_mock):
+        input_data = AgentInput(
+            prompt="Continue from where we left off",
+            resume_session_id="sess-abc-123",
+        )
+        result = await env.run(execute_agent_activity, input_data)
+
+    assert result.status == "success"
+    assert result.response == "Continued"
+    assert result.session_id == "sess-new-456"
+    # Verify resume was set on the options
+    assert len(captured_options) == 1
+    assert captured_options[0].resume == "sess-abc-123"
 
 
 @pytest.mark.asyncio
