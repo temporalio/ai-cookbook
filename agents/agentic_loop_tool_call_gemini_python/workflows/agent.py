@@ -36,7 +36,7 @@ class AgentWorkflow:
             types.Content(role="user", parts=[types.Part(text=input)])
         ]
 
-        # Get tools (cached - initialized by worker at startup)
+        # Get tools
         tools = [get_tools()]
 
         # The agentic loop

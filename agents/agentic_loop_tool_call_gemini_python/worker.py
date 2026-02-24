@@ -13,10 +13,6 @@ from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.envconfig import ClientConfig
 from temporalio.worker import Worker
 
-# Initialize tools cache before importing workflow (requires GOOGLE_API_KEY)
-from tools import get_tools
-get_tools()  # Populate cache
-
 from activities import gemini_chat, tool_invoker
 from workflows.agent import AgentWorkflow
 

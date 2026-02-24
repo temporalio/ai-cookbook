@@ -19,7 +19,6 @@ async def main():
 
     # Submit the agent workflow for execution
     # Using string-based workflow name to avoid importing workflow module
-    # (which requires GOOGLE_API_KEY for tool generation)
     result = await client.execute_workflow(
         "AgentWorkflow",
         query,

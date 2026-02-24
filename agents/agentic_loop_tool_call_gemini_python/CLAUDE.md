@@ -8,7 +8,7 @@ This is a Temporal-based agentic loop implementation using Google's Gemini model
 
 ```
 agentic_loop_tool_call_gemini_python/
-├── worker.py               # Temporal worker (initializes tool cache)
+├── worker.py               # Temporal worker
 ├── start_workflow.py       # Client (no API key needed)
 ├── workflows/
 │   └── agent.py            # Agentic loop workflow (the "engine")
@@ -39,10 +39,9 @@ This separation allows the same engine to power different agents by swapping out
 
 ### Tool Definition Strategy
 
-We use `FunctionDeclaration.from_callable()` from the Google GenAI SDK to generate tool definitions. This requires:
+We use `FunctionDeclaration.from_callable_with_api_option()` from the Google GenAI SDK to generate tool definitions. This method accepts the API backend as a string (`"GEMINI_API"`), so no client or API key is needed for tool generation.
 
-1. **API key at generation time**: The SDK needs a client to call `from_callable()`
-2. **Docstrings for parameter descriptions**: The SDK extracts the entire docstring as the function description, but does NOT extract individual parameter descriptions from Pydantic `Field(description=...)`. Put parameter descriptions in the docstring's Args section.
+**Docstrings for parameter descriptions**: The SDK extracts the entire docstring as the function description, but does NOT extract individual parameter descriptions from Pydantic `Field(description=...)`. Put parameter descriptions in the docstring's Args section.
 
 ### Why Pydantic Models for Tool Parameters
 
@@ -51,31 +50,17 @@ Temporal best practice is to use 0-1 parameters for activities, typically a data
 - Clear activity contracts
 - Consistent patterns across the codebase
 
-When using Pydantic models with `from_callable()`, the LLM produces **nested output**:
+When using Pydantic models with `from_callable_with_api_option()`, the LLM produces **nested output**:
 ```python
 {"request": {"state": "CA"}}  # Not flat {"state": "CA"}
 ```
 
 The `tool_invoker` extracts the nested dict using the parameter name.
 
-### Tool Caching Architecture
-
-Tools are generated once at worker startup to:
-1. Avoid requiring API key on the client side
-2. Prevent sandbox restrictions (genai client uses threading.local)
-3. Improve efficiency (no regeneration per workflow)
-
-```
-Worker startup → get_tools() → cache populated
-                                    ↓
-Workflow runs → get_tools() → returns cached value
-```
-
 ### Temporal Sandbox Considerations
 
 - `google.genai.Client` uses `threading.local` which is restricted in workflows
-- Tool generation must happen OUTSIDE the workflow sandbox
-- The workflow imports `get_tools` in `imports_passed_through` but calls it inside `run()` - this works because the cache is already populated
+- The `get_tools()` function does not create a client, so it can be called safely from within the workflow sandbox
 
 ### Serialization
 
@@ -99,16 +84,14 @@ result = await client.execute_workflow(
 )
 ```
 
-This ensures the client doesn't need the `GOOGLE_API_KEY` environment variable, since importing the workflow would trigger tool generation.
+This avoids importing the workflow module on the client side.
 
 ## Common Pitfalls
 
 1. **Forgetting docstring parameter descriptions**: The LLM won't know what parameters mean
-2. **Calling `get_tools()` before worker initializes cache**: Will fail in sandbox
-3. **Importing workflow in client**: Triggers tool generation, requires API key
-4. **Not handling nested LLM output**: Tool invocation will fail
-5. **Wrong type for function_calls args**: Use `dict[str, Any]` not `dict[str, str]` since args is a dict
-6. **Pydantic sandbox warnings**: Import `pydantic_core` and `annotated_types` early in `imports_passed_through`
+2. **Not handling nested LLM output**: Tool invocation will fail
+3. **Wrong type for function_calls args**: Use `dict[str, Any]` not `dict[str, str]` since args is a dict
+4. **Pydantic sandbox warnings**: Import `pydantic_core` and `annotated_types` early in `imports_passed_through`
 
 ## Customizing the Agent
 
@@ -122,13 +105,13 @@ Edit `agent_config/prompts.py` to modify the system instructions. The `SYSTEM_IN
 2. Create async handler with descriptive docstring (include parameter descriptions!)
 3. Register in `tools/__init__.py`:
    - Add to `get_handler()`
-   - Add `FunctionDeclaration.from_callable()` in `get_tools()`
+   - Add `FunctionDeclaration.from_callable_with_api_option()` in `get_tools()`
 
 No changes to the workflow are needed when adding tools.
 
 ## Environment Variables
 
-- `GOOGLE_API_KEY`: Required by worker only (for tool generation and API calls)
+- `GOOGLE_API_KEY`: Required by worker only (for Gemini API calls)
 
 ## Testing
 

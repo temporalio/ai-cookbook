@@ -11,10 +11,10 @@ directly. If the LLM determines a tool should be used it will return with the na
 of the chosen tool and any needed parameters. The agent then invokes the
 appropriate tool.
 
-Tools are supplied to the [`generate_content` API](https://googleapis.github.io/python-genai/) through the `tools` parameter. Tool definitions are generated using `FunctionDeclaration.from_callable()` from the Google GenAI SDK.
+Tools are supplied to the [`generate_content` API](https://googleapis.github.io/python-genai/) through the `tools` parameter. Tool definitions are generated using `FunctionDeclaration.from_callable_with_api_option()` from the Google GenAI SDK. This method accepts the API backend as a string (`"GEMINI_API"`), so no client or API key is needed for tool generation.
 
 > [!NOTE]
-> `FunctionDeclaration.from_callable()` extracts the function description from the docstring, but does NOT extract parameter descriptions from Pydantic `Field(description=...)`. Parameter descriptions should be included in the docstring's Args section.
+> `FunctionDeclaration.from_callable_with_api_option()` extracts the function description from the docstring, but does NOT extract parameter descriptions from Pydantic `Field(description=...)`. Parameter descriptions should be included in the docstring's Args section.
 
 Being external API calls, invoking the LLM and invoking any functions/tools are done within a Temporal Activity.
 
@@ -87,7 +87,7 @@ class AgentWorkflow:
             types.Content(role="user", parts=[types.Part(text=input)])
         ]
 
-        # Get tools (cached - initialized by worker at startup)
+        # Get tools
         tools = [get_tools()]
 
         # The agentic loop
@@ -209,7 +209,12 @@ async def generate_content(request: GeminiChatRequest) -> GeminiChatResponse:
     api_key = os.environ.get("GOOGLE_API_KEY")
     if not api_key:
         raise ValueError("GOOGLE_API_KEY environment variable is not set")
-    client = genai.Client(api_key=api_key)
+    client = genai.Client(
+        api_key=api_key,
+        http_options=types.HttpOptions(
+            retry_options=types.HttpRetryOptions(attempts=1),
+        ),
+    )
 
     # Configure the request with automatic function calling disabled
     # (Temporal handles tool execution, not the SDK)
@@ -326,23 +331,18 @@ The `__init__.py` file holds the tool registry:
 - The `get_tools` method returns the `types.Tool` object containing all function declarations that will be passed to the LLM.
 - The `get_handler` method captures the mapping from tool name to tool function.
 
-Tool definitions are generated using `FunctionDeclaration.from_callable()` from the Google GenAI SDK. The result is cached at worker startup to avoid repeated client creation.
+Tool definitions are generated using `FunctionDeclaration.from_callable_with_api_option()` from the Google GenAI SDK. This method accepts the API backend as a string, so no client or API key is needed for tool generation.
 
 *File: tools/__init__.py*
 ```python
-import os
 from typing import Any, Awaitable, Callable
 
-from google import genai
 from google.genai import types
 
 from .get_location import get_location_info, get_ip_address
 from .get_weather import get_weather_alerts
 
 ToolHandler = Callable[..., Awaitable[Any]]
-
-# Cache for the generated Tool object
-_tools_cache: types.Tool | None = None
 
 
 def get_handler(tool_name: str) -> ToolHandler:
@@ -358,31 +358,19 @@ def get_handler(tool_name: str) -> ToolHandler:
 
 def get_tools() -> types.Tool:
     """Get the Tool object containing all available function declarations."""
-    global _tools_cache
-    if _tools_cache is not None:
-        return _tools_cache
-
-    # Create client to generate FunctionDeclarations
-    api_key = os.environ.get("GOOGLE_API_KEY")
-    if not api_key:
-        raise ValueError("GOOGLE_API_KEY environment variable is not set")
-    client = genai.Client(api_key=api_key)
-
-    # Generate FunctionDeclarations from callables
-    _tools_cache = types.Tool(
+    return types.Tool(
         function_declarations=[
-            types.FunctionDeclaration.from_callable(
-                client=client, callable=get_weather_alerts
+            types.FunctionDeclaration.from_callable_with_api_option(
+                callable=get_weather_alerts, api_option="GEMINI_API"
             ),
-            types.FunctionDeclaration.from_callable(
-                client=client, callable=get_location_info
+            types.FunctionDeclaration.from_callable_with_api_option(
+                callable=get_location_info, api_option="GEMINI_API"
             ),
-            types.FunctionDeclaration.from_callable(
-                client=client, callable=get_ip_address
+            types.FunctionDeclaration.from_callable_with_api_option(
+                callable=get_ip_address, api_option="GEMINI_API"
             ),
         ]
     )
-    return _tools_cache
 ```
 
 The tool descriptions and functions are defined in `tools/get_location.py` and
@@ -432,8 +420,19 @@ from typing import Any
 import httpx
 from pydantic import BaseModel, Field
 
+# Constants
 NWS_API_BASE = "https://api.weather.gov"
 USER_AGENT = "weather-app/1.0"
+
+
+async def _make_nws_request(url: str) -> dict[str, Any] | None:
+    """Make a request to the NWS API with proper error handling."""
+    headers = {"User-Agent": USER_AGENT, "Accept": "application/geo+json"}
+
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url, headers=headers, timeout=5.0)
+        response.raise_for_status()
+        return response.json()
 
 
 class GetWeatherAlertsRequest(BaseModel):
@@ -449,21 +448,14 @@ async def get_weather_alerts(request: GetWeatherAlertsRequest) -> str:
         request: The request object containing:
             - state: Two-letter US state code (e.g. CA, NY)
     """
-    headers = {"User-Agent": USER_AGENT, "Accept": "application/geo+json"}
     url = f"{NWS_API_BASE}/alerts/active/area/{request.state}"
-
-    async with httpx.AsyncClient() as client:
-        response = await client.get(url, headers=headers, timeout=5.0)
-        response.raise_for_status()
-        return json.dumps(response.json())
+    data = await _make_nws_request(url)
+    return json.dumps(data)
 ```
 
 ## Create the Worker
 
 The worker is the process that dispatches work to the various parts of the agent implementation - the orchestrator and the activities for the LLM and tool invocations.
-
-> [!IMPORTANT]
-> The worker must initialize the tools cache before importing the workflow. This ensures tool generation happens outside the workflow sandbox (which restricts `threading.local` used by the Gemini client).
 
 *File: worker.py*
 
@@ -477,19 +469,18 @@ from concurrent.futures import ThreadPoolExecutor
 
 from temporalio.client import Client
 from temporalio.contrib.pydantic import pydantic_data_converter
+from temporalio.envconfig import ClientConfig
 from temporalio.worker import Worker
-
-# Initialize tools cache before importing workflow (requires GOOGLE_API_KEY)
-from tools import get_tools
-get_tools()  # Populate cache
 
 from activities import gemini_chat, tool_invoker
 from workflows.agent import AgentWorkflow
 
 
 async def main():
+    config = ClientConfig.load_client_connect_config()
+    config.setdefault("target_host", "localhost:7233")
     client = await Client.connect(
-        "localhost:7233",
+        **config,
         data_converter=pydantic_data_converter,
     )
 
@@ -517,7 +508,7 @@ if __name__ == "__main__":
 In order to interact with this simple AI agent, we create a Temporal client and execute a workflow.
 
 > [!NOTE]
-> The client uses string-based workflow execution (`"AgentWorkflow"` instead of `AgentWorkflow.run`) to avoid importing the workflow module, which would require the `GOOGLE_API_KEY` environment variable.
+> The client uses string-based workflow execution (`"AgentWorkflow"` instead of `AgentWorkflow.run`) to avoid importing the workflow module on the client side.
 
 *File: start_workflow.py*
 ```python
@@ -539,7 +530,6 @@ async def main():
 
     # Submit the agent workflow for execution
     # Using string-based workflow name to avoid importing workflow module
-    # (which requires GOOGLE_API_KEY for tool generation)
     result = await client.execute_workflow(
         "AgentWorkflow",
         query,
