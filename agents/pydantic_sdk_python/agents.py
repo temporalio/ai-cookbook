@@ -4,7 +4,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import os
+import json
 import math
+import httpx
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, RunContext
 from dataclasses import dataclass
@@ -27,13 +29,6 @@ class SearchResult(BaseModel):
     """Result from searching documentation."""
     matching_docs: list[str] = Field(description="List of document titles that match")
     total_matches: int = Field(description="Total number of matching documents")
-
-
-class WeatherInfo(BaseModel):
-    """Weather information for a city."""
-    city: str
-    temperature_range: str
-    conditions: str
 
 
 # ============================================================================
@@ -74,7 +69,9 @@ documentation_agent = Agent(
 You have access to several tools:
 - search_documentation: Search through available documentation by keywords
 - list_available_docs: See what documentation is available
-- get_weather: Get weather information for a city (for demonstration)
+- get_ip_address: Get the public IP address of the current machine
+- get_location_info: Get city, state, and country for an IP address
+- get_weather_alerts: Get active weather alerts for a US state (e.g. CA, NY)
 - calculate_circle_area: Calculate the area of a circle (for demonstration)
 
 Use these tools to help answer questions. You can call multiple tools in sequence if needed.
@@ -107,15 +104,45 @@ async def list_available_docs(ctx: RunContext[DocsContext]) -> list[str]:
 
 
 @documentation_agent.tool
-async def get_weather(_ctx: RunContext[DocsContext], city: str) -> WeatherInfo:
-    """Get weather information for a city."""
-    # introduce a bug
-    raise Exception("This is a test error")
-    return WeatherInfo(
-        city=city,
-        temperature_range="14-20C",
-        conditions="Sunny with wind"
-    )
+async def get_ip_address(_ctx: RunContext[DocsContext]) -> str:
+    """Get the public IP address of the current machine."""
+    async with httpx.AsyncClient() as client:
+        response = await client.get("https://icanhazip.com")
+        response.raise_for_status()
+        return response.text.strip()
+
+
+@documentation_agent.tool
+async def get_location_info(_ctx: RunContext[DocsContext], ipaddress: str) -> str:
+    """Get the location information for an IP address, including city, state, and country.
+
+    Args:
+        ipaddress: An IP address
+    """
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"http://ip-api.com/json/{ipaddress}")
+        response.raise_for_status()
+        result = response.json()
+        return f"{result['city']}, {result['regionName']}, {result['country']}"
+
+
+NWS_API_BASE = "https://api.weather.gov"
+NWS_USER_AGENT = "weather-app/1.0"
+
+
+@documentation_agent.tool
+async def get_weather_alerts(_ctx: RunContext[DocsContext], state: str) -> str:
+    """Get active weather alerts for a US state.
+
+    Args:
+        state: Two-letter US state code (e.g. CA, NY)
+    """
+    url = f"{NWS_API_BASE}/alerts/active/area/{state}"
+    headers = {"User-Agent": NWS_USER_AGENT, "Accept": "application/geo+json"}
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url, headers=headers, timeout=5.0)
+        response.raise_for_status()
+        return json.dumps(response.json())
 
 
 @documentation_agent.tool

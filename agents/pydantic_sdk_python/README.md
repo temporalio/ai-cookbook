@@ -12,7 +12,6 @@ This recipe highlights key implementation patterns:
 
 - **Agent-based architecture**: Uses PydanticAI to create an intelligent agent that can reason about which tools to use
 - **Model flexibility**: PydanticAI supports multiple LLM providers - use any model supported by the framework (OpenAI, Anthropic, Google, and more)
-- **Structured outputs**: Tools return Pydantic models for type-safe, validated responses that automatically serialize across Temporal activity boundaries
 - **Tool integration**: Tools are registered with the `@agent.tool` decorator and automatically converted to Temporal Activities by the `TemporalAgent` wrapper
 - **Durable execution**: The agent's state and execution are managed by Temporal, providing reliability and observability
 - **Plugin configuration**: Uses the `PydanticAIPlugin` to configure Temporal for PydanticAI integration
@@ -31,25 +30,32 @@ Tools are registered using PydanticAI's `@agent.tool` decorator. The agent is co
 *File: agents.py*
 
 ```python
+import httpx
+import json
+import math
+from pydantic import BaseModel, Field
 from pydantic_ai import Agent, RunContext
 from dataclasses import dataclass
 
+# DocsContext is passed to tools that need access to loaded documentation
 @dataclass
 class DocsContext:
-    """Context passed to agent tools."""
     docs: dict[str, str]
+
+# SearchResult is a Pydantic model - PydanticAI serializes it automatically
+# across Temporal activity boundaries
+class SearchResult(BaseModel):
+    matching_docs: list[str] = Field(description="List of document titles that match")
+    total_matches: int = Field(description="Total number of matching documents")
 
 documentation_agent = Agent(
     model_name,
     deps_type=DocsContext,
     name='documentation_agent',
-    system_prompt="""You are a helpful documentation assistant...
-
-Use these tools to help answer questions. You can call multiple tools
-in sequence if needed.""",
+    system_prompt="...",
 )
 
-# Tools that use the context
+# Tools that use context receive it as the first argument
 @documentation_agent.tool
 async def search_documentation(
     ctx: RunContext[DocsContext],
@@ -60,22 +66,49 @@ async def search_documentation(
     for title, content in ctx.deps.docs.items():
         if any(keyword.lower() in content.lower() for keyword in keywords):
             matching_docs.append(title)
-    return SearchResult(
-        matching_docs=matching_docs,
-        total_matches=len(matching_docs)
-    )
+    return SearchResult(matching_docs=matching_docs, total_matches=len(matching_docs))
 
-# Tools that don't use context still need the parameter (prefix with _ to indicate unused)
+# Tools that don't use context still require the parameter - prefix with _ to
+# signal it's intentionally unused
+@documentation_agent.tool
+async def get_ip_address(_ctx: RunContext[DocsContext]) -> str:
+    """Get the public IP address of the current machine."""
+    async with httpx.AsyncClient() as client:
+        response = await client.get("https://icanhazip.com")
+        response.raise_for_status()
+        return response.text.strip()
+
+@documentation_agent.tool
+async def get_location_info(_ctx: RunContext[DocsContext], ipaddress: str) -> str:
+    """Get the location information for an IP address, including city, state, and country."""
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"http://ip-api.com/json/{ipaddress}")
+        response.raise_for_status()
+        result = response.json()
+        return f"{result['city']}, {result['regionName']}, {result['country']}"
+
+@documentation_agent.tool
+async def get_weather_alerts(_ctx: RunContext[DocsContext], state: str) -> str:
+    """Get active weather alerts for a US state."""
+    url = f"https://api.weather.gov/alerts/active/area/{state}"
+    headers = {"User-Agent": "weather-app/1.0", "Accept": "application/geo+json"}
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url, headers=headers, timeout=5.0)
+        response.raise_for_status()
+        return json.dumps(response.json())
+
 @documentation_agent.tool
 async def calculate_circle_area(_ctx: RunContext[DocsContext], radius: float) -> float:
     """Calculate the area of a circle given its radius."""
     return math.pi * radius ** 2
 ```
 
-The agent has access to four tools:
+The agent has access to six tools:
 - **`search_documentation(keywords: list[str])`** - Search through available documentation
 - **`list_available_docs()`** - List all available documentation files
-- **`get_weather(city: str)`** - Get weather information (demonstration tool)
+- **`get_ip_address()`** - Get the public IP address of the current machine
+- **`get_location_info(ipaddress: str)`** - Get city, state, and country for an IP address
+- **`get_weather_alerts(state: str)`** - Get active NWS weather alerts for a US state (e.g. CA, NY)
 - **`calculate_circle_area(radius: float)`** - Calculate circle area (demonstration tool)
 
 ## How the Agentic Loop Works
@@ -86,12 +119,12 @@ The agentic loop is an autonomous cycle where the AI agent makes decisions about
 
 The key is **autonomy** - you don't tell the agent which tools to call or when. You provide a goal and the agent figures out the rest.
 
-Here's what happens when you ask "What's the weather in Paris and what docs do you have?":
+Here's what happens when you ask "Are there any weather alerts where I am?":
 
 ```
-┌────────────────────────────────────────────────────────────────┐
-│ User: "What's the weather in Paris and what docs do you have?" │
-└───────────────────────┬────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────┐
+│ User: "Are there any weather alerts where I am?"      │
+└───────────────────────┬───────────────────────────────┘
                         │
                         ▼
                 ┌───────────────┐
@@ -101,80 +134,98 @@ Here's what happens when you ask "What's the weather in Paris and what docs do y
                 └───────────────┘     │
                         ▲             │
                         │             ▼
-                        │     ┌─────────────────────┐
-                        │     │ Execute Tool Call   │
-                        │     │ (Temporal Activity) │
-                        │     │                     │
-                        │     │ get_weather("Paris")│
-                        │     │ Returns:            │
-                        │     │ WeatherInfo(        │
-                        │     │   city="Paris",     │
-                        │     │   temp="14-20C",    │
-                        │     │   conditions="Sunny"│
-                        │     │ )                   │
-                        │     └──────────┬──────────┘
+                        │     ┌──────────────────────────┐
+                        │     │ Execute Tool Call        │
+                        │     │ (Temporal Activity)      │
+                        │     │                          │
+                        │     │ get_ip_address()         │
+                        │     │ → GET icanhazip.com      │
+                        │     │ Returns: "203.0.113.42"  │
+                        │     └──────────┬───────────────┘
                         │                │
                         │                ▼
                 ┌───────┴────────────────────┐
                 │      LLM Call #2           │
-                │ Receives tool results      │
+                │ Receives IP address        │
                 │ Returns: TOOL              │ ────┐
                 └────────────────────────────┘     │
                         ▲                          │
                         │                          ▼
-                        │          ┌─────────────────────┐
-                        │          │ Execute Tool Call   │
-                        │          │ (Temporal Activity) │
-                        │          │                     │
-                        │          │ list_available_docs()│
-                        │          │ Returns:            │
-                        │          │ ["workflows.md",    │
-                        │          │  "activities.md"]   │
-                        │          └──────────┬──────────┘
+                        │     ┌──────────────────────────────────┐
+                        │     │ Execute Tool Call                │
+                        │     │ (Temporal Activity)              │
+                        │     │                                  │
+                        │     │ get_location_info("203.0.113.42")│
+                        │     │ → GET ip-api.com/json/...        │
+                        │     │ Returns: "San Francisco,         │
+                        │     │  California, United States"      │
+                        │     └──────────┬───────────────────────┘
+                        │                │
+                        │                ▼
+                ┌───────┴────────────────────┐
+                │      LLM Call #3           │
+                │ Receives location          │
+                │ Returns: TOOL              │ ────┐
+                └────────────────────────────┘     │
+                        ▲                          │
+                        │                          ▼
+                        │          ┌──────────────────────────┐
+                        │          │ Execute Tool Call        │
+                        │          │ (Temporal Activity)      │
+                        │          │                          │
+                        │          │ get_weather_alerts("CA") │
+                        │          │ → GET api.weather.gov/   │
+                        │          │   alerts/active/area/CA  │
+                        │          │ Returns: live NWS alert  │
+                        │          │ JSON for California      │
+                        │          └──────────┬───────────────┘
                         │                     │
                         │                     ▼
                 ┌───────┴────────────────────────┐
-                │      LLM Call #3               │
-                │ Receives both tool results     │
+                │      LLM Call #4               │
+                │ Receives alert data            │
                 │ Returns: TEXT                  │
                 └───────────┬────────────────────┘
                             │
                             ▼
-            ┌────────────────────────────────────┐
-            │ "In Paris, it's currently 14-20C   │
-            │ and sunny. I have access to 2      │
-            │ documentation files:                │
-            │  - workflows.md                     │
-            │  - activities.md"                   │
-            └────────────────────────────────────┘
+            ┌────────────────────────────────────────┐
+            │ "Based on your location in San         │
+            │ Francisco, CA, there are currently     │
+            │ flood warnings in several Northern     │
+            │ California counties and a wind         │
+            │ advisory near Lake Tahoe."             │
+            └────────────────────────────────────────┘
 ```
 
 ### What Happens Inside `temporal_agent.run()`
 
 When you call `temporal_agent.run(prompt, deps=DocsContext(docs))`, this entire loop happens in a single function call. PydanticAI handles the tool registration, decision making, and execution:
 
-**Tool Registration**: When you use `@agent.tool`, PydanticAI extracts the function signature and docstring to create a schema the LLM understands. The agent knows: "I have a tool that gets weather given a city name."
+**Tool Registration**: When you use `@agent.tool`, PydanticAI extracts the function signature and docstring to create a schema the LLM understands. The agent knows what each tool does and what arguments it requires.
 
 **Loop Iteration 1:**
-- Agent receives the user prompt
-- Agent analyzes: "I need weather for Paris and a list of docs"
-- LLM (GPT-4, Claude, Gemini) decides to call `get_weather("Paris")` first
-- `TemporalAgent` wrapper intercepts and converts this to a Temporal activity
-- Tool returns `WeatherInfo(city="Paris", temp="14-20C", conditions="Sunny")`
+- Agent receives: "Are there any weather alerts where I am?"
+- Agent thinks: "I need to find their location. First, get their IP address."
+- LLM calls `get_ip_address()` — converted to a Temporal activity by `TemporalAgent`
+- Tool calls `icanhazip.com` and returns the public IP
 
 **Loop Iteration 2:**
-- Agent receives the weather result
-- Agent thinks: "Got weather. Now I need the docs list."
-- Agent calls `list_available_docs()`
-- Again converted to a Temporal activity with full observability in the Web UI
-- Tool returns `["workflows.md", "activities.md"]`
+- Agent receives the IP address
+- Agent thinks: "Now I can resolve this IP to a location."
+- Agent calls `get_location_info("203.0.113.42")`
+- Tool calls `ip-api.com` and returns `"San Francisco, California, United States"`
 
 **Loop Iteration 3:**
-- Agent receives the docs list
-- Agent thinks: "I have both pieces of information. I can answer now."
-- LLM decides to return final answer (returns TEXT instead of TOOL)
-- Agent returns natural language text combining both results
-- Loop ends
+- Agent receives the location
+- Agent thinks: "Now I can look up weather alerts for California."
+- Agent calls `get_weather_alerts("CA")`
+- Tool calls `api.weather.gov` and returns live NWS alert JSON
+
+**Loop Iteration 4:**
+- Agent receives the alert data
+- Agent thinks: "I have everything I need to answer."
+- LLM returns TEXT instead of TOOL — loop ends
+- Agent returns a natural language summary of the alerts for the user's location
 
 ### Why This Matters
 
@@ -316,7 +367,7 @@ temporal server start-dev
 Install dependencies:
 
 ```bash
-cd agents/pydantic_ai_docs_bot_python
+cd agents/pydantic_sdk_python
 uv sync
 ```
 
@@ -353,10 +404,12 @@ uv run python start_workflow.py
 
 Try asking the agent questions like:
 
+- "Are there any weather alerts where I am?"
+- "What is my IP address?"
 - "What documentation is available?"
 - "Search for information about workflows"
+- "What are the weather alerts for TX?"
 - "Calculate the area of a circle with radius 5"
-- "What's the weather in Tokyo and calculate the area of a circle with radius 3"
 
 The agent will determine which tools to use and provide intelligent responses. Watch the worker terminal to see tool execution logs, or visit the [Temporal Web UI](http://localhost:8233) to view the complete workflow execution history.
 
