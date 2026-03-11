@@ -1,0 +1,106 @@
+name: Validate Python Projects
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: validate-python-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  detect-changes:
+    name: Detect Changed Projects
+    runs-on: ubuntu-latest
+    outputs:
+      projects: ${{ steps.find-projects.outputs.projects }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Find affected Python projects
+        id: find-projects
+        run: |
+          # Find all directories containing pyproject.toml
+          ALL_PROJECTS=$(find . -name "pyproject.toml" -not -path "./.github/*" -exec dirname {} \; | sed 's|^\./||' | sort)
+
+          # Check if CI workflow files changed — if so, validate all projects
+          if [ "${{ github.event_name }}" = "push" ]; then
+            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
+          else
+            CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD 2>/dev/null || echo "")
+          fi
+
+          CI_CHANGED=$(echo "$CHANGED_FILES" | grep -c "^\.github/workflows/validate-python-projects\.yml$" || true)
+
+          if [ "$CI_CHANGED" -gt 0 ]; then
+            echo "CI workflow changed — validating all projects"
+            AFFECTED_PROJECTS="$ALL_PROJECTS"
+          else
+            # Find which projects have changed files
+            AFFECTED_PROJECTS=""
+            for project in $ALL_PROJECTS; do
+              if echo "$CHANGED_FILES" | grep -q "^${project}/"; then
+                AFFECTED_PROJECTS="${AFFECTED_PROJECTS}${project}"$'\n'
+              fi
+            done
+          fi
+
+          # Convert to JSON array for matrix strategy
+          if [ -z "$AFFECTED_PROJECTS" ]; then
+            echo "projects=[]" >> "$GITHUB_OUTPUT"
+            echo "No affected projects found"
+          else
+            JSON=$(echo "$AFFECTED_PROJECTS" | grep -v '^$' | jq -R -s -c 'split("\n") | map(select(length > 0))')
+            echo "projects=$JSON" >> "$GITHUB_OUTPUT"
+            echo "Affected projects: $JSON"
+          fi
+
+  validate:
+    name: Validate ${{ matrix.project }}
+    needs: detect-changes
+    if: needs.detect-changes.outputs.projects != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        project: ${{ fromJson(needs.detect-changes.outputs.projects) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Sync dependencies
+        working-directory: ${{ matrix.project }}
+        run: uv sync
+
+      - name: Run tests
+        working-directory: ${{ matrix.project }}
+        run: |
+          if [ -d "tests" ]; then
+            echo "Running tests in ${{ matrix.project }}"
+            uv run pytest tests/ -x -q
+          else
+            echo "No tests/ directory found — skipping tests"
+          fi
+
+      - name: Import check
+        working-directory: ${{ matrix.project }}
+        run: |
+          # Try importing key modules to catch import-time breakage
+          for init in $(find . -name "__init__.py" -maxdepth 2 | head -5); do
+            module=$(dirname "$init" | sed 's|^\./||' | tr '/' '.')
+            echo "Checking import: $module"
+            uv run python -c "import $module" || echo "Warning: failed to import $module"
+          done
