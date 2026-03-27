@@ -8,6 +8,6 @@ readme = "README.md"
 license = "MIT"
 dependencies = [
     "temporalio>=1.15.0,<2",
-    "litellm!=1.82.7,!=1.82.8,>=1.48.0",
+    "litellm!=1.82.7,!=1.82.8,>=1.48.0,<2",
     "google-auth>=2.0.0,<3",
 ]
