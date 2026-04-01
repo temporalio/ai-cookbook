@@ -6,7 +6,8 @@ readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
     "temporalio>=1.8.0",
-    "openai>=1.59.6",
+    "boto3>=1.35.0",
+    "botocore[crt]>=1.35.0",
     "pydantic>=2.10.3",
 ]
 
