@@ -9,6 +9,7 @@ from activities.bedrock import create
 from activities.execute_action import execute_action
 from activities.notify_approval_needed import notify_approval_needed
 from temporalio.contrib.pydantic import pydantic_data_converter
+import server
 
 
 async def main():
@@ -32,8 +33,12 @@ async def main():
             notify_approval_needed,
         ],
     )
-    
-    await worker.run()
+
+    class StubHealthProvider:
+        def is_busy(self) -> bool:
+            return False
+
+    await asyncio.gather(server.run(StubHealthProvider()), worker.run())
 
 
 if __name__ == "__main__":
