@@ -10,6 +10,7 @@ from activities.execute_action import execute_action
 from activities.notify_approval_needed import notify_approval_needed
 from temporalio.contrib.pydantic import pydantic_data_converter
 import server
+from health import HealthTracker, HealthInterceptor, create_tuner
 
 
 async def main():
@@ -23,6 +24,7 @@ async def main():
         data_converter=pydantic_data_converter,
     )
 
+    health = HealthTracker()
     worker = Worker(
         client,
         task_queue="human-in-the-loop-task-queue",
@@ -32,13 +34,11 @@ async def main():
             execute_action,
             notify_approval_needed,
         ],
+        interceptors=[HealthInterceptor(health)],
+        tuner=create_tuner(health),
     )
 
-    class StubHealthProvider:
-        def is_busy(self) -> bool:
-            return False
-
-    await asyncio.gather(server.run(StubHealthProvider()), worker.run())
+    await asyncio.gather(server.run(health), worker.run())
 
 
 if __name__ == "__main__":

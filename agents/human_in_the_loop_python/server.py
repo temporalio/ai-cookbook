@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import time
 from typing import Protocol
 
 from aiohttp import web
@@ -8,12 +7,13 @@ from aiohttp import web
 
 class HealthProvider(Protocol):
     def is_busy(self) -> bool: ...
+    def last_update_time(self) -> int: ...
 
 
 async def handle_ping(request: web.Request) -> web.Response:
     provider: HealthProvider = request.app["health_provider"]
     status = "HealthyBusy" if provider.is_busy() else "Healthy"
-    return web.json_response({"status": status, "time_of_last_update": int(time.time())})
+    return web.json_response({"status": status, "time_of_last_update": provider.last_update_time()})
 
 
 async def handle_invocations(request: web.Request) -> web.Response:
