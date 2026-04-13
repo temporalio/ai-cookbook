@@ -8,7 +8,7 @@ dependencies = [
     "httpx>=0.28.1",
     "temporalio>=1.11.1",
     # Elicitation support requires FastMCP 2.10.0+
-    "fastmcp>=2.10.0",
+    "fastmcp>=3.2.0",
 ]
 
 [dependency-groups]
