@@ -11,9 +11,19 @@ dependencies = [
     "fastmcp>=2.10.0",
 ]
 
+[dependency-groups]
+dev = [
+    "pytest>=8.4.1",
+    "pytest-asyncio",
+    "pytest-timeout>=2.4.0",
+]
+
 [build-system]
 requires = [ "hatchling",]
 build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
 
 [tool.hatch.build.targets.wheel]
 packages = [

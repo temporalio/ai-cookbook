@@ -1,8 +1,7 @@
 from datetime import timedelta
+
 from temporalio import workflow
 from temporalio.common import RetryPolicy
-import json
-import asyncio
 
 retry_policy = RetryPolicy(
     maximum_attempts=0,  # Infinite retries
@@ -24,12 +23,13 @@ def format_alert(feature: dict) -> str:
     """Format an alert feature into a readable string."""
     props = feature["properties"]
     return f"""
-Event: {props.get('event', 'Unknown')}
-Area: {props.get('areaDesc', 'Unknown')}
-Severity: {props.get('severity', 'Unknown')}
-Description: {props.get('description', 'No description available')}
-Instructions: {props.get('instruction', 'No specific instructions provided')}
+Event: {props.get("event", "Unknown")}
+Area: {props.get("areaDesc", "Unknown")}
+Severity: {props.get("severity", "Unknown")}
+Description: {props.get("description", "No description available")}
+Instructions: {props.get("instruction", "No specific instructions provided")}
 """
+
 
 @workflow.defn
 class GetAlerts:
@@ -93,12 +93,11 @@ class GetForecast:
         forecasts = []
         for period in periods[:5]:  # Only show next 5 periods
             forecast = f"""
-    {period['name']}:
-    Temperature: {period['temperature']}°{period['temperatureUnit']}
-    Wind: {period['windSpeed']} {period['windDirection']}
-    Forecast: {period['detailedForecast']}
+    {period["name"]}:
+    Temperature: {period["temperature"]}°{period["temperatureUnit"]}
+    Wind: {period["windSpeed"]} {period["windDirection"]}
+    Forecast: {period["detailedForecast"]}
     """
             forecasts.append(forecast)
 
         return "\n---\n".join(forecasts)
-
