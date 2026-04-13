@@ -10,7 +10,7 @@ dependencies = ["temporalio>=1.15.0,<2", "openai>=1.40.0", "pydantic>=2.0.0"]
 
 [dependency-groups]
 dev = [
-    "pytest>=8.4.2",
+    "pytest>=9.0.3",
     "pytest-asyncio>=0.24.0",
     "pytest-timeout>=2.3.1",
 ]
