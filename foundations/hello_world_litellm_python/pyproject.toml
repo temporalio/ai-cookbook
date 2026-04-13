@@ -12,12 +12,12 @@ dependencies = [
     "google-auth>=2.0.0,<3",
 ]
 
-[tool.pytest.ini_options]
-pythonpath = ["."]
-
 [dependency-groups]
 dev = [
     "pytest-asyncio",
     "pytest-timeout>=2.4.0",
     "pytest>=8.4.1",
 ]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
