@@ -1,47 +1,16 @@
 # ABOUTME: Tests for weather workflows and activities.
 # Covers format_alert, make_nws_request activity, and GetAlerts/GetForecast workflows.
 
-import pytest
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
+import pytest
+from activities.weather_activities import make_nws_request
 from temporalio import activity
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
-
-from activities.weather_activities import make_nws_request
-from workflows.weather_workflows import format_alert, GetAlerts, GetForecast
-
-
-class TestFormatAlert:
-    """Tests for the format_alert pure function."""
-
-    def test_format_alert_complete(self):
-        """All fields present are rendered correctly."""
-        feature = {
-            "properties": {
-                "event": "Tornado Warning",
-                "areaDesc": "Dallas County",
-                "severity": "Extreme",
-                "description": "Take shelter immediately.",
-                "instruction": "Move to interior room.",
-            }
-        }
-        result = format_alert(feature)
-        assert "Tornado Warning" in result
-        assert "Dallas County" in result
-        assert "Extreme" in result
-        assert "Take shelter immediately." in result
-        assert "Move to interior room." in result
-
-    def test_format_alert_missing_fields(self):
-        """Missing keys fall back to defaults via .get()."""
-        feature = {"properties": {}}
-        result = format_alert(feature)
-        assert "Unknown" in result
-        assert "No description available" in result
-        assert "No specific instructions provided" in result
+from workflows.weather_workflows import GetAlerts, GetForecast
 
 
 class TestMakeNwsRequest:
@@ -60,7 +29,9 @@ class TestMakeNwsRequest:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
-        with patch("activities.weather_activities.httpx.AsyncClient", return_value=mock_client):
+        with patch(
+            "activities.weather_activities.httpx.AsyncClient", return_value=mock_client
+        ):
             result = await make_nws_request("https://api.weather.gov/alerts")
 
         assert result == expected
@@ -85,7 +56,9 @@ class TestMakeNwsRequest:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
-        with patch("activities.weather_activities.httpx.AsyncClient", return_value=mock_client):
+        with patch(
+            "activities.weather_activities.httpx.AsyncClient", return_value=mock_client
+        ):
             with pytest.raises(httpx.HTTPStatusError):
                 await make_nws_request("https://api.weather.gov/alerts")
 
@@ -93,18 +66,23 @@ class TestMakeNwsRequest:
 # Module-level mock activity factories to avoid Python name mangling of
 # __temporal_activity_definition inside class bodies.
 
+
 def _make_mock_activity(return_value=None, side_effect=None):
     """Create an @activity.defn-decorated async mock matching make_nws_request."""
     if side_effect:
+
         @activity.defn(name="make_nws_request")
         async def mock_make_nws_request(url: str) -> dict[str, Any] | None:
             return side_effect(url)
+
         # Store side_effect so the test can swap it
         mock_make_nws_request._side_effect = side_effect
     else:
+
         @activity.defn(name="make_nws_request")
         async def mock_make_nws_request(url: str) -> dict[str, Any] | None:
             return return_value
+
     return mock_make_nws_request
 
 

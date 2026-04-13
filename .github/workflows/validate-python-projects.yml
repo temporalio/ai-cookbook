@@ -90,7 +90,7 @@ jobs:
         run: |
           if [ -d "tests" ]; then
             echo "Running tests in ${{ matrix.project }}"
-            uv run pytest tests/ -x -q
+            uv run pytest tests/ --timeout=30 # 30 second timeout per test
           else
             echo "No tests/ directory found — skipping tests"
           fi
@@ -102,5 +102,5 @@ jobs:
           for init in $(find . -name "__init__.py" -maxdepth 2 | head -5); do
             module=$(dirname "$init" | sed 's|^\./||' | tr '/' '.')
             echo "Checking import: $module"
-            uv run python -c "import $module" || echo "Warning: failed to import $module"
+            uv run python -c "import $module"
           done
