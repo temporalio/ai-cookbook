@@ -3,10 +3,20 @@ name = "cookbook-basic-openai-agent"
 version = "0.1"
 description = "Basic example showing how to build a Durable Agent using the OpenAI Agents SDK Temporal integration"
 authors = [{ name = "Temporal Technologies Inc", email = "sdk@temporal.io" }]
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.14"
 readme = "README.md"
 license = "MIT"
 dependencies = [
     "temporalio>=1.15.0,<2",
     "openai-agents>=0.1.0",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-timeout>=2.4.0",
+    "pytest-asyncio>=0.26.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

@@ -3,7 +3,7 @@ name = "claim-check-pattern-python"
 version = "0.1"
 description = "Claim Check pattern implementation for handling large payloads in Temporal"
 authors = [{ name = "Temporal Technologies Inc", email = "sdk@temporal.io" }]
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.14"
 readme = "README.md"
 license = "MIT"
 dependencies = [
@@ -14,6 +14,13 @@ dependencies = [
     "aiohttp>=3.13.3",
     "openai>=1.44.0",
     "rank-bm25>=0.2.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-timeout>=2.4.0",
+    "pytest-asyncio>=0.26.0",
 ]
 
 [tool.pytest.ini_options]
