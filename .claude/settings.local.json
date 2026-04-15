@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(TOOL_NAME=Edit TOOL_INPUT='{\"\"file_path\"\": \"\"/Users/jssmith/w/ai-cookbook-hook-test/foundations/claim_check_pattern_python/codec/claim_check.py\"\"}' uv run python scripts/verify_readme_snippets.py)",
+      "Bash(TOOL_NAME=Edit TOOL_INPUT='{\"\"file_path\"\": \"\"/Users/jssmith/w/ai-cookbook-hook-test/foundations/claim_check_pattern_python/README.md\"\"}' uv run python scripts/verify_readme_snippets.py)",
+      "Bash(TOOL_NAME=Bash TOOL_INPUT='{\"\"command\"\": \"\"git commit -m test\"\"}' uv run python scripts/verify_readme_snippets.py)"
+    ]
+  }
+}
