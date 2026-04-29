@@ -3,8 +3,12 @@
 Thanks for your interest in contributing! The cookbook is a collection of self-contained, runnable examples. Contributions can be new recipes, improvements to existing ones, bug fixes, or documentation updates.
 
 ## Prerequisites
-
-### Python
+```markdown
+<!--
+For other Recipe languages: add notes here as you add other language recipes.
+-->
+```
+### For Python Recipes
 - Python 3.10 or later
 - [`uv`](https://docs.astral.sh/uv/) — used for dependency management in all projects
 - A running Temporal server, or use the [Temporal CLI](https://docs.temporal.io/cli) (`temporal server start-dev`) for local development
@@ -50,7 +54,7 @@ priority: 500
 
 ## Running Tests
 
-### Python
+### For Python Recipes
 From inside a recipe directory:
 
 ```bash
