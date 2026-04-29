@@ -11,8 +11,8 @@ The AI Engineering liaison ensures that Engineering feedback is reflected in the
 
 - [Johann Schleier-Smith](https://github.com/jssmith) (to be confirmed)
 
-## Solution Archirect liaison
-The Solition Archirect liaison ensures that Solition Archirect feedback is reflected in the priorities of the project, and help secure other Solition Archirect folks if needed to make progress on reviews.
+## Solution Architect liaison
+The Solution Architect liaison ensures that Solution Architect feedback is reflected in the priorities of the project, and help secure other Solution Architect folks if needed to make progress on reviews.
 
 - [Josh Smith](https://github.com/joshmsmith) (to be confirmed)
 
