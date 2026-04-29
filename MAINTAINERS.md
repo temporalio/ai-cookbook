@@ -14,7 +14,7 @@ The AI Engineering liaison ensures that Engineering feedback is reflected in the
 ## Solution Architect liaison
 The Solution Architect liaison ensures that Solution Architect feedback is reflected in the priorities of the project, and help secure other Solution Architect folks if needed to make progress on reviews.
 
-- [Josh Smith](https://github.com/joshmsmith) (to be confirmed)
+- [Josh Smith](https://github.com/joshmsmith)
 
 ## (other leadership roles...)
 
@@ -45,7 +45,7 @@ Technical reviewers ensure that contributors' submissions are looked at in a tim
 Tooling maintainers give care and feeding to the infrastructure underpinning the project.
 
 ## Documentation Tooling
-- [Lenny Chen](https://github.com/lennessyy) (to be confirmed)
+- [Lenny Chen](https://github.com/lennessyy)
 
 ## CI/CD Tooling
 - TBD
