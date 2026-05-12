@@ -47,6 +47,9 @@ Tooling maintainers give care and feeding to the infrastructure underpinning the
 ## Documentation Tooling
 - [Lenny Chen](https://github.com/lennessyy)
 
+## Standards Tooling
+- [Mason Egger](https://github.com/MasonEgger)
+
 ## CI/CD Tooling
 - TBD
 
