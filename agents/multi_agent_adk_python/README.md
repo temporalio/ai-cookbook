@@ -1,6 +1,6 @@
 <!--
 description: Build a multi-agent pipeline (parallel + sequential) with Google ADK on Temporal — every LLM call and every tool call is a durable activity.
-tags: [agents, python, google-adk]
+tags: [agents, python, gemini, google-adk]
 priority: 750
 -->
 
@@ -80,6 +80,7 @@ This recipe highlights:
 ## Prerequisites
 
 - Python 3.10+
+- [`uv`](https://docs.astral.sh/uv/) for dependency management
 - A running Temporal Dev Server (`temporal server start-dev`)
 - A Google API key with access to Gemini (`GOOGLE_API_KEY`)
 
