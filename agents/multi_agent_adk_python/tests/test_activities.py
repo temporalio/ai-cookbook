@@ -83,6 +83,7 @@ class TestModels:
         again = AssignmentInput.model_validate(order.model_dump())
         assert again == order
 
-    def test_assignment_output_defaults(self):
+    def test_assignment_output_construction(self):
         out = AssignmentOutput(driver_id="driver-a", reasoning_summary="test")
         assert out.driver_id == "driver-a"
+        assert out.reasoning_summary == "test"
