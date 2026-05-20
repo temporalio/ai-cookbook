@@ -22,11 +22,11 @@ async def main():
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     )
 
+    client = await Client.connect("localhost:7233")
+
     # GoogleAdkPlugin registers the `invoke_model` activity (used by
     # TemporalModel for LLM calls) and provides the workflow-sandbox
     # passthroughs and deterministic runtime overrides ADK needs.
-    client = await Client.connect("localhost:7233")
-
     worker = Worker(
         client,
         task_queue=TASK_QUEUE,
