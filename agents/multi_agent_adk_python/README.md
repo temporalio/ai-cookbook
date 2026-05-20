@@ -200,11 +200,13 @@ _fleet_status_tool = activity_tool(
 
 The local `_activity_tool.py` adds **graceful failure** on top of the
 upstream `temporalio.contrib.google_adk_agents.workflow.activity_tool`:
-when an activity exhausts its retry policy, the error becomes a string
-tool response so the agent can reason about it and adapt instead of
+when an activity execution fails (retry policy exhausted, non-retryable
+application error, timeout), the wrapper catches the `ActivityError`
+and returns it to the LLM as a string so the agent can adapt instead of
 crashing the pipeline. (The retry attempts still appear in workflow
-history.) Upstream `activity_tool` (temporalio>=1.25) already handles
-multi-arg activities and local non-workflow ADK runs.
+history.) Programming bugs — e.g. argument-binding errors — are not
+caught and propagate normally. Upstream `activity_tool` (temporalio>=1.25)
+already handles multi-arg activities and local non-workflow ADK runs.
 
 ### Composing the pipeline
 
