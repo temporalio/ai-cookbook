@@ -6,6 +6,11 @@ The Product Owner is responsible for taking in feedback from stakeholders and ma
 
 - [Angie Byron](https://github.com/webchick) (interim)
 
+## Technical strategist
+The Technical Strategist works with the Product Owner to define and prioritize the product roadmap, and is available to consult on technical matters.
+
+- [Cornelia Davis](https://github.com/cdavisafc)
+
 ## Solution Architect liaisons
 The Solution Architect liaisons ensure that Solution Architect feedback is reflected in the priorities of the project, and help secure other Solution Architect folks if needed to make progress on reviews.
 
@@ -71,5 +76,4 @@ Tooling maintainers give care and feeding to the infrastructure underpinning the
 We would like to thank these folks for all of their fantastic work shepherding the AI Cookbook project forward!
 
 - [Johann Schleier-Smith](https://github.com/jssmith)
-- [Cornelia Davis](https://github.com/cdavisafc) (to be confirmed)
 - [Rob Holland](https://github.com/robholland)
