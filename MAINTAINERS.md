@@ -11,28 +11,24 @@ The Technical Strategist works with the Product Owner to define and prioritize t
 
 - [Cornelia Davis](https://github.com/cdavisafc)
 
-## Solution Architect liaisons
-The Solution Architect liaisons ensure that Solution Architect feedback is reflected in the priorities of the project, and help secure other Solution Architect folks if needed to make progress on reviews.
+## Cross-functional liaisons
+AI Cookbook is a cross-functional initiative, and liaisons represent their functions' unique viewpoints and provide feedback into the priorities and roadmap of the project. They also help secure other folks from their respetive teams if needed to make progress on recipes and reviews.
 
+### Solution Architect liaisons
 - Growth: [Josh Smith](https://github.com/joshmsmith)
 - Commercial: [MasonEgger](https://github.com/MasonEgger)
 
-## Product liaison
-The Product liaisons ensures that Product feedback is reflected in the priorities of the project, and help secure other Product folks if needed to make progress on reviews.
-
+### Product liaison
 - [Ethan Ruhe](https://github.com/ethanruhe) (to be confirmed)
 
-## AI Engineering liaison
-The AI Engineering liaison ensures that Engineering feedback is reflected in the priorities of the project, and help secure other Engineering folks if needed to make progress on reviews.
-
+### AI Engineering liaison
 - TBD member of the AI SDK team
 
-## Documentation liaison
-...
+### AI DevRel liaison
+- TBD member of the AI DevRel team
 
+### Documentation and Tooling liaison
 - TBD member of the Documentation and Tooling team
-
-## (other leadership roles...)
 
 # Technical reviewers
 Technical reviewers ensure that contributors' submissions are looked at in a timely manner, provide architectural guidance, etc.
