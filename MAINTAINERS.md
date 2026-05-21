@@ -24,8 +24,8 @@ AI Cookbook is a cross-functional initiative, and liaisons represent their funct
 ### AI Engineering liaison
 - TBD member of the AI SDK team
 
-### AI DevRel liaison
-- TBD member of the AI DevRel team
+### DevRel liaison
+- [Cecil Philip](https://github.com/cecilphillip) (to be confirmed)
 
 ### Documentation and Tooling liaison
 - TBD member of the Documentation and Tooling team
