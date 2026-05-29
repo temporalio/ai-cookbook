@@ -6,7 +6,11 @@ Usage: `/project:recipe-ify <github-url>`
 
 ## What you do
 
-You are an expert at extracting teachable, self-contained patterns from real-world AI projects and turning them into cookbook recipes in the exact format this repo uses. Work through the following steps.
+You are an expert at extracting teachable, self-contained AI patterns from real-world projects and turning them into cookbook recipes in the exact format this repo uses.
+
+**Audience reminder:** The AI Cookbook targets AI Engineers who are comfortable with LLMs and agents but are new to Temporal. Recipes should teach *AI building blocks* — patterns for how agents think, decide, call tools, and coordinate — with Temporal providing durability underneath. Do NOT extract patterns that are primarily about Temporal orchestration, distributed systems, or infrastructure; those belong in Temporal's own documentation, not here.
+
+Work through the following steps.
 
 ---
 
@@ -15,36 +19,39 @@ You are an expert at extracting teachable, self-contained patterns from real-wor
 Fetch the repository at `$ARGUMENTS`. Collect:
 - The README (for intent and architecture overview)
 - The full file tree (via GitHub API: `https://api.github.com/repos/{owner}/{repo}/git/trees/main?recursive=1`)
-- Key source files: workflow definitions, activity implementations, LLM integration code, any agent/tool patterns
+- Key source files: LLM integration code, agent/tool patterns, prompt construction, workflow definitions
 
-Look specifically for these patterns, which make strong recipes:
-- **Agentic loops** — LLM calls in a loop until stop condition (tool use, stop sequence, empty choices)
-- **Forced completion** — Constraining tool choice on the final loop iteration to force a decision
-- **Parallel activities** — Multiple independent async activities launched concurrently with `asyncio.gather`
-- **Graceful degradation** — Activities that catch their own failures and return defaults rather than propagating
-- **Workflow deduplication** — Using a deterministic workflow ID as a cache/dedup key across triggers
-- **Prompt caching** — `cache_control: ephemeral` or equivalent to amortize repeated system prompts
-- **Structured output validation** — LLM outputs validated through a Pydantic schema
-- **Human-in-the-loop** — Workflow pauses awaiting a signal or external approval
-- **Prompt injection prevention** — Untrusted data isolated from control instructions via XML tags or similar
-- **Multi-provider abstraction** — Single interface dispatching to Anthropic, OpenAI, LiteLLM, etc.
-- **Signal/Query handlers** — Workflows that expose runtime state or accept commands
+Look specifically for these **AI building block** patterns, which make strong recipes:
+- **Agentic loop** — LLM called in a loop until a stop condition (tool use, stop sequence, empty tool calls)
+- **Forced completion** — On the final loop iteration, `tool_choice` is constrained to a specific tool so the agent must commit to a decision rather than looping forever
+- **Tool calling** — LLM invokes structured tools; results fed back into the conversation
+- **Multi-agent coordination** — One agent spawns or delegates to sub-agents; results are aggregated
+- **Structured output** — LLM output is parsed and validated against a Pydantic schema
+- **Human-in-the-loop** — Workflow pauses and waits for a human decision before continuing
+- **Prompt injection prevention** — Untrusted external data is isolated from control instructions (e.g., XML tags, separate message turns)
+- **Dynamic system prompts** — System instructions constructed at runtime from context (user prefs, retrieved docs, current state)
+- **Multi-provider LLM abstraction** — Single interface that dispatches to Anthropic, OpenAI, LiteLLM, or local models
+
+Ignore patterns that are primarily about Temporal internals (workflow ID policies, heartbeats, signal/query handlers, replay determinism) unless they are a natural, invisible part of an AI pattern above.
 
 ---
 
 ### Step 2 — Recommend which patterns to extract
 
 For each candidate pattern you find, evaluate:
-1. **Is it self-contained?** Can it stand alone as a 200–400 line recipe without pulling in the entire project?
-2. **Is it teachable?** Does it demonstrate a single clear concept a developer can learn from?
-3. **Is it novel vs. existing recipes?** Check existing recipes in this repo (foundations/, agents/, deep_research/, mcp/) and flag if a very similar recipe already exists.
+1. **Is it an AI building block?** Would an AI engineer immediately recognize this as a useful pattern for their LLM/agent work, independent of what orchestrator they use?
+2. **Is it self-contained?** Can it stand alone as a 200–400 line recipe without pulling in the entire project?
+3. **Is it teachable?** Does it demonstrate a single clear concept a developer can learn from?
+4. **Is it novel vs. existing recipes?** Check existing recipes in this repo (foundations/, agents/, deep_research/, mcp/) and flag if a very similar recipe already exists.
 
 Rank the top 2–4 patterns. For each, give:
 - A proposed recipe name (kebab-case, ending in `_python`)
 - A proposed category (foundations, agents, deep_research, or mcp)
 - A one-sentence description for the README front matter
 - The key files from the source project that the recipe would draw from
-- Why this pattern matters / what a developer learns from it
+- The AI concept the developer learns — framed for someone who knows LLMs but not Temporal
+
+If a pattern you found is interesting but primarily a Temporal/infrastructure concern rather than an AI building block, note it briefly and explain why it was excluded.
 
 Ask the user which recipe(s) to generate before proceeding.
 
