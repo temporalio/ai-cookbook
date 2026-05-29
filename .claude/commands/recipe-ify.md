@@ -67,14 +67,25 @@ For each candidate pattern you find, evaluate:
 5. **Is it novel vs. existing recipes?** Check existing recipes in this repo (foundations/, agents/, deep_research/, mcp/) and flag if a very similar recipe already exists.
 6. **Does it fill a wishlist gap?** Cross-reference against the coverage wishlist above.
 
-Rank the top 2–4 patterns. For each, give:
-- A proposed recipe name (kebab-case, ending in `_python`)
-- A proposed category (foundations, agents, deep_research, or mcp)
-- A one-sentence description for the README front matter
-- The key files from the source project that the recipe would draw from
-- The AI concept the developer learns — framed for someone who knows LLMs but not Temporal
+Rank the top 2–4 patterns. For each, provide a proposal card with the following sections — written so a reviewer who has never seen the source project can evaluate it:
 
-If a pattern you found is interesting but primarily a Temporal/infrastructure concern rather than an AI building block, note it briefly and explain why it was excluded.
+**Proposed recipe:** `{category}/{recipe-name}_python`
+
+**One-line description:** _(the README front matter `description` field)_
+
+**The problem it solves:** In 2–3 sentences: what goes wrong if a developer doesn't know this pattern? What mistake do they typically make, and what does that cost them?
+
+**The pattern in the source:** A short code excerpt (10–25 lines) from the source project that shows the pattern at its clearest. If the source isn't Python or doesn't translate directly, describe the equivalent pseudocode. This is the "exhibit A" that justifies the recipe.
+
+**How the recipe would be structured:** A brief outline — what the workflow does, what the key activity does, what tool or API is involved. Not full code, just enough for a reviewer to picture the finished recipe. Should be 5–10 bullet points.
+
+**Closest existing recipe and what's different:** Name the most similar recipe already in the cookbook and state specifically what this recipe adds or changes. If there's no close match, say so.
+
+**Wishlist gap filled:** Which item from the coverage wishlist does this address, if any? If none, say so.
+
+**Estimated size:** Rough line count for the finished recipe (all files combined). Flag anything over 400 lines as potentially too complex for a single recipe.
+
+If a pattern you found is interesting but primarily a Temporal/infrastructure concern rather than an AI building block, list it in a separate "Excluded patterns" section with a one-line reason for each.
 
 Ask the user which recipe(s) to generate before proceeding.
 
