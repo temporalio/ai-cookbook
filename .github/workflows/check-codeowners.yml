@@ -1,0 +1,33 @@
+name: Check for CODEOWNERS
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: check-codeowners-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check-codeowners:
+    name: Check for CODEOWNERS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify CODEOWNERS exists and is non-empty
+        run: |
+          if [ ! -s .github/CODEOWNERS ]; then
+            echo "❌ .github/CODEOWNERS is missing or empty"
+            exit 1
+          fi
+          echo "✅ .github/CODEOWNERS is present"
