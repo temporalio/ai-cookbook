@@ -1,0 +1,90 @@
+name: Dependency Scout Triage
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+  workflow_dispatch:
+    inputs:
+      pr_url:
+        description: "PR URL to triage (leave blank to triage all open Dependabot PRs)"
+        required: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]' || github.event_name == 'workflow_dispatch'
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout dependency-scout
+        uses: actions/checkout@v4
+        with:
+          repository: temporal-community/dependency-scout
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Write Temporal TLS certificates
+        run: |
+          echo "${{ secrets.TEMPORAL_CLIENT_CERT }}" > /tmp/temporal-client.pem
+          echo "${{ secrets.TEMPORAL_CLIENT_KEY }}" > /tmp/temporal-client.key
+          chmod 600 /tmp/temporal-client.pem /tmp/temporal-client.key
+
+      - name: Start worker
+        env:
+          TEMPORAL_ADDRESS: ${{ secrets.TEMPORAL_ADDRESS }}
+          TEMPORAL_NAMESPACE: ${{ secrets.TEMPORAL_NAMESPACE }}
+          TEMPORAL_TLS_CERT: /tmp/temporal-client.pem
+          TEMPORAL_TLS_KEY: /tmp/temporal-client.key
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          uv run python -m worker &
+          echo "WORKER_PID=$!" >> "$GITHUB_ENV"
+          sleep 5
+
+      - name: Triage PR (event-triggered)
+        if: github.event_name == 'pull_request_target'
+        env:
+          TEMPORAL_ADDRESS: ${{ secrets.TEMPORAL_ADDRESS }}
+          TEMPORAL_NAMESPACE: ${{ secrets.TEMPORAL_NAMESPACE }}
+          TEMPORAL_TLS_CERT: /tmp/temporal-client.pem
+          TEMPORAL_TLS_KEY: /tmp/temporal-client.key
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          uv run dependency-scout triage "${{ github.event.pull_request.html_url }}"
+
+      - name: Triage PR (manual — specific URL)
+        if: github.event_name == 'workflow_dispatch' && inputs.pr_url != ''
+        env:
+          TEMPORAL_ADDRESS: ${{ secrets.TEMPORAL_ADDRESS }}
+          TEMPORAL_NAMESPACE: ${{ secrets.TEMPORAL_NAMESPACE }}
+          TEMPORAL_TLS_CERT: /tmp/temporal-client.pem
+          TEMPORAL_TLS_KEY: /tmp/temporal-client.key
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          uv run dependency-scout triage "${{ inputs.pr_url }}"
+
+      - name: Triage all open Dependabot PRs (manual — no URL given)
+        if: github.event_name == 'workflow_dispatch' && inputs.pr_url == ''
+        env:
+          TEMPORAL_ADDRESS: ${{ secrets.TEMPORAL_ADDRESS }}
+          TEMPORAL_NAMESPACE: ${{ secrets.TEMPORAL_NAMESPACE }}
+          TEMPORAL_TLS_CERT: /tmp/temporal-client.pem
+          TEMPORAL_TLS_KEY: /tmp/temporal-client.key
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          uv run dependency-scout triage --repo temporalio/ai-cookbook
+
+      - name: Stop worker
+        if: always()
+        run: |
+          kill "$WORKER_PID" 2>/dev/null || true
+          rm -f /tmp/temporal-client.pem /tmp/temporal-client.key
