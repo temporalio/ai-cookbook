@@ -25,11 +25,20 @@ Look specifically for these **AI building block** patterns, which make strong re
 - **Agentic loop** — LLM called in a loop until a stop condition (tool use, stop sequence, empty tool calls)
 - **Forced completion** — On the final loop iteration, `tool_choice` is constrained to a specific tool so the agent must commit to a decision rather than looping forever
 - **Tool calling** — LLM invokes structured tools; results fed back into the conversation
-- **Multi-agent coordination** — One agent spawns or delegates to sub-agents; results are aggregated
+- **Parallel tool calls** — LLM requests multiple tools simultaneously; all results must be collected before the next turn
+- **Multi-agent coordination / agent supervisor** — One agent spawns or delegates to sub-agents; results are aggregated
 - **Structured output** — LLM output is parsed and validated against a Pydantic schema
 - **Human-in-the-loop** — Workflow pauses and waits for a human decision before continuing
+- **Streaming output** — Activity emits incremental tokens/chunks rather than waiting for full completion
+- **RAG (retrieval-augmented generation)** — Retrieved context injected into the prompt before calling the LLM
+- **Short-term memory** — Conversation history carried across turns within a single workflow run
+- **Long-term memory** — Facts or summaries persisted across workflow runs and retrieved on demand
+- **Context summarization** — Long conversation history compressed (e.g., via `continue_as_new`) to stay within context limits
+- **Guardrails** — LLM output checked against a policy before being acted on; rejected outputs are blocked or re-requested
+- **Chain-of-thought / tree-of-thought** — LLM explicitly reasons through steps before producing a final answer
 - **Prompt injection prevention** — Untrusted external data is isolated from control instructions (e.g., XML tags, separate message turns)
 - **Dynamic system prompts** — System instructions constructed at runtime from context (user prefs, retrieved docs, current state)
+- **Cost/token tracking** — Token usage recorded per workflow run for budgeting or rate-limiting
 - **Multi-provider LLM abstraction** — Single interface that dispatches to Anthropic, OpenAI, LiteLLM, or local models
 
 Ignore patterns that are primarily about Temporal internals (workflow ID policies, heartbeats, signal/query handlers, replay determinism) unless they are a natural, invisible part of an AI pattern above.
@@ -38,11 +47,25 @@ Ignore patterns that are primarily about Temporal internals (workflow ID policie
 
 ### Step 2 — Recommend which patterns to extract
 
+The cookbook has a wishlist of use cases not yet covered. Patterns that fill one of these gaps should be ranked higher:
+- RAG pipeline
+- Streaming output
+- Short-term or long-term memory
+- Context summarization (ContinueAsNew)
+- Agent supervisor / multi-agent swarm
+- Guardrails
+- Chain-of-thought / tree-of-thought
+- Cost/token tracking
+- Trigger-based AI (event-driven or timer-based)
+- Web crawler
+
 For each candidate pattern you find, evaluate:
 1. **Is it an AI building block?** Would an AI engineer immediately recognize this as a useful pattern for their LLM/agent work, independent of what orchestrator they use?
-2. **Is it self-contained?** Can it stand alone as a 200–400 line recipe without pulling in the entire project?
-3. **Is it teachable?** Does it demonstrate a single clear concept a developer can learn from?
-4. **Is it novel vs. existing recipes?** Check existing recipes in this repo (foundations/, agents/, deep_research/, mcp/) and flag if a very similar recipe already exists.
+2. **Is it well-engineered, not a demo?** The cookbook publishes reference-quality code, not flashy one-offs. Does the pattern reflect how a real production system would be built?
+3. **Is it self-contained?** Can it stand alone as a 200–400 line recipe without pulling in the entire project?
+4. **Is it teachable?** Does it demonstrate a single clear concept a developer can learn from?
+5. **Is it novel vs. existing recipes?** Check existing recipes in this repo (foundations/, agents/, deep_research/, mcp/) and flag if a very similar recipe already exists.
+6. **Does it fill a wishlist gap?** Cross-reference against the coverage wishlist above.
 
 Rank the top 2–4 patterns. For each, give:
 - A proposed recipe name (kebab-case, ending in `_python`)
