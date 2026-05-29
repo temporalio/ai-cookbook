@@ -26,7 +26,7 @@ jobs:
           repository: temporal-community/dependency-scout
 
       - name: Setup uv
-        uses: astral-sh/setup-uv@v4
+        uses: astral-sh/setup-uv@v7
 
       - name: Install dependencies
         run: uv sync
