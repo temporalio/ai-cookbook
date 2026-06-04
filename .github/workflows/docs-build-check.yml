@@ -22,12 +22,12 @@ jobs:
 
     steps:
       - name: Checkout ai-cookbook repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v6.0.2
         with:
           path: ai-cookbook
 
       - name: Checkout documentation repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v6.0.2
         with:
           repository: temporalio/documentation
           path: documentation

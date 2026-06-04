@@ -21,7 +21,7 @@ jobs:
 
     steps:
       - name: Checkout dependency-scout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6.0.2
         with:
           repository: temporal-community/dependency-scout
 
