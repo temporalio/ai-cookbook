@@ -21,8 +21,8 @@ AI Cookbook is a cross-functional initiative, and liaisons represent their funct
 ### Product liaison
 - [Ethan Ruhe](https://github.com/ethanruhe) (to be confirmed)
 
-### AI Engineering liaison
-- TBD member of the AI SDK team
+### AI Foundations liaison
+- [Donald Pickney](https://github.com/donald-pinckney)
 
 ### DevRel liaison
 - [Cecil Philip](https://github.com/cecilphillip) (to be confirmed)
