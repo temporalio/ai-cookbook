@@ -19,13 +19,13 @@ AI Cookbook is a cross-functional initiative, and liaisons represent their funct
 - Commercial: [MasonEgger](https://github.com/MasonEgger)
 
 ### Product liaison
-- [Ethan Ruhe](https://github.com/ethanruhe) (to be confirmed)
+- [Amir Benvenisti](https://github.com/starfleeth)
 
 ### AI Foundations liaison
 - [Donald Pickney](https://github.com/donald-pinckney)
 
 ### DevRel liaison
-- [Cecil Philip](https://github.com/cecilphillip) (to be confirmed)
+- [Cecil Philip](https://github.com/cecilphillip)
 
 ### Documentation and Tooling liaison
 - TBD member of the Documentation and Tooling team
