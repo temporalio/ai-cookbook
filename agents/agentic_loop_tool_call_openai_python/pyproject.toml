@@ -10,7 +10,7 @@ dependencies = [
     "temporalio>=1.15.0,<2", 
     "openai>=1.40.0",
     "numpy>=1.26",
-    "requests>=2.32.3"]
+    "requests>=2.33.0"]
 
 [dependency-groups]
 dev = [
