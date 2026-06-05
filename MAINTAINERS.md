@@ -28,7 +28,7 @@ AI Cookbook is a cross-functional initiative, and liaisons represent their funct
 - [Cecil Philip](https://github.com/cecilphillip)
 
 ### Documentation and Tooling liaison
-- TBD member of the Documentation and Tooling team
+- [Duncan Mackenzie](https://github.com/Duncanma)
 
 # Technical reviewers
 Technical reviewers ensure that contributors' submissions are looked at in a timely manner, provide architectural guidance, etc.
