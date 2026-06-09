@@ -45,12 +45,12 @@ CI uses repo paths.
 ## Phase 1 — Validation tooling
 
 ### Step 7: Scaffold the recipe-lint CLI
-- [ ] 1. Create toolkit/tools/recipe-lint uv package + entry point + dirs
-- [ ] 2. findings.py (Finding, format_report, exit-code rule)
-- [ ] 3. dispatch.py (detect_language, run_checks)
-- [ ] 4. cli.py (argparse, text/json)
-- [ ] 5. Tests for dispatch + findings
-- [ ] 6. Verify runs on a real recipe; ruff + mypy clean
+- [x] 1. Create toolkit/tools/recipe-lint uv package + entry point + dirs (src layout, hatchling, ruff/mypy/pytest config)
+- [x] 2. findings.py (Finding, format_report, exit-code rule)
+- [x] 3. dispatch.py (detect_language, run_checks; empty CHECKS registry for now)
+- [x] 4. cli.py (argparse, text/json)
+- [x] 5. Tests for dispatch + findings (9 tests pass)
+- [x] 6. Verify: recipe-lint on guardrails → empty/exit 0; ruff + mypy --strict clean
 
 ### Step 8: Structural / layout / naming / link checks
 - [ ] 1. checks/python/structure.py (required files/dirs, mandatory tests, naming, links/assets)

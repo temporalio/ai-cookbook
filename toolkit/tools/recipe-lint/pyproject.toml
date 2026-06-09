@@ -1,0 +1,37 @@
+[project]
+name = "recipe-lint"
+version = "0.1.0"
+description = "Lints Temporal AI Cookbook recipes for structural, layout, and code conventions."
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+recipe-lint = "recipe_lint.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "ruff",
+    "mypy",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/recipe_lint"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+strict = true
+python_version = "3.10"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
