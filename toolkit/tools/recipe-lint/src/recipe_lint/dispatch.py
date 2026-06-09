@@ -30,7 +30,7 @@ def _ensure_checks_loaded() -> None:
         return
     # Each check module appends to CHECKS on import. (__init__.py files stay empty
     # per the recipe convention, so import the modules explicitly here.)
-    from recipe_lint.checks.python import structure  # noqa: F401
+    from recipe_lint.checks.python import conventions, structure  # noqa: F401
 
     _checks_loaded = True
 

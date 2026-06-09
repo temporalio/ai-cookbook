@@ -59,10 +59,10 @@ CI uses repo paths.
 - [x] 4. Run on all 13 recipes: 0 errors, no crashes; warnings = Phase-3 worklist
 
 ### Step 9: Code-convention AST checks
-- [ ] 1. checks/python/conventions.py (max_retries, data converter, timeout, ApplicationError, model currency)
-- [ ] 2. Register checks
-- [ ] 3. Tests with code-snippet fixtures
-- [ ] 4. Run on corpus; validate sample; tune false positives; ruff+mypy clean
+- [x] 1. checks/python/conventions.py (max_retries SCOPED to clients, data converter, timeout, stale models; ApplicationError deferred to reviewer agent per "earn every rule")
+- [x] 2. Register checks (added conventions to lazy dispatch import)
+- [x] 3. Tests with code-snippet fixtures incl. RetryPolicy-never-flagged (Mason's max_retries constraint)
+- [x] 4. Run on corpus: findings accurate/low-FP on sample of 3; ruff+mypy clean; 28 tests pass
 
 ### Step 10: Wire ruff + mypy into recipe-lint
 - [ ] 1. checks/python/quality.py + shipped ruff/mypy configs
