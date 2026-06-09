@@ -101,10 +101,10 @@ CI uses repo paths.
 - [x] 3. Verify: instantiated skeleton → recipe-lint clean (0 findings, exit 0)
 
 ### Step 17: Package the toolkit plugin + local-load docs
-- [ ] 1. Create toolkit/.claude-plugin/plugin.json (no custom paths needed)
-- [ ] 2. Confirm all components under toolkit/ + ${CLAUDE_PLUGIN_ROOT} refs; nothing relies on .claude/ or repo-relative paths
-- [ ] 3. Root README: three purposes + `claude --plugin-dir <repo>/toolkit` load instructions
-- [ ] 4. Verify plugin loads via --plugin-dir; /help lists commands; content agents/ unaffected
+- [x] 1. Create toolkit/.claude-plugin/plugin.json (name ai-cookbook-toolkit; no custom paths)
+- [x] 2. Confirmed: 4 commands + recipe-reviewer agent + recipe-writing skill all under toolkit/; intra-plugin refs use ${CLAUDE_PLUGIN_ROOT}; repo-root agents/ untouched
+- [x] 3. Root README: three purposes + `claude --plugin-dir <repo>/toolkit` load instructions
+- [x] 4. Structure verified (manifest valid, components discoverable, no agents/ collision); live --plugin-dir /help check is manual
 
 ## Phase 3 — Backfill consistency
 

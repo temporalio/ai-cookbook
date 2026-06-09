@@ -12,6 +12,34 @@ A collection of example projects and patterns for building durable AI agents and
 | [`mcp/`](mcp/) | Durable [Model Context Protocol](https://modelcontextprotocol.io/) servers backed by Temporal workflows |
 
 
+## Toolkit
+
+This repository serves three purposes:
+
+1. **Recipe content** — the runnable examples above. Each recipe's `README.md` is published
+   to [docs.temporal.io/ai-cookbook](https://docs.temporal.io/ai-cookbook).
+2. **Consistency tooling** — `toolkit/tools/recipe-lint`, a `uv`-runnable CLI that checks a
+   recipe's structure, layout, naming, and Temporal/Python conventions, plus a small
+   [Vale](https://vale.sh/) prose ruleset under `toolkit/styles/`. CI runs both advisorily
+   (see `.github/workflows/lint-recipes.yml`); only docs-breakers and missing tests fail.
+3. **A local Claude Code plugin** — `toolkit/` is a Claude Code plugin (the `recipe-writing`
+   skill, the `recipe-reviewer` agent, and the `/recipe-ify`, `/recipe-scout`,
+   `/new-recipe`, and `/review-recipe` commands). It is loaded locally, not published:
+
+   ```bash
+   claude --plugin-dir <path-to-repo>/toolkit
+   ```
+
+The recipe conventions live in exactly one place —
+`toolkit/skills/recipe-writing/references/` — which the linter, commands, and agent all
+reference. Run the linter directly without the plugin:
+
+```bash
+uv run --project toolkit/tools/recipe-lint recipe-lint <category>/<recipe>_python
+```
+
+(Local `.claude/` skills remain fine for one-off use; `toolkit/` is the durable home.)
+
 ## Learn More
 
 - **Documentation:** [docs.temporal.io](https://docs.temporal.io)

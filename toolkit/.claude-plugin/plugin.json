@@ -1,0 +1,9 @@
+{
+  "name": "ai-cookbook-toolkit",
+  "version": "0.1.0",
+  "description": "Authoring and consistency toolkit for the Temporal AI Cookbook: the recipe-writing skill (single source of truth), generation and review commands, and the recipe-lint CLI.",
+  "author": {
+    "name": "Temporal Technologies"
+  },
+  "keywords": ["temporal", "ai-cookbook", "recipes", "linting", "consistency", "authoring"]
+}
