@@ -1,0 +1,134 @@
+# TODO: AI Cookbook Authoring & Consistency Toolkit
+
+Mirrors `plan.md`. Check off sub-steps as they complete.
+
+**Plugin mechanics (apply to all plugin steps):** plugin rooted in `toolkit/`, loaded via
+`claude --plugin-dir <repo>/toolkit` (local, not published); components at the toolkit root
+auto-discover; `.claude/` is project-local only; intra-plugin refs use `${CLAUDE_PLUGIN_ROOT}`,
+CI uses repo paths.
+
+## Phase 0 — Foundation: single source of truth + validator fix
+
+### Step 1: Scaffold the recipe-writing skill
+- [ ] 1. Create toolkit/skills/recipe-writing/ + four reference stubs
+- [ ] 2. Write SKILL.md (3rd-person trigger desc + read-references-first + tool invocations via ${CLAUDE_PLUGIN_ROOT})
+- [ ] 3. Stub reference files with H1 + TODO placeholder
+- [ ] 4. Verify skill loads via --plugin-dir; paths exist
+
+### Step 2: Author references/structure.md (canonical README walkthrough)
+- [ ] 1. Document the mandatory shape + light code-sandwich + H1 rule + allowed variation
+- [ ] 2. Include a correct example excerpt from hello_world_openai_responses
+- [ ] 3. Verify against 3 walkthrough recipes; note deviations for Phase 3
+
+### Step 3: Author references/layout.md (layout + slug/URL contract)
+- [ ] 1. Document stable core, optional dirs, mandatory tests, naming, slug/URL contract, standardize-away
+- [ ] 2. Decide + document the __init__.py convention
+- [ ] 3. Verify against all 13 recipe layouts; list deviations
+
+### Step 4: Author references/frontmatter.md (schema + governed values)
+- [ ] 1. Document README-only, schema, HTML-comment rationale, spacing, ordering, accept-list, priority bands, exclusions, YAML validity
+- [ ] 2. Inventory all tags; produce canonical accept-list + synonym map as tags.json (source of truth)
+- [ ] 3. Verify; list per-recipe violations (Step 18 worklist)
+
+### Step 5: Author references/code-conventions.md (Temporal rules + quality bar)
+- [ ] 1. Document each Python rule with rationale + tiny example
+- [ ] 2. Mark each rule mechanically-checkable vs judgment-only
+- [ ] 3. Verify rules against two real recipes
+
+### Step 6: Rewrite the front-matter validator (real YAML, tiered severity)
+- [ ] 1. Add .github/scripts/package.json (js-yaml) + install in CI
+- [ ] 2. Rewrite validator: js-yaml parse, hard-error vs warning tiers, accept-list (tags.json), ordering, exclusions
+- [ ] 3. Write validator tests (node:test) + npm test script + run in CI
+- [ ] 4. Reconcile CONTRIBUTING.md + CLAUDE.md claims
+- [ ] 5. Verify against whole repo (exit 0 + expected warnings)
+
+## Phase 1 — Validation tooling
+
+### Step 7: Scaffold the recipe-lint CLI
+- [ ] 1. Create toolkit/tools/recipe-lint uv package + entry point + dirs
+- [ ] 2. findings.py (Finding, format_report, exit-code rule)
+- [ ] 3. dispatch.py (detect_language, run_checks)
+- [ ] 4. cli.py (argparse, text/json)
+- [ ] 5. Tests for dispatch + findings
+- [ ] 6. Verify runs on a real recipe; ruff + mypy clean
+
+### Step 8: Structural / layout / naming / link checks
+- [ ] 1. checks/python/structure.py (required files/dirs, mandatory tests, naming, links/assets)
+- [ ] 2. Register module for "python"
+- [ ] 3. Tests with good/bad fixture recipes
+- [ ] 4. Run on all 13 recipes; capture worklist; no crashes
+
+### Step 9: Code-convention AST checks
+- [ ] 1. checks/python/conventions.py (max_retries, data converter, timeout, ApplicationError, model currency)
+- [ ] 2. Register checks
+- [ ] 3. Tests with code-snippet fixtures
+- [ ] 4. Run on corpus; validate sample; tune false positives; ruff+mypy clean
+
+### Step 10: Wire ruff + mypy into recipe-lint
+- [ ] 1. checks/python/quality.py + shipped ruff/mypy configs
+- [ ] 2. Register quality checks
+- [ ] 3. Tests (violation → finding; clean → none; missing tool → info)
+- [ ] 4. Verify full lint on corpus; exit-code rule holds
+
+### Step 11: Author the Vale ruleset
+- [ ] 1. toolkit/.vale.ini + toolkit/styles/AICookbook (HeadingsSentenceCase, MarketingLanguage, FileAnnotation) + vocab
+- [ ] 2. toolkit/styles/AICookbook/README.md documenting rules + "earn its place" bar
+- [ ] 3. Verify Vale (via --config) fires only on genuine issues; trim noise
+
+### Step 12: review-recipe command + recipe-reviewer agent
+- [ ] 1. Author toolkit/agents/recipe-reviewer.md (prose triggers + "When to invoke"; ${CLAUDE_PLUGIN_ROOT} tool paths)
+- [ ] 2. Author toolkit/commands/review-recipe.md
+- [ ] 3. Verify end-to-end via --plugin-dir on guardrails recipe
+
+### Step 13: Wire toolkit into CI (non-blocking)
+- [ ] 1. Add lint-recipes.yml (changed-recipe detection, recipe-lint + vale by repo path, report, warn-not-block, error→block)
+- [ ] 2. Confirm frontmatter + python-projects remain hard gates
+- [ ] 3. Verify with a draft non-conforming PR
+
+## Phase 2 — Reconcile generation + packaging
+
+### Step 14: Move + point recipe-ify at the SSOT (Angie's file — coordinate)
+- [ ] 1. Move to toolkit/commands/recipe-ify.md; add frontmatter; read references; generate canonical README; run recipe-lint after
+- [ ] 2. Verify generated recipe is canonical + lint-clean
+
+### Step 15: Move + point recipe-scout at SSOT + wishlist (Angie's file — coordinate)
+- [ ] 1. Move to toolkit/commands/recipe-scout.md; add frontmatter; reference references; keep taxonomy + wishlist
+- [ ] 2. Verify proposal cards on a sample repo
+
+### Step 16: new-recipe command + template
+- [ ] 1. toolkit/templates/recipe-skeleton (canonical, runnable, placeholders)
+- [ ] 2. Author toolkit/commands/new-recipe.md (copies skeleton to repo-root category dir)
+- [ ] 3. Verify skeleton passes lint + uv sync
+
+### Step 17: Package the toolkit plugin + local-load docs
+- [ ] 1. Create toolkit/.claude-plugin/plugin.json (no custom paths needed)
+- [ ] 2. Confirm all components under toolkit/ + ${CLAUDE_PLUGIN_ROOT} refs; nothing relies on .claude/ or repo-relative paths
+- [ ] 3. Root README: three purposes + `claude --plugin-dir <repo>/toolkit` load instructions
+- [ ] 4. Verify plugin loads via --plugin-dir; /help lists commands; content agents/ unaffected
+
+## Phase 3 — Backfill consistency
+
+### Step 18: Backfill front matter (no renames)
+- [ ] 1. Edit each README front matter to schema (spacing, vocab, ordering, priority)
+- [ ] 2. Run validator per file
+- [ ] 3. Verify zero warnings across corpus
+
+### Step 19: Converge README structure to canonical (outliers)
+- [ ] 1. Restructure non-canonical READMEs (exclude guardrails + human_in_the_loop)
+- [ ] 2. Run vale (--config) + recipe-lint per recipe
+- [ ] 3. Verify structure rules pass + render check
+
+### Step 20: Backfill code quality
+- [ ] 1. Apply quality bar per recipe (ruff/mypy/conventions), minimal changes
+- [ ] 2. Ensure tests still pass
+- [ ] 3. Verify no error-severity findings across corpus
+
+### Step 21: Final integration
+- [ ] 1. Update CONTRIBUTING.md + CLAUDE.md (toolkit + --plugin-dir load step)
+- [ ] 2. Full toolchain dry-run on fresh clone (validator/lint/vale/tests)
+- [ ] 3. Verify CI green; plugin loads via --plugin-dir; new-recipe → review-recipe cycle works
+
+## Open items (tracked separately, not part of the 21 steps)
+
+- [ ] Deliver a PR reconciling `human_in_the_loop_python` to canonical, with rationale (outcome may sanction a richer variant)
+- [ ] Temporal-wide tag vocabulary across all content properties (Mason owns)
