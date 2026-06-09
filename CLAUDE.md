@@ -80,6 +80,24 @@ full conventions.
 
 **Tests must pass** before a PR is merged. CI detects changed recipe directories and runs `uv sync && pytest tests/ --timeout=30` for each.
 
+## Toolkit (`toolkit/`)
+
+`toolkit/` is a local Claude Code plugin and linter for authoring consistent recipes. The
+recipe conventions are defined once in `toolkit/skills/recipe-writing/references/`
+(structure, layout, frontmatter, code-conventions) and `toolkit/skills/recipe-writing/references/tags.json`;
+the linter, commands, reviewer agent, and CI all reference them — never restate them.
+
+- `toolkit/tools/recipe-lint` — a `uv` CLI checking recipe structure, layout, naming,
+  links, and Temporal/Python conventions. Error-severity findings (e.g. missing `tests/`)
+  fail CI; the rest are advisory warnings.
+- `toolkit/styles/` + `toolkit/.vale.ini` — a minimal Vale prose ruleset.
+- Plugin components (load with `claude --plugin-dir <repo>/toolkit`): the `recipe-writing`
+  skill, the `recipe-reviewer` agent, and the `recipe-ify` / `recipe-scout` / `new-recipe` /
+  `review-recipe` commands. They reference their own files via `${CLAUDE_PLUGIN_ROOT}`.
+- The plugin is rooted in `toolkit/` (not the repo root) so the cookbook's `agents/` recipe
+  category stays outside the plugin's component tree. CI wires both tools in advisorily via
+  `.github/workflows/lint-recipes.yml`.
+
 ## Local Development Prerequisites
 
 - Python 3.10+

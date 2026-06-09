@@ -36,6 +36,35 @@ Look at an existing recipe (e.g., [`foundations/hello_world_openai_responses_pyt
 - **Take advantage of AI tooling for Temporal guidance and best practices.** The [Temporal Docs MCP Server](https://docs.temporal.io/with-ai) (`https://temporal.mcp.kapa.ai`) gives your AI assistant real-time access to Temporal documentation. The [Temporal Developer Skill](https://docs.temporal.io/with-ai) adds expert-level knowledge of workflow determinism, activity patterns, retry policies, and testing strategies to agents like Claude Code, Cursor, and Codex. See [docs.temporal.io/with-ai](https://docs.temporal.io/with-ai) for setup instructions.
 - **Use `uv` for dependencies.** Add dependencies in `pyproject.toml` and commit any lockfile changes.
 
+## Authoring tooling
+
+The `toolkit/` directory holds an optional, local Claude Code plugin and linter that help
+you write consistent recipes. The recipe conventions live in one place —
+`toolkit/skills/recipe-writing/references/` (structure, layout, front matter, code
+conventions) — and everything else references them.
+
+- **Lint a recipe** (structure, layout, naming, links, Temporal/Python conventions):
+
+  ```bash
+  uv run --project toolkit/tools/recipe-lint recipe-lint <category>/<recipe>_python
+  ```
+
+  Error-severity findings (e.g. a missing `tests/`) fail CI; the rest are advisory warnings.
+
+- **Load the plugin** for authoring commands and the reviewer agent:
+
+  ```bash
+  claude --plugin-dir <path-to-repo>/toolkit
+  ```
+
+  Then `/new-recipe <category>/<name>` scaffolds a recipe from the template, `/review-recipe
+  <dir>` runs a full review, and `/recipe-ify` / `/recipe-scout` generate recipes from a
+  description or an external repo.
+
+- **Prose**: a small [Vale](https://vale.sh/) ruleset (`vale --config toolkit/.vale.ini
+  <recipe>/README.md`) flags marketing / AI-giveaway language. CI runs `recipe-lint` and
+  Vale advisorily via `.github/workflows/lint-recipes.yml`.
+
 ## README Requirements
 
 Every top-level recipe README must include a front matter block as an HTML comment at the very top of the file. This is validated by CI:
