@@ -3,15 +3,20 @@
 Thanks for your interest in contributing! The cookbook is a collection of self-contained, runnable examples. Contributions can be new recipes, improvements to existing ones, bug fixes, or documentation updates.
 
 ## Prerequisites
-```markdown
-<!--
-For other Recipe languages: add notes here as you add other language recipes.
--->
-```
+
+<!-- Recipes are Python today; add per-language prerequisites here as other languages land. -->
+
 ### For Python Recipes
 - Python 3.10 or later
 - [`uv`](https://docs.astral.sh/uv/) — used for dependency management in all projects
 - A running Temporal server, or use the [Temporal CLI](https://docs.temporal.io/cli) (`temporal server start-dev`) for local development
+
+### Optional (for the authoring toolkit)
+
+- [`just`](https://just.systems) — task runner for the toolkit's check commands
+  (`cookbook-toolkit/justfile`); the quickest way to run them. See [Authoring tooling](#authoring-tooling).
+- [`vale`](https://vale.sh/) — prose linter for recipe READMEs (`brew install vale`). Only
+  needed to run the Vale checks locally.
 
 ## Repository Structure
 
@@ -32,18 +37,37 @@ Look at an existing recipe (e.g., [`foundations/hello_world_openai_responses_pyt
 
 ## Coding Conventions
 
-- **Let Temporal handle retries.** Set `max_retries=0` on LLM client libraries and rely on Temporal's activity retry policy instead. Client-side retries interfere with durable error handling.
-- **Take advantage of AI tooling for Temporal guidance and best practices.** The [Temporal Docs MCP Server](https://docs.temporal.io/with-ai) (`https://temporal.mcp.kapa.ai`) gives your AI assistant real-time access to Temporal documentation. The [Temporal Developer Skill](https://docs.temporal.io/with-ai) adds expert-level knowledge of workflow determinism, activity patterns, retry policies, and testing strategies to agents like Claude Code, Cursor, and Codex. See [docs.temporal.io/with-ai](https://docs.temporal.io/with-ai) for setup instructions.
-- **Use `uv` for dependencies.** Add dependencies in `pyproject.toml` and commit any lockfile changes.
+Recipe code conventions — retries via Temporal (`max_retries=0` on clients), the Pydantic
+data converter, activity timeouts, naming, and the ruff + strict-typing quality bar — are
+documented in
+[`cookbook-toolkit/skills/recipe-writing/references/code-conventions.md`](cookbook-toolkit/skills/recipe-writing/references/code-conventions.md)
+and checked by `recipe-lint` (see [Authoring tooling](#authoring-tooling)). Use `uv` for
+dependencies and commit lockfile changes.
 
-## Authoring tooling
+While you work, point your AI assistant at the [Temporal Docs MCP Server](https://docs.temporal.io/with-ai)
+(`https://temporal.mcp.kapa.ai`) and the [Temporal Developer Skill](https://docs.temporal.io/with-ai)
+for expert guidance on determinism, activity patterns, retry policies, and testing — see
+[docs.temporal.io/with-ai](https://docs.temporal.io/with-ai).
+
+## Authoring Tooling
 
 The `cookbook-toolkit/` directory holds an optional, local Claude Code plugin and linter that help
 you write consistent recipes. The recipe conventions live in one place —
 `cookbook-toolkit/skills/recipe-writing/references/` (structure, layout, front matter, code
 conventions) — and everything else references them.
 
-- **Lint a recipe** (structure, layout, naming, links, Temporal/Python conventions):
+- **Run the checks via [`just`](https://just.systems)** (the convenient entry point;
+  `cookbook-toolkit/justfile`):
+
+  ```bash
+  cd cookbook-toolkit && just            # list commands
+  just check <category>/<recipe>_python  # recipe-lint + Vale on one recipe
+  just report                            # full report across every recipe
+  just frontmatter                       # validate front matter for all READMEs
+  ```
+
+- **Or run the tools directly.** Lint a recipe (structure, layout, naming, links,
+  Temporal/Python conventions):
 
   ```bash
   uv run --project cookbook-toolkit/tools/recipe-lint recipe-lint <category>/<recipe>_python
@@ -97,8 +121,8 @@ for the full rules.
 From inside a recipe directory:
 
 ```bash
-uv sync          # install dependencies
-pytest tests/    # run the test suite
+uv sync                # install dependencies
+uv run pytest tests/   # run the test suite
 ```
 
 All tests must pass before opening a pull request.
@@ -108,7 +132,7 @@ All tests must pass before opening a pull request.
 Before submitting a PR, confirm:
 
 - [ ] README front matter is present and valid (`description`, `tags`, `priority`)
-- [ ] All tests pass locally (`uv sync && pytest tests/`)
+- [ ] All tests pass locally (`uv sync && uv run pytest tests/`)
 - [ ] CI checks are green
 - [ ] LLM client retries are disabled (let Temporal retry instead)
 - [ ] New dependencies are added to `pyproject.toml`
