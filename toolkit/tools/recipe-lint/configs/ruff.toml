@@ -1,0 +1,8 @@
+# ABOUTME: Toolkit-standard ruff config recipe-lint applies when checking a recipe.
+# Mirrors the python skill defaults; target-version py310 since recipes support 3.10+.
+
+line-length = 120
+target-version = "py310"
+
+[lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]

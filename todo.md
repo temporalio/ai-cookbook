@@ -65,10 +65,10 @@ CI uses repo paths.
 - [x] 4. Run on corpus: findings accurate/low-FP on sample of 3; ruff+mypy clean; 28 tests pass
 
 ### Step 10: Wire ruff + mypy into recipe-lint
-- [ ] 1. checks/python/quality.py + shipped ruff/mypy configs
-- [ ] 2. Register quality checks
-- [ ] 3. Tests (violation → finding; clean → none; missing tool → info)
-- [ ] 4. Verify full lint on corpus; exit-code rule holds
+- [x] 1. checks/python/quality.py + shipped configs/ruff.toml (mypy deliberately NOT run cross-corpus — untyped SDK noise; documented)
+- [x] 2. Register quality checks (added quality to lazy dispatch import)
+- [x] 3. Tests (ruff violation → finding; clean → none; missing tool → graceful warning)
+- [x] 4. Verify full lint on corpus: coherent report, exit-code rule holds (guardrails → 9 ruff warnings, exit 0)
 
 ### Step 11: Author the Vale ruleset
 - [ ] 1. toolkit/.vale.ini + toolkit/styles/AICookbook (HeadingsSentenceCase, MarketingLanguage, FileAnnotation) + vocab
