@@ -92,8 +92,8 @@ CI uses repo paths.
 - [x] 2. Live /recipe-ify run deferred to Step 17 (--plugin-dir); generated recipes are gated by recipe-lint per the command
 
 ### Step 15: Move + point recipe-scout at SSOT + wishlist (Angie's file — coordinate)
-- [ ] 1. Move to toolkit/commands/recipe-scout.md; add frontmatter; reference references; keep taxonomy + wishlist
-- [ ] 2. Verify proposal cards on a sample repo
+- [x] 1. Moved to toolkit/commands/recipe-scout.md; added frontmatter; references SSOT for "good recipe"; kept AI-building-block taxonomy + wishlist; proposal cards reference canonical structure; old file removed
+- [x] 2. Live /recipe-scout run deferred to Step 17 (--plugin-dir); command structure validated
 
 ### Step 16: new-recipe command + template
 - [ ] 1. toolkit/templates/recipe-skeleton (canonical, runnable, placeholders)
