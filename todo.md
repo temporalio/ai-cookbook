@@ -53,10 +53,10 @@ CI uses repo paths.
 - [x] 6. Verify: recipe-lint on guardrails → empty/exit 0; ruff + mypy --strict clean
 
 ### Step 8: Structural / layout / naming / link checks
-- [ ] 1. checks/python/structure.py (required files/dirs, mandatory tests, naming, links/assets)
-- [ ] 2. Register module for "python"
-- [ ] 3. Tests with good/bad fixture recipes
-- [ ] 4. Run on all 13 recipes; capture worklist; no crashes
+- [x] 1. checks/python/structure.py (required files/dirs, mandatory tests, empty-init, naming, task-queue, stray-entry, frontmatter, links/assets; MCP variant handled)
+- [x] 2. Register module for "python" (lazy load in dispatch; empty __init__.py preserved)
+- [x] 3. Tests with good/bad fixture recipes (test_structure_checks.py)
+- [x] 4. Run on all 13 recipes: 0 errors, no crashes; warnings = Phase-3 worklist
 
 ### Step 9: Code-convention AST checks
 - [ ] 1. checks/python/conventions.py (max_retries, data converter, timeout, ApplicationError, model currency)
