@@ -1,0 +1,28 @@
+extends: existence
+message: "Avoid marketing / AI-giveaway language: '%s'. Say plainly what the recipe does."
+level: warning
+ignorecase: true
+tokens:
+  - leverage
+  - leverages
+  - leveraging
+  - utilize
+  - utilizes
+  - utilizing
+  - seamless
+  - seamlessly
+  - effortless
+  - effortlessly
+  - cutting[- ]edge
+  - state[- ]of[- ]the[- ]art
+  - game[- ]chang(?:ing|er)
+  - revolutionary
+  - blazing(?:ly)?[- ]fast
+  - dive in(?:to)?
+  - delve
+  - in conclusion
+  - unleash
+  - supercharge
+  - turbocharge
+  - best[- ]in[- ]class
+  - world[- ]class

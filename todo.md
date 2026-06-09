@@ -71,9 +71,9 @@ CI uses repo paths.
 - [x] 4. Verify full lint on corpus: coherent report, exit-code rule holds (guardrails → 9 ruff warnings, exit 0)
 
 ### Step 11: Author the Vale ruleset
-- [ ] 1. toolkit/.vale.ini + toolkit/styles/AICookbook (HeadingsSentenceCase, MarketingLanguage, FileAnnotation) + vocab
-- [ ] 2. toolkit/styles/AICookbook/README.md documenting rules + "earn its place" bar
-- [ ] 3. Verify Vale (via --config) fires only on genuine issues; trim noise
+- [x] 1. toolkit/.vale.ini + toolkit/styles/AICookbook + vocab; MarketingLanguage kept; HeadingsSentenceCase dropped (49 FPs — corpus is Title Case); FileAnnotation → reviewer agent (not Vale-expressible)
+- [x] 2. toolkit/styles/AICookbook/README.md documenting the rule + "earn its place" bar + the two rejected candidates
+- [x] 3. Verify Vale (via --config): 3 genuine MarketingLanguage hits across corpus, exit 0; noise trimmed
 
 ### Step 12: review-recipe command + recipe-reviewer agent
 - [ ] 1. Author toolkit/agents/recipe-reviewer.md (prose triggers + "When to invoke"; ${CLAUDE_PLUGIN_ROOT} tool paths)
