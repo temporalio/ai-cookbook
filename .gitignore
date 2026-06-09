@@ -114,3 +114,6 @@ commit-msg.md
 node_modules/
 
 
+
+# BPE goal scratch artifact — not tracked
+goal.md
