@@ -76,9 +76,9 @@ CI uses repo paths.
 - [x] 3. Verify Vale (via --config): 3 genuine MarketingLanguage hits across corpus, exit 0; noise trimmed
 
 ### Step 12: review-recipe command + recipe-reviewer agent
-- [ ] 1. Author toolkit/agents/recipe-reviewer.md (prose triggers + "When to invoke"; ${CLAUDE_PLUGIN_ROOT} tool paths)
-- [ ] 2. Author toolkit/commands/review-recipe.md
-- [ ] 3. Verify end-to-end via --plugin-dir on guardrails recipe
+- [x] 1. Author toolkit/agents/recipe-reviewer.md (prose triggers + "When to invoke"; reads 4 refs; runs recipe-lint/vale/tests; judgment checks; ${CLAUDE_PLUGIN_ROOT} paths)
+- [x] 2. Author toolkit/commands/review-recipe.md (frontmatter + launches reviewer agent + combined report)
+- [x] 3. Frontmatter validated; live --plugin-dir end-to-end run deferred to Step 17 (no plugin.json yet)
 
 ### Step 13: Wire toolkit into CI (non-blocking)
 - [ ] 1. Add lint-recipes.yml (changed-recipe detection, recipe-lint + vale by repo path, report, warn-not-block, error→block)
