@@ -1,0 +1,11 @@
+{
+  "_comment": "Authoritative tag vocabulary for cookbook recipe README front matter. Consumed by .github/scripts/validate-frontmatter.js and cookbook-toolkit/tools/recipe-lint. Edit here; frontmatter.md documents it in prose. A tag is valid if (after synonym resolution) it appears in categories, languages, or providers. Unknown tags are warnings.",
+  "order": ["category", "language", "provider"],
+  "categories": ["agents", "foundations", "deep_research", "mcp"],
+  "languages": ["python"],
+  "providers": ["openai", "anthropic", "litellm"],
+  "synonyms": {
+    "claude": "anthropic",
+    "provider-neutral": "litellm"
+  }
+}

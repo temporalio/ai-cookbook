@@ -91,8 +91,8 @@ Implications this spec must respect:
 
 | Decision | Choice |
 | :--- | :--- |
-| Toolkit home & packaging | Hybrid in-repo plugin **rooted in a `toolkit/` subdirectory** (`toolkit/.claude-plugin/plugin.json` + skill + commands + agent + styles + tools). Rooting in a subdir keeps the cookbook's `agents/` recipe category outside the plugin's component tree, avoiding the auto-discovery collision. Repo-level CI scripts stay at repo root. |
-| Distribution | **Local only**, loaded via `claude --plugin-dir <repo>/toolkit`. Not published to a marketplace. Local `.claude/` skills/commands are acceptable for one-offs; the `toolkit/` plugin is the durable home. |
+| Toolkit home & packaging | Hybrid in-repo plugin **rooted in a `cookbook-toolkit/` subdirectory** (`cookbook-toolkit/.claude-plugin/plugin.json` + skill + commands + agent + styles + tools). Rooting in a subdir keeps the cookbook's `agents/` recipe category outside the plugin's component tree, avoiding the auto-discovery collision. Repo-level CI scripts stay at repo root. |
+| Distribution | **Local only**, loaded via `claude --plugin-dir <repo>/cookbook-toolkit`. Not published to a marketplace. Local `.claude/` skills/commands are acceptable for one-offs; the `cookbook-toolkit/` plugin is the durable home. |
 | Enforcement scope | Both prose and Python code now; language-extensible for other languages later. |
 | Canonical README style | **Light code-walkthrough** (confirmed: READMEs render verbatim as docs pages; established pages use this style). The brief style is non-canonical. |
 | Weight | Deliberately lighter than VPT — this is a cookbook. |
@@ -221,14 +221,14 @@ These are mechanically checkable and form the Python code-layer rules.
 ```mermaid
 flowchart LR
     subgraph repo["ai-cookbook repo"]
-        subgraph plugin["toolkit/ — plugin root (loaded via --plugin-dir)"]
-            M["toolkit/.claude-plugin/plugin.json"]
-            SK["toolkit/skills/recipe-writing/<br/>SKILL.md + references/ (SSOT)"]
-            CM["toolkit/commands/<br/>recipe-scout · recipe-ify · review-recipe · new-recipe"]
-            AG["toolkit/agents/recipe-reviewer"]
-            TP["toolkit/templates/recipe skeleton"]
-            ST["toolkit/styles/ + toolkit/.vale.ini (prose)"]
-            LN["toolkit/tools/recipe-lint (code conventions)"]
+        subgraph plugin["cookbook-toolkit/ — plugin root (loaded via --plugin-dir)"]
+            M["cookbook-toolkit/.claude-plugin/plugin.json"]
+            SK["cookbook-toolkit/skills/recipe-writing/<br/>SKILL.md + references/ (SSOT)"]
+            CM["cookbook-toolkit/commands/<br/>recipe-scout · recipe-ify · review-recipe · new-recipe"]
+            AG["cookbook-toolkit/agents/recipe-reviewer"]
+            TP["cookbook-toolkit/templates/recipe skeleton"]
+            ST["cookbook-toolkit/styles/ + cookbook-toolkit/.vale.ini (prose)"]
+            LN["cookbook-toolkit/tools/recipe-lint (code conventions)"]
         end
         subgraph content["Recipe content (repo root — outside the plugin tree)"]
             R["agents/ foundations/ deep_research/ mcp/"]
@@ -242,10 +242,10 @@ flowchart LR
     SK -.-> LN
 ```
 
-Rooting the plugin in `toolkit/` (rather than the repo root) is deliberate: Claude Code
+Rooting the plugin in `cookbook-toolkit/` (rather than the repo root) is deliberate: Claude Code
 auto-discovers `agents/`, `commands/`, and `skills/` at the **plugin root**, and the
 cookbook already uses `agents/` as a recipe **category**. Keeping the plugin under
-`toolkit/` puts the recipe `agents/` directory outside the plugin's component tree, so
+`cookbook-toolkit/` puts the recipe `agents/` directory outside the plugin's component tree, so
 there is no collision. Components reference their own files via `${CLAUDE_PLUGIN_ROOT}/…`
 (which resolves to the `--plugin-dir` target); CI invokes the same tools by repo path.
 
@@ -279,34 +279,34 @@ no rework.
 
 ### Phase 0 — Foundation: single source of truth + cheap CI fix
 
-- Author `toolkit/skills/recipe-writing/references/`: `structure.md` (walkthrough README),
+- Author `cookbook-toolkit/skills/recipe-writing/references/`: `structure.md` (walkthrough README),
   `frontmatter.md` (schema, tag accept-list, priority bands, YAML rules), `layout.md`
   (directory conventions, naming, URL/slug contract), `code-conventions.md` (the
   Temporal/recipe Python rules).
-- `toolkit/skills/recipe-writing/SKILL.md` entry point that loads the references.
+- `cookbook-toolkit/skills/recipe-writing/SKILL.md` entry point that loads the references.
 - Fix `.github/scripts/validate-frontmatter.js`: enforce `tags` and `priority`, validate
   vocabulary/spacing/bands, and parse with real-YAML semantics to match the docs build.
   Reconcile `CONTRIBUTING.md`/`CLAUDE.md` claims with the validator.
 
 ### Phase 1 — Validation tooling (the missing half)
 
-- `toolkit/tools/recipe-lint` (standalone uv CLI): AST/grep checks for `max_retries=0`,
+- `cookbook-toolkit/tools/recipe-lint` (standalone uv CLI): AST/grep checks for `max_retries=0`,
   `pydantic_data_converter`, timeouts, `ApplicationError` boundaries, naming, model
   currency; plus relative-link and `_assets` checks. Language-dispatcher skeleton.
-- `toolkit/styles/AICookbook/` + `toolkit/.vale.ini`: a **small** Vale rule set (front
+- `cookbook-toolkit/styles/AICookbook/` + `cookbook-toolkit/.vale.ini`: a **small** Vale rule set (front
   matter, heading case, banned marketing words, the `*File:*` convention). Not VPT's 30.
-- `toolkit/commands/review-recipe` + `toolkit/agents/recipe-reviewer`: run Vale +
+- `cookbook-toolkit/commands/review-recipe` + `cookbook-toolkit/agents/recipe-reviewer`: run Vale +
   recipe-lint + tests and produce a structured report (VPT's `review-pattern` analog).
 - Wire `recipe-lint` and Vale into `.github/workflows` (invoked by repo path).
 
 ### Phase 2 — Reconcile generation with the source of truth
 
-- Move `recipe-ify` / `recipe-scout` into `toolkit/commands/` and refactor them to
+- Move `recipe-ify` / `recipe-scout` into `cookbook-toolkit/commands/` and refactor them to
   reference the skill's `references/` (via `${CLAUDE_PLUGIN_ROOT}`) instead of inline
   conventions, and to generate the **canonical walkthrough README**.
-- `toolkit/commands/new-recipe` + `toolkit/templates/` recipe skeleton (the `new-pattern`
+- `cookbook-toolkit/commands/new-recipe` + `cookbook-toolkit/templates/` recipe skeleton (the `new-pattern`
   analog).
-- Package: `toolkit/.claude-plugin/plugin.json`, command frontmatter (`allowed-tools`,
+- Package: `cookbook-toolkit/.claude-plugin/plugin.json`, command frontmatter (`allowed-tools`,
   `argument-hint`, `description`), `--plugin-dir` load instructions, and a root README
   documenting the three purposes (content / linter / plugin), mirroring VPT.
 

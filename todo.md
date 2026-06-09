@@ -2,15 +2,15 @@
 
 Mirrors `plan.md`. Check off sub-steps as they complete.
 
-**Plugin mechanics (apply to all plugin steps):** plugin rooted in `toolkit/`, loaded via
-`claude --plugin-dir <repo>/toolkit` (local, not published); components at the toolkit root
+**Plugin mechanics (apply to all plugin steps):** plugin rooted in `cookbook-toolkit/`, loaded via
+`claude --plugin-dir <repo>/cookbook-toolkit` (local, not published); components at the toolkit root
 auto-discover; `.claude/` is project-local only; intra-plugin refs use `${CLAUDE_PLUGIN_ROOT}`,
 CI uses repo paths.
 
 ## Phase 0 — Foundation: single source of truth + validator fix
 
 ### Step 1: Scaffold the recipe-writing skill
-- [x] 1. Create toolkit/skills/recipe-writing/ + four reference stubs
+- [x] 1. Create cookbook-toolkit/skills/recipe-writing/ + four reference stubs
 - [x] 2. Write SKILL.md (3rd-person trigger desc + read-references-first + tool invocations via ${CLAUDE_PLUGIN_ROOT})
 - [x] 3. Stub reference files with H1 + TODO placeholder
 - [x] 4. Verify paths exist + SKILL.md frontmatter valid (live --plugin-dir load deferred to Step 17, when plugin.json exists)
@@ -45,7 +45,7 @@ CI uses repo paths.
 ## Phase 1 — Validation tooling
 
 ### Step 7: Scaffold the recipe-lint CLI
-- [x] 1. Create toolkit/tools/recipe-lint uv package + entry point + dirs (src layout, hatchling, ruff/mypy/pytest config)
+- [x] 1. Create cookbook-toolkit/tools/recipe-lint uv package + entry point + dirs (src layout, hatchling, ruff/mypy/pytest config)
 - [x] 2. findings.py (Finding, format_report, exit-code rule)
 - [x] 3. dispatch.py (detect_language, run_checks; empty CHECKS registry for now)
 - [x] 4. cli.py (argparse, text/json)
@@ -71,13 +71,13 @@ CI uses repo paths.
 - [x] 4. Verify full lint on corpus: coherent report, exit-code rule holds (guardrails → 9 ruff warnings, exit 0)
 
 ### Step 11: Author the Vale ruleset
-- [x] 1. toolkit/.vale.ini + toolkit/styles/AICookbook + vocab; MarketingLanguage kept; HeadingsSentenceCase dropped (49 FPs — corpus is Title Case); FileAnnotation → reviewer agent (not Vale-expressible)
-- [x] 2. toolkit/styles/AICookbook/README.md documenting the rule + "earn its place" bar + the two rejected candidates
+- [x] 1. cookbook-toolkit/.vale.ini + cookbook-toolkit/styles/AICookbook + vocab; MarketingLanguage kept; HeadingsSentenceCase dropped (49 FPs — corpus is Title Case); FileAnnotation → reviewer agent (not Vale-expressible)
+- [x] 2. cookbook-toolkit/styles/AICookbook/README.md documenting the rule + "earn its place" bar + the two rejected candidates
 - [x] 3. Verify Vale (via --config): 3 genuine MarketingLanguage hits across corpus, exit 0; noise trimmed
 
 ### Step 12: review-recipe command + recipe-reviewer agent
-- [x] 1. Author toolkit/agents/recipe-reviewer.md (prose triggers + "When to invoke"; reads 4 refs; runs recipe-lint/vale/tests; judgment checks; ${CLAUDE_PLUGIN_ROOT} paths)
-- [x] 2. Author toolkit/commands/review-recipe.md (frontmatter + launches reviewer agent + combined report)
+- [x] 1. Author cookbook-toolkit/agents/recipe-reviewer.md (prose triggers + "When to invoke"; reads 4 refs; runs recipe-lint/vale/tests; judgment checks; ${CLAUDE_PLUGIN_ROOT} paths)
+- [x] 2. Author cookbook-toolkit/commands/review-recipe.md (frontmatter + launches reviewer agent + combined report)
 - [x] 3. Frontmatter validated; live --plugin-dir end-to-end run deferred to Step 17 (no plugin.json yet)
 
 ### Step 13: Wire toolkit into CI (non-blocking)
@@ -88,22 +88,22 @@ CI uses repo paths.
 ## Phase 2 — Reconcile generation + packaging
 
 ### Step 14: Move + point recipe-ify at the SSOT (Angie's file — coordinate)
-- [x] 1. Moved to toolkit/commands/recipe-ify.md; added frontmatter; references the SSOT (no inline conventions); canonical walkthrough README; runs recipe-lint after; old .claude/commands/recipe-ify.md removed
+- [x] 1. Moved to cookbook-toolkit/commands/recipe-ify.md; added frontmatter; references the SSOT (no inline conventions); canonical walkthrough README; runs recipe-lint after; old .claude/commands/recipe-ify.md removed
 - [x] 2. Live /recipe-ify run deferred to Step 17 (--plugin-dir); generated recipes are gated by recipe-lint per the command
 
 ### Step 15: Move + point recipe-scout at SSOT + wishlist (Angie's file — coordinate)
-- [x] 1. Moved to toolkit/commands/recipe-scout.md; added frontmatter; references SSOT for "good recipe"; kept AI-building-block taxonomy + wishlist; proposal cards reference canonical structure; old file removed
+- [x] 1. Moved to cookbook-toolkit/commands/recipe-scout.md; added frontmatter; references SSOT for "good recipe"; kept AI-building-block taxonomy + wishlist; proposal cards reference canonical structure; old file removed
 - [x] 2. Live /recipe-scout run deferred to Step 17 (--plugin-dir); command structure validated
 
 ### Step 16: new-recipe command + template
-- [x] 1. toolkit/templates/recipe-skeleton (runnable, ruff-clean, canonical walkthrough README, ALL_CAPS placeholders)
-- [x] 2. Author toolkit/commands/new-recipe.md (asks name/category/provider; copies skeleton to repo-root category dir; fills placeholders)
+- [x] 1. cookbook-toolkit/templates/recipe-skeleton (runnable, ruff-clean, canonical walkthrough README, ALL_CAPS placeholders)
+- [x] 2. Author cookbook-toolkit/commands/new-recipe.md (asks name/category/provider; copies skeleton to repo-root category dir; fills placeholders)
 - [x] 3. Verify: instantiated skeleton → recipe-lint clean (0 findings, exit 0)
 
 ### Step 17: Package the toolkit plugin + local-load docs
-- [x] 1. Create toolkit/.claude-plugin/plugin.json (name ai-cookbook-toolkit; no custom paths)
-- [x] 2. Confirmed: 4 commands + recipe-reviewer agent + recipe-writing skill all under toolkit/; intra-plugin refs use ${CLAUDE_PLUGIN_ROOT}; repo-root agents/ untouched
-- [x] 3. Root README: three purposes + `claude --plugin-dir <repo>/toolkit` load instructions
+- [x] 1. Create cookbook-toolkit/.claude-plugin/plugin.json (name ai-cookbook-toolkit; no custom paths)
+- [x] 2. Confirmed: 4 commands + recipe-reviewer agent + recipe-writing skill all under cookbook-toolkit/; intra-plugin refs use ${CLAUDE_PLUGIN_ROOT}; repo-root agents/ untouched
+- [x] 3. Root README: three purposes + `claude --plugin-dir <repo>/cookbook-toolkit` load instructions
 - [x] 4. Structure verified (manifest valid, components discoverable, no agents/ collision); live --plugin-dir /help check is manual
 
 ## Phase 3 — Backfill consistency

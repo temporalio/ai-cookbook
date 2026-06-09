@@ -10,7 +10,7 @@ on:
     paths:
       - '**/README.md'
       - '.github/scripts/**'
-      - 'toolkit/skills/recipe-writing/references/tags.json'
+      - 'cookbook-toolkit/skills/recipe-writing/references/tags.json'
       - '.github/workflows/validate-frontmatter.yml'
 
 concurrency:

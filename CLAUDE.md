@@ -70,31 +70,31 @@ The validator parses with the same YAML library the docs site uses and tiers its
 - **Hard errors (fail CI — they break the docs build):** missing `description`, missing
   H1 title, or invalid YAML.
 - **Warnings (reported, non-blocking):** `tags` not in the controlled vocabulary
-  (`toolkit/skills/recipe-writing/references/tags.json`), `tags:[` spacing, wrong tag order
+  (`cookbook-toolkit/skills/recipe-writing/references/tags.json`), `tags:[` spacing, wrong tag order
   (`category, language, provider`), missing/non-integer `priority`, or forbidden
   `last_updated`/`title` keys.
 
 Consistency is enforced by the `recipe-writing` skill and the `recipe-lint` tool under
-`toolkit/`, not by hard CI gates. See `toolkit/skills/recipe-writing/references/` for the
+`cookbook-toolkit/`, not by hard CI gates. See `cookbook-toolkit/skills/recipe-writing/references/` for the
 full conventions.
 
 **Tests must pass** before a PR is merged. CI detects changed recipe directories and runs `uv sync && pytest tests/ --timeout=30` for each.
 
-## Toolkit (`toolkit/`)
+## Toolkit (`cookbook-toolkit/`)
 
-`toolkit/` is a local Claude Code plugin and linter for authoring consistent recipes. The
-recipe conventions are defined once in `toolkit/skills/recipe-writing/references/`
-(structure, layout, frontmatter, code-conventions) and `toolkit/skills/recipe-writing/references/tags.json`;
+`cookbook-toolkit/` is a local Claude Code plugin and linter for authoring consistent recipes. The
+recipe conventions are defined once in `cookbook-toolkit/skills/recipe-writing/references/`
+(structure, layout, frontmatter, code-conventions) and `cookbook-toolkit/skills/recipe-writing/references/tags.json`;
 the linter, commands, reviewer agent, and CI all reference them — never restate them.
 
-- `toolkit/tools/recipe-lint` — a `uv` CLI checking recipe structure, layout, naming,
+- `cookbook-toolkit/tools/recipe-lint` — a `uv` CLI checking recipe structure, layout, naming,
   links, and Temporal/Python conventions. Error-severity findings (e.g. missing `tests/`)
   fail CI; the rest are advisory warnings.
-- `toolkit/styles/` + `toolkit/.vale.ini` — a minimal Vale prose ruleset.
-- Plugin components (load with `claude --plugin-dir <repo>/toolkit`): the `recipe-writing`
+- `cookbook-toolkit/styles/` + `cookbook-toolkit/.vale.ini` — a minimal Vale prose ruleset.
+- Plugin components (load with `claude --plugin-dir <repo>/cookbook-toolkit`): the `recipe-writing`
   skill, the `recipe-reviewer` agent, and the `recipe-ify` / `recipe-scout` / `new-recipe` /
   `review-recipe` commands. They reference their own files via `${CLAUDE_PLUGIN_ROOT}`.
-- The plugin is rooted in `toolkit/` (not the repo root) so the cookbook's `agents/` recipe
+- The plugin is rooted in `cookbook-toolkit/` (not the repo root) so the cookbook's `agents/` recipe
   category stays outside the plugin's component tree. CI wires both tools in advisorily via
   `.github/workflows/lint-recipes.yml`.
 

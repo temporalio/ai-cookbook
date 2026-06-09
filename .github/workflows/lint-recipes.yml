@@ -13,7 +13,7 @@ on:
       - 'foundations/**'
       - 'deep_research/**'
       - 'mcp/**'
-      - 'toolkit/**'
+      - 'cookbook-toolkit/**'
       - '.github/workflows/lint-recipes.yml'
 
 concurrency:
@@ -81,7 +81,7 @@ jobs:
         run: |
           echo "## recipe-lint: ${{ matrix.recipe }}" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
-          uv run --project toolkit/tools/recipe-lint recipe-lint "${{ matrix.recipe }}" | tee -a "$GITHUB_STEP_SUMMARY"
+          uv run --project cookbook-toolkit/tools/recipe-lint recipe-lint "${{ matrix.recipe }}" | tee -a "$GITHUB_STEP_SUMMARY"
           status=${PIPESTATUS[0]}
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           exit "$status"
@@ -91,5 +91,5 @@ jobs:
         run: |
           echo "## Vale: ${{ matrix.recipe }}" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
-          vale --config toolkit/.vale.ini "${{ matrix.recipe }}/README.md" | tee -a "$GITHUB_STEP_SUMMARY" || true
+          vale --config cookbook-toolkit/.vale.ini "${{ matrix.recipe }}/README.md" | tee -a "$GITHUB_STEP_SUMMARY" || true
           echo '```' >> "$GITHUB_STEP_SUMMARY"

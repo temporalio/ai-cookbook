@@ -38,15 +38,15 @@ Look at an existing recipe (e.g., [`foundations/hello_world_openai_responses_pyt
 
 ## Authoring tooling
 
-The `toolkit/` directory holds an optional, local Claude Code plugin and linter that help
+The `cookbook-toolkit/` directory holds an optional, local Claude Code plugin and linter that help
 you write consistent recipes. The recipe conventions live in one place —
-`toolkit/skills/recipe-writing/references/` (structure, layout, front matter, code
+`cookbook-toolkit/skills/recipe-writing/references/` (structure, layout, front matter, code
 conventions) — and everything else references them.
 
 - **Lint a recipe** (structure, layout, naming, links, Temporal/Python conventions):
 
   ```bash
-  uv run --project toolkit/tools/recipe-lint recipe-lint <category>/<recipe>_python
+  uv run --project cookbook-toolkit/tools/recipe-lint recipe-lint <category>/<recipe>_python
   ```
 
   Error-severity findings (e.g. a missing `tests/`) fail CI; the rest are advisory warnings.
@@ -54,14 +54,14 @@ conventions) — and everything else references them.
 - **Load the plugin** for authoring commands and the reviewer agent:
 
   ```bash
-  claude --plugin-dir <path-to-repo>/toolkit
+  claude --plugin-dir <path-to-repo>/cookbook-toolkit
   ```
 
   Then `/new-recipe <category>/<name>` scaffolds a recipe from the template, `/review-recipe
   <dir>` runs a full review, and `/recipe-ify` / `/recipe-scout` generate recipes from a
   description or an external repo.
 
-- **Prose**: a small [Vale](https://vale.sh/) ruleset (`vale --config toolkit/.vale.ini
+- **Prose**: a small [Vale](https://vale.sh/) ruleset (`vale --config cookbook-toolkit/.vale.ini
   <recipe>/README.md`) flags marketing / AI-giveaway language. CI runs `recipe-lint` and
   Vale advisorily via `.github/workflows/lint-recipes.yml`.
 
@@ -80,7 +80,7 @@ priority: 500
 - `description` — plain text, one sentence. **Required** — a missing `description` (or a
   missing H1, or invalid YAML) breaks the docs build and **fails CI**.
 - `tags` — array, ordered `category, language, provider`, drawn from the controlled
-  vocabulary in `toolkit/skills/recipe-writing/references/tags.json` (categories `agents`,
+  vocabulary in `cookbook-toolkit/skills/recipe-writing/references/tags.json` (categories `agents`,
   `foundations`, `deep_research`, `mcp`; language `python`; providers `openai`,
   `anthropic`, `litellm`). Checked as a **warning** (reported, non-blocking).
 - `priority` — an integer; higher numbers appear earlier in listings. Checked as a
@@ -88,7 +88,7 @@ priority: 500
 
 CI validates front matter with the same YAML parser the docs site uses. Only the
 docs-breakers above fail the build; tag-vocabulary, spacing, ordering, and `priority`
-issues are reported as warnings. See `toolkit/skills/recipe-writing/references/frontmatter.md`
+issues are reported as warnings. See `cookbook-toolkit/skills/recipe-writing/references/frontmatter.md`
 for the full rules.
 
 ## Running Tests

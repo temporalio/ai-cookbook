@@ -4,7 +4,7 @@ The prose layer of the cookbook toolkit. Deliberately **minimal** — this is a 
 not the Validated Patterns program, so it does not carry VP's ~30 rules. Run it with:
 
 ```bash
-vale --config toolkit/.vale.ini <recipe>/README.md
+vale --config cookbook-toolkit/.vale.ini <recipe>/README.md
 ```
 
 ## Rules

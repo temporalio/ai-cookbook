@@ -37,7 +37,7 @@ judgment. This skill is the enforcer.
 - Prose layer: `vale --config ${CLAUDE_PLUGIN_ROOT}/.vale.ini <file-or-dir>`
 
 When working in the repo directly rather than through the loaded plugin, invoke the same
-tools by repo path (`toolkit/tools/recipe-lint`, `toolkit/.vale.ini`).
+tools by repo path (`cookbook-toolkit/tools/recipe-lint`, `cookbook-toolkit/.vale.ini`).
 
 ## Write or review
 

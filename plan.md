@@ -21,29 +21,29 @@ command files and must be coordinated with Angie per the branch-flow constraint.
 These constraints come from the Claude Code plugin model and govern Steps 1, 11, 12, 14–17.
 
 - **Distribution is local, via `--plugin-dir`.** This is not a published plugin. It is
-  loaded with `claude --plugin-dir <repo>/toolkit`. No marketplace entry.
-- **The plugin is rooted in `toolkit/`, not the repo root.** Claude Code auto-discovers
+  loaded with `claude --plugin-dir <repo>/cookbook-toolkit`. No marketplace entry.
+- **The plugin is rooted in `cookbook-toolkit/`, not the repo root.** Claude Code auto-discovers
   `commands/`, `agents/`, and `skills/` at the **plugin root**. The cookbook already uses
-  `agents/` as a recipe **category** at the repo root. Rooting the plugin in `toolkit/`
+  `agents/` as a recipe **category** at the repo root. Rooting the plugin in `cookbook-toolkit/`
   keeps the recipe `agents/` directory outside the plugin's component tree, so there is no
   discovery collision — and no need to probe whether discovery recurses.
 - **Custom component paths in `plugin.json` supplement defaults; they do not replace
   them.** This is why we relocate rather than try to "redirect" `agents/`.
 - **`.claude/` is project-local, not a plugin component path.** Files under `.claude/`
   load for anyone working in the repo, but are NOT discovered as plugin components. The
-  durable home for toolkit components is `toolkit/…`. Local `.claude/` skills remain
+  durable home for toolkit components is `cookbook-toolkit/…`. Local `.claude/` skills remain
   acceptable for one-off use.
 - **Plugin components reference their own files via `${CLAUDE_PLUGIN_ROOT}/…`** (resolves
   to the `--plugin-dir` target). CI and contributors invoke the same tools by repo path
-  (`toolkit/…`). Never hardcode absolute paths.
-- **Component layout under `toolkit/`:**
-  - `toolkit/.claude-plugin/plugin.json` (manifest)
-  - `toolkit/skills/recipe-writing/SKILL.md` + `references/` (the single source of truth)
-  - `toolkit/commands/*.md` (recipe-ify, recipe-scout, review-recipe, new-recipe)
-  - `toolkit/agents/recipe-reviewer.md`
-  - `toolkit/templates/recipe-skeleton/`
-  - `toolkit/styles/AICookbook/` + `toolkit/.vale.ini`
-  - `toolkit/tools/recipe-lint/` (standalone uv CLI; bundled, not a plugin component)
+  (`cookbook-toolkit/…`). Never hardcode absolute paths.
+- **Component layout under `cookbook-toolkit/`:**
+  - `cookbook-toolkit/.claude-plugin/plugin.json` (manifest)
+  - `cookbook-toolkit/skills/recipe-writing/SKILL.md` + `references/` (the single source of truth)
+  - `cookbook-toolkit/commands/*.md` (recipe-ify, recipe-scout, review-recipe, new-recipe)
+  - `cookbook-toolkit/agents/recipe-reviewer.md`
+  - `cookbook-toolkit/templates/recipe-skeleton/`
+  - `cookbook-toolkit/styles/AICookbook/` + `cookbook-toolkit/.vale.ini`
+  - `cookbook-toolkit/tools/recipe-lint/` (standalone uv CLI; bundled, not a plugin component)
 - **Repo-root, outside the plugin:** the recipe categories (`agents/`, `foundations/`,
   `deep_research/`, `mcp/`) and CI (`.github/`). The validator stays at
   `.github/scripts/validate-frontmatter.js`.
@@ -54,18 +54,18 @@ These constraints come from the Claude Code plugin model and govern Steps 1, 11,
 
 ### Step 1: Scaffold the recipe-writing skill
 
-**NOTE:** Home for the single source of truth, under the `toolkit/` plugin root. Nothing
+**NOTE:** Home for the single source of truth, under the `cookbook-toolkit/` plugin root. Nothing
 references it yet; later steps and the validator/linter/commands all point here.
 
 ```text
 1. Create the skill directory structure under the toolkit plugin root:
-   - toolkit/skills/recipe-writing/SKILL.md
-   - toolkit/skills/recipe-writing/references/structure.md       (stub)
-   - toolkit/skills/recipe-writing/references/layout.md           (stub)
-   - toolkit/skills/recipe-writing/references/frontmatter.md       (stub)
-   - toolkit/skills/recipe-writing/references/code-conventions.md  (stub)
+   - cookbook-toolkit/skills/recipe-writing/SKILL.md
+   - cookbook-toolkit/skills/recipe-writing/references/structure.md       (stub)
+   - cookbook-toolkit/skills/recipe-writing/references/layout.md           (stub)
+   - cookbook-toolkit/skills/recipe-writing/references/frontmatter.md       (stub)
+   - cookbook-toolkit/skills/recipe-writing/references/code-conventions.md  (stub)
 
-2. Write toolkit/skills/recipe-writing/SKILL.md:
+2. Write cookbook-toolkit/skills/recipe-writing/SKILL.md:
    - YAML frontmatter: `name: recipe-writing`; third-person `description` with specific
      trigger phrases: "write a recipe", "review a recipe", "check a recipe against the
      cookbook style", "cookbook-ify", "validate recipe front matter", "recipe conventions".
@@ -81,7 +81,7 @@ references it yet; later steps and the validator/linter/commands all point here.
 3. Each stub reference file: a single H1 + a one-line "TODO: authored in Step N"
    placeholder, so cross-links resolve.
 
-4. Verify: load the toolkit locally with `claude --plugin-dir <repo>/toolkit` and confirm
+4. Verify: load the toolkit locally with `claude --plugin-dir <repo>/cookbook-toolkit` and confirm
    the skill appears in the available-skills list; confirm all four reference paths exist.
 ```
 
@@ -91,7 +91,7 @@ references it yet; later steps and the validator/linter/commands all point here.
 Enforced by `recipe-ify`, `new-recipe`, Vale, and the reviewer agent.
 
 ```text
-1. Write toolkit/skills/recipe-writing/references/structure.md documenting the canonical
+1. Write cookbook-toolkit/skills/recipe-writing/references/structure.md documenting the canonical
    README:
    - The mandatory shape: H1 title → 1–2 sentence intro → optional "key design decisions"
      bullets OR "## Application Components" → a sequence of "## Create the {Component}"
@@ -116,7 +116,7 @@ Enforced by `recipe-ify`, `new-recipe`, Vale, and the reviewer agent.
 ### Step 3: Author `references/layout.md` (directory conventions + slug/URL contract)
 
 ```text
-1. Write toolkit/skills/recipe-writing/references/layout.md documenting:
+1. Write cookbook-toolkit/skills/recipe-writing/references/layout.md documenting:
    - The stable core every recipe has: pyproject.toml, README.md, worker.py,
      start_workflow.py, activities/, workflows/, tests/.
    - Optional dirs and when to use them: models/, tools/, helpers/, agents/, util/,
@@ -141,7 +141,7 @@ Enforced by `recipe-ify`, `new-recipe`, Vale, and the reviewer agent.
 ### Step 4: Author `references/frontmatter.md` (schema + governed values)
 
 ```text
-1. Write toolkit/skills/recipe-writing/references/frontmatter.md documenting:
+1. Write cookbook-toolkit/skills/recipe-writing/references/frontmatter.md documenting:
    - Front matter lives ONLY on README.md, never in code.
    - The schema (description, tags, priority) with the exact HTML-comment form.
    - WHY HTML comment not `---` YAML: invisible in GitHub README render; the docs sync
@@ -160,7 +160,7 @@ Enforced by `recipe-ify`, `new-recipe`, Vale, and the reviewer agent.
 2. Build the accept-list by inventorying every tag currently used across all recipe
    READMEs; produce the canonical set + a synonym→canonical map. Define this as the single
    source of truth the validator (Step 6) imports — write it as a small JSON the validator
-   can read (e.g. toolkit/skills/recipe-writing/references/tags.json) and describe it in
+   can read (e.g. cookbook-toolkit/skills/recipe-writing/references/tags.json) and describe it in
    frontmatter.md. Decide and document which file is authoritative.
 
 3. Verify: list, per existing recipe, which front-matter rules it currently violates
@@ -170,7 +170,7 @@ Enforced by `recipe-ify`, `new-recipe`, Vale, and the reviewer agent.
 ### Step 5: Author `references/code-conventions.md` (Temporal rules + quality bar)
 
 ```text
-1. Write toolkit/skills/recipe-writing/references/code-conventions.md documenting the
+1. Write cookbook-toolkit/skills/recipe-writing/references/code-conventions.md documenting the
    Python code-layer rules, each with a one-line rationale and a tiny correct/incorrect
    example:
    - LLM clients constructed with max_retries=0 (Temporal owns retries).
@@ -215,7 +215,7 @@ docs-breakers, warn on consistency issues.
        `tags:[` spacing violation; tag not in the accept-list; wrong tag ordering;
        presence of forbidden `last_updated`/`title` keys.
    - Load the tag accept-list + synonym map from the Step 4 source of truth
-     (toolkit/skills/recipe-writing/references/tags.json).
+     (cookbook-toolkit/skills/recipe-writing/references/tags.json).
    - Keep the existing top-level-vs-nested README discovery logic.
    - Print a clear per-file report grouped by tier.
 
@@ -245,12 +245,12 @@ docs-breakers, warn on consistency issues.
 ### Step 7: Scaffold the `recipe-lint` CLI
 
 **NOTE:** Standalone uv-runnable Python CLI (resolved decision), bundled under
-`toolkit/tools/recipe-lint/`. Usable locally, by CI (repo path), and by the skill/agent
+`cookbook-toolkit/tools/recipe-lint/`. Usable locally, by CI (repo path), and by the skill/agent
 (via `${CLAUDE_PLUGIN_ROOT}`). This step builds the skeleton — dispatcher, finding model,
 report formatter, registry — with no checks yet.
 
 ```text
-1. Create a uv package at toolkit/tools/recipe-lint/:
+1. Create a uv package at cookbook-toolkit/tools/recipe-lint/:
    - pyproject.toml: name "recipe-lint", requires-python ">=3.10", a console entry point
      `recipe-lint = recipe_lint.cli:main`, dev deps pytest. Follow the `python` skill's
      pyproject conventions (ruff + mypy config).
@@ -276,7 +276,7 @@ report formatter, registry — with no checks yet.
    - argparse: `recipe-lint <recipe-dir> [--format text|json]`.
    - Calls dispatch.run_checks, prints report, returns the exit code from the rule above.
 
-5. Tests (toolkit/tools/recipe-lint/tests/test_dispatch.py, test_findings.py):
+5. Tests (cookbook-toolkit/tools/recipe-lint/tests/test_dispatch.py, test_findings.py):
    - detect_language maps `foo_python` → "python", unknown suffix → None.
    - exit-code rule: any error → nonzero; only warnings → zero; empty → zero.
    - format_report groups by severity and includes file/line when present.
@@ -349,7 +349,7 @@ report formatter, registry — with no checks yet.
 ```text
 1. Add recipe_lint/checks/python/quality.py:
    - Shell out to `ruff check` and `mypy` against the recipe directory, using a
-     toolkit-provided config (ship toolkit/tools/recipe-lint/configs/ruff.toml and
+     toolkit-provided config (ship cookbook-toolkit/tools/recipe-lint/configs/ruff.toml and
      mypy.ini reflecting the `python` skill's strict defaults).
    - Parse their output into Finding objects (warning severity).
    - Gracefully degrade to a single informational finding if ruff/mypy are not installed.
@@ -373,30 +373,30 @@ the plugin; invoked via `--config`.
 
 ```text
 1. Create the Vale config and a small ruleset under the toolkit:
-   - toolkit/.vale.ini: StylesPath=styles, Vocab=AICookbook, applied to **/README.md.
-   - toolkit/styles/AICookbook/ with a minimal set of rules:
+   - cookbook-toolkit/.vale.ini: StylesPath=styles, Vocab=AICookbook, applied to **/README.md.
+   - cookbook-toolkit/styles/AICookbook/ with a minimal set of rules:
      * HeadingsSentenceCase.yml — section headings in sentence case.
      * MarketingLanguage.yml — flag banned marketing/AI-giveaway words (small curated list).
      * FileAnnotation.yml — flag code blocks in a "Create the X" section not preceded by a
        `*File: ...*` line (best-effort existence check).
-   - toolkit/styles/config/vocabularies/AICookbook/accept.txt + reject.txt (Temporal
+   - cookbook-toolkit/styles/config/vocabularies/AICookbook/accept.txt + reject.txt (Temporal
      primitives, provider names, etc.).
 
-2. Keep the rule set intentionally short; document in toolkit/styles/AICookbook/README.md
+2. Keep the rule set intentionally short; document in cookbook-toolkit/styles/AICookbook/README.md
    what each rule does and the "must earn its place" bar for adding more.
 
-3. Verify: run `vale --config toolkit/.vale.ini agents/ foundations/ deep_research/ mcp/`
+3. Verify: run `vale --config cookbook-toolkit/.vale.ini agents/ foundations/ deep_research/ mcp/`
    over existing READMEs; confirm the rules fire only on genuine issues. Trim noise.
 ```
 
 ### Step 12: Build the `review-recipe` command + `recipe-reviewer` agent
 
-**NOTE:** Both live under the `toolkit/` plugin root (NOT `.claude/`, which is project-local
+**NOTE:** Both live under the `cookbook-toolkit/` plugin root (NOT `.claude/`, which is project-local
 and not a plugin component path). Use the current agent description style — prose triggers +
 a "When to invoke" body section — not XML `<example>` blocks.
 
 ```text
-1. Author toolkit/agents/recipe-reviewer.md:
+1. Author cookbook-toolkit/agents/recipe-reviewer.md:
    - Frontmatter: `name: recipe-reviewer`; `description` in prose
      ("Use this agent when… Typical triggers include reviewing a recipe before a PR,
      checking a recipe against the cookbook style, validating a generated recipe. See
@@ -412,14 +412,14 @@ a "When to invoke" body section — not XML `<example>` blocks.
      Temporal capitalization). Output a structured report grouped error/warning/suggestion.
      State that tooling is advisory and the agent is the enforcer.
 
-2. Author toolkit/commands/review-recipe.md:
+2. Author cookbook-toolkit/commands/review-recipe.md:
    - Frontmatter: `description`; `allowed-tools: Read, Grep, Glob, Bash, Task`;
      `argument-hint: <recipe-dir>`.
    - Body (instructions FOR Claude): resolve the target recipe dir; launch the
      recipe-reviewer agent against it; combine recipe-lint + Vale + test results + agent
      findings into one report with a prioritized action list.
 
-3. Verify: load with `--plugin-dir <repo>/toolkit`; run
+3. Verify: load with `--plugin-dir <repo>/cookbook-toolkit`; run
    `/review-recipe agents/guardrails_hard_rules_python` end to end; confirm the report is
    accurate and actionable, and that `${CLAUDE_PLUGIN_ROOT}` paths resolve.
 ```
@@ -431,8 +431,8 @@ a "When to invoke" body section — not XML `<example>` blocks.
    - On pull_request touching recipe dirs, detect changed recipe directories (reuse the
      detection approach from validate-python-projects.yml).
    - For each changed recipe: run recipe-lint by repo path
-     (`uv run --project toolkit/tools/recipe-lint recipe-lint <dir>`) and
-     `vale --config toolkit/.vale.ini <dir>/README.md`.
+     (`uv run --project cookbook-toolkit/tools/recipe-lint recipe-lint <dir>`) and
+     `vale --config cookbook-toolkit/.vale.ini <dir>/README.md`.
    - Report findings as job summary output. Do NOT fail the job on warnings
      (lint-not-block). Allow failure only if recipe-lint emits an error-severity finding
      (e.g. missing mandatory tests/).
@@ -451,11 +451,11 @@ a "When to invoke" body section — not XML `<example>` blocks.
 
 ### Step 14: Move + point `recipe-ify` at the single source of truth
 
-**NOTE:** Relocates Angie's `.claude/commands/recipe-ify.md` to `toolkit/commands/recipe-ify.md`
+**NOTE:** Relocates Angie's `.claude/commands/recipe-ify.md` to `cookbook-toolkit/commands/recipe-ify.md`
 and refactors it. Coordinate with Angie per the branch-flow constraint before merging back.
 
 ```text
-1. Move .claude/commands/recipe-ify.md → toolkit/commands/recipe-ify.md and refactor:
+1. Move .claude/commands/recipe-ify.md → cookbook-toolkit/commands/recipe-ify.md and refactor:
    - Add command frontmatter (description, argument-hint, allowed-tools).
    - Replace the inline convention prose with instructions to READ
      ${CLAUDE_PLUGIN_ROOT}/skills/recipe-writing/references/ (structure, layout,
@@ -472,11 +472,11 @@ and refactors it. Coordinate with Angie per the branch-flow constraint before me
 
 ### Step 15: Move + point `recipe-scout` at the SSOT + wishlist
 
-**NOTE:** Relocates Angie's `.claude/commands/recipe-scout.md` to `toolkit/commands/`.
+**NOTE:** Relocates Angie's `.claude/commands/recipe-scout.md` to `cookbook-toolkit/commands/`.
 Coordinate with Angie.
 
 ```text
-1. Move .claude/commands/recipe-scout.md → toolkit/commands/recipe-scout.md and refactor:
+1. Move .claude/commands/recipe-scout.md → cookbook-toolkit/commands/recipe-scout.md and refactor:
    - Add command frontmatter.
    - Reference ${CLAUDE_PLUGIN_ROOT}/skills/recipe-writing/references/ for what a "good
      recipe" is, instead of restating conventions inline.
@@ -491,11 +491,11 @@ Coordinate with Angie.
 ### Step 16: Add `new-recipe` command + recipe template
 
 ```text
-1. Create toolkit/templates/recipe-skeleton/ — a minimal, runnable recipe matching
+1. Create cookbook-toolkit/templates/recipe-skeleton/ — a minimal, runnable recipe matching
    layout.md and the canonical README (placeholders in ALL_CAPS): pyproject.toml,
    README.md, worker.py, start_workflow.py, activities/, workflows/, tests/.
 
-2. Author toolkit/commands/new-recipe.md:
+2. Author cookbook-toolkit/commands/new-recipe.md:
    - Frontmatter: description; allowed-tools (Read, Write, Bash, AskUserQuestion, Glob);
      argument-hint "<category/recipe-name>".
    - Body (FOR Claude): ask for recipe name, category, language, provider; copy the
@@ -507,29 +507,29 @@ Coordinate with Angie.
    that passes recipe-lint (modulo intentional TODO placeholders) and `uv sync` succeeds.
 ```
 
-### Step 17: Package the `toolkit/` plugin + local-load docs
+### Step 17: Package the `cookbook-toolkit/` plugin + local-load docs
 
 **NOTE:** Local, `--plugin-dir`-loaded plugin — no marketplace. The `agents/` collision is
-already avoided by rooting in `toolkit/` (the recipe `agents/` category is outside the
+already avoided by rooting in `cookbook-toolkit/` (the recipe `agents/` category is outside the
 plugin tree). This step just finalizes the manifest and the load instructions.
 
 ```text
-1. Create toolkit/.claude-plugin/plugin.json: name "ai-cookbook-toolkit", version,
+1. Create cookbook-toolkit/.claude-plugin/plugin.json: name "ai-cookbook-toolkit", version,
    description, author, keywords. No custom component paths needed — commands/, agents/,
    skills/ sit at the toolkit (plugin) root and auto-discover.
 
-2. Confirm every component is under toolkit/ and uses ${CLAUDE_PLUGIN_ROOT} for intra-
+2. Confirm every component is under cookbook-toolkit/ and uses ${CLAUDE_PLUGIN_ROOT} for intra-
    plugin references (skill body, commands, agent). Confirm nothing the plugin needs lives
    under .claude/ or relies on repo-relative paths.
 
 3. Write load + usage instructions:
    - In the root README.md, document the repo's THREE purposes (recipe content; the
      Vale + recipe-lint consistency tooling; the local Claude Code plugin) and how to load
-     it: `claude --plugin-dir <path-to-repo>/toolkit`.
-   - Note that local `.claude/` skills remain fine for one-off use, but `toolkit/` is the
+     it: `claude --plugin-dir <path-to-repo>/cookbook-toolkit`.
+   - Note that local `.claude/` skills remain fine for one-off use, but `cookbook-toolkit/` is the
      durable home.
 
-4. Verify: in a fresh session, `claude --plugin-dir <repo>/toolkit` exposes the skill and
+4. Verify: in a fresh session, `claude --plugin-dir <repo>/cookbook-toolkit` exposes the skill and
    all four commands; `/help` lists them; the content `agents/` recipes are unaffected
    (no recipe README is mis-loaded as an agent).
 ```
@@ -559,8 +559,8 @@ plugin tree). This step just finalizes the manifest and the load instructions.
    - guardrails_hard_rules_python (Angie's — coordinate separately).
    - human_in_the_loop_python (its own PR + rationale, per Open items).
 
-2. After each, run `vale --config toolkit/.vale.ini <dir>/README.md` and
-   `uv run --project toolkit/tools/recipe-lint recipe-lint <dir>`.
+2. After each, run `vale --config cookbook-toolkit/.vale.ini <dir>/README.md` and
+   `uv run --project cookbook-toolkit/tools/recipe-lint recipe-lint <dir>`.
 
 3. Verify: every converged README passes Vale's structure-related rules and renders
    correctly (spot-check the H1 + "Create the X" sections).
@@ -584,13 +584,13 @@ plugin tree). This step just finalizes the manifest and the load instructions.
 ```text
 1. Update CONTRIBUTING.md and CLAUDE.md to describe the toolkit: the skill, the commands,
    recipe-lint, Vale, the (non-blocking) CI lint workflow, and the
-   `claude --plugin-dir <repo>/toolkit` load step. Point contributors at `/new-recipe` and
+   `claude --plugin-dir <repo>/cookbook-toolkit` load step. Point contributors at `/new-recipe` and
    `/review-recipe`.
 
 2. Run the full toolchain end to end on a fresh clone:
    - `node .github/scripts/validate-frontmatter.js` → exit 0, no warnings.
    - recipe-lint on every recipe → no errors.
-   - `vale --config toolkit/.vale.ini` on every README → clean.
+   - `vale --config cookbook-toolkit/.vale.ini` on every README → clean.
    - All recipe test suites pass.
 
 3. Verify: CI is green on the branch; the plugin loads via --plugin-dir; a dry-run
@@ -605,51 +605,51 @@ plugin tree). This step just finalizes the manifest and the load instructions.
   corpus. The validator (Step 6) and `recipe-lint` (Steps 7–10) ship with real unit tests
   because they have non-trivial logic; everything else is verified by execution.
 - **Single source of truth.** Conventions live once in
-  `toolkit/skills/recipe-writing/references/`. The validator, linter, commands, and agent
+  `cookbook-toolkit/skills/recipe-writing/references/`. The validator, linter, commands, and agent
   reference them — never restate them.
 - **Lint, don't block.** CI reports style/consistency; it hard-fails only on docs-breakers
   (invalid YAML, missing H1) and missing mandatory tests. The skill/agent is the enforcer.
 - **No renames.** Directory names are public URLs; Phase 3 changes content, never paths.
-- **Respect the branch flow.** Steps 1–13 and 16–21 add or edit toolkit/content files.
+- **Respect the branch flow.** Steps 1–13 and 16–21 add or edit cookbook-toolkit/content files.
   Steps 14–15 move and modify Angie's command files — coordinate before merging back.
 - **Earn every rule.** Adding a Vale or recipe-lint check requires a real inconsistency it
   catches. Prefer few, high-value checks.
 - **Language-extensible.** All Python-specific logic lives under
-  `toolkit/tools/recipe-lint/.../checks/python/`; adding a language is a new module behind
+  `cookbook-toolkit/tools/recipe-lint/.../checks/python/`; adding a language is a new module behind
   the dispatcher, not a rework.
 - **Match surrounding style.** Follow the `python` skill for all Python; match existing
   recipe idioms when editing recipes.
 
 ### Plugin mechanics (applies to every plugin step)
 
-- The plugin is **rooted in `toolkit/`** and **loaded locally via
-  `claude --plugin-dir <repo>/toolkit`** — not published. This keeps the recipe `agents/`
+- The plugin is **rooted in `cookbook-toolkit/`** and **loaded locally via
+  `claude --plugin-dir <repo>/cookbook-toolkit`** — not published. This keeps the recipe `agents/`
   category outside the plugin's component tree, avoiding auto-discovery collisions.
 - Auto-discovered component dirs (`commands/`, `agents/`, `skills/`) sit at the **plugin
-  root** (`toolkit/`). `.claude/` is project-local and is NOT a plugin component path;
+  root** (`cookbook-toolkit/`). `.claude/` is project-local and is NOT a plugin component path;
   local `.claude/` skills are acceptable for one-offs only.
 - Custom paths in `plugin.json` **supplement** defaults, they do not replace them — so we
   relocate components rather than try to redirect a default directory.
 - Plugin components reference their own files with **`${CLAUDE_PLUGIN_ROOT}/…`** (resolves
   to the `--plugin-dir` target). CI and contributors invoke the same tools by repo path
-  (`toolkit/…`). No hardcoded absolute paths.
+  (`cookbook-toolkit/…`). No hardcoded absolute paths.
 - Agent files use the current style: **prose triggers in `description` + a "When to invoke"
   body section** (not XML `<example>` blocks); required frontmatter `name` / `description`
   / `model: inherit` / `color`, with least-privilege `tools`.
 
 ## Success Metrics
 
-- One source of truth exists (`toolkit/skills/recipe-writing/references/`) and every tool
+- One source of truth exists (`cookbook-toolkit/skills/recipe-writing/references/`) and every tool
   references it; no convention is duplicated in command prose.
 - `recipe-lint` runs standalone via `uv` and reports accurate findings on all 13 recipes
   with no crashes and no noisy false positives.
 - The front-matter validator parses with `js-yaml`, matches the docs build, and tiers
   hard-errors vs warnings correctly.
-- Vale runs on every README with a small, high-signal rule set via `--config toolkit/.vale.ini`.
+- Vale runs on every README with a small, high-signal rule set via `--config cookbook-toolkit/.vale.ini`.
 - `/new-recipe` → `/review-recipe` is a working author loop; `/recipe-ify` generates
   canonical, lint-clean recipes.
 - CI reports consistency non-blockingly and hard-gates only docs-breakers and tests.
-- The `toolkit/` plugin loads via `--plugin-dir` without disturbing the `agents/` recipe
+- The `cookbook-toolkit/` plugin loads via `--plugin-dir` without disturbing the `agents/` recipe
   category, and all intra-plugin references resolve through `${CLAUDE_PLUGIN_ROOT}`.
 - After Phase 3: the corpus is consistent — front matter clean, READMEs canonical (except
   the two coordinated open-item recipes), code meets the quality bar — with zero renames.

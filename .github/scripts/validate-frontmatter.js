@@ -11,7 +11,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Repo root: this script lives at <repo>/.github/scripts/.
 const REPO_ROOT = process.argv[2] || path.resolve(__dirname, '..', '..');
-const TAGS_PATH = path.join(REPO_ROOT, 'toolkit', 'skills', 'recipe-writing', 'references', 'tags.json');
+const TAGS_PATH = path.join(REPO_ROOT, 'cookbook-toolkit', 'skills', 'recipe-writing', 'references', 'tags.json');
 
 const FORBIDDEN_KEYS = ['last_updated', 'title'];
 
@@ -216,7 +216,7 @@ async function main() {
   const recipeReadmes = [];
   for (const readme of allReadmes) {
     if (path.dirname(readme) === path.resolve(REPO_ROOT)) continue; // skip root README
-    if (path.resolve(readme).includes(`${path.sep}toolkit${path.sep}`)) continue; // skip toolkit docs
+    if (path.resolve(readme).includes(`${path.sep}cookbook-toolkit${path.sep}`)) continue; // skip cookbook-toolkit docs
     if (!(await hasParentReadme(readme, REPO_ROOT))) recipeReadmes.push(readme);
   }
 
