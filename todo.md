@@ -96,9 +96,9 @@ CI uses repo paths.
 - [x] 2. Live /recipe-scout run deferred to Step 17 (--plugin-dir); command structure validated
 
 ### Step 16: new-recipe command + template
-- [ ] 1. toolkit/templates/recipe-skeleton (canonical, runnable, placeholders)
-- [ ] 2. Author toolkit/commands/new-recipe.md (copies skeleton to repo-root category dir)
-- [ ] 3. Verify skeleton passes lint + uv sync
+- [x] 1. toolkit/templates/recipe-skeleton (runnable, ruff-clean, canonical walkthrough README, ALL_CAPS placeholders)
+- [x] 2. Author toolkit/commands/new-recipe.md (asks name/category/provider; copies skeleton to repo-root category dir; fills placeholders)
+- [x] 3. Verify: instantiated skeleton → recipe-lint clean (0 findings, exit 0)
 
 ### Step 17: Package the toolkit plugin + local-load docs
 - [ ] 1. Create toolkit/.claude-plugin/plugin.json (no custom paths needed)
