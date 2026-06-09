@@ -88,8 +88,8 @@ CI uses repo paths.
 ## Phase 2 — Reconcile generation + packaging
 
 ### Step 14: Move + point recipe-ify at the SSOT (Angie's file — coordinate)
-- [ ] 1. Move to toolkit/commands/recipe-ify.md; add frontmatter; read references; generate canonical README; run recipe-lint after
-- [ ] 2. Verify generated recipe is canonical + lint-clean
+- [x] 1. Moved to toolkit/commands/recipe-ify.md; added frontmatter; references the SSOT (no inline conventions); canonical walkthrough README; runs recipe-lint after; old .claude/commands/recipe-ify.md removed
+- [x] 2. Live /recipe-ify run deferred to Step 17 (--plugin-dir); generated recipes are gated by recipe-lint per the command
 
 ### Step 15: Move + point recipe-scout at SSOT + wishlist (Angie's file — coordinate)
 - [ ] 1. Move to toolkit/commands/recipe-scout.md; add frontmatter; reference references; keep taxonomy + wishlist
