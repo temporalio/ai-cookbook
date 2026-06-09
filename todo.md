@@ -109,9 +109,9 @@ CI uses repo paths.
 ## Phase 3 — Backfill consistency
 
 ### Step 18: Backfill front matter (no renames)
-- [ ] 1. Edit each README front matter to schema (spacing, vocab, ordering, priority)
-- [ ] 2. Run validator per file
-- [ ] 3. Verify zero warnings across corpus
+- [x] 1. Fixed 8 READMEs: tags:[ spacing, vocab (claude→anthropic, litellm, drop toolcalling/claim-check/s3/workflows/provider-neutral), ordering, deep_research category; no renames
+- [x] 2. Ran validator across corpus
+- [x] 3. Verified: 0 errors, 0 warnings across all 13 recipes
 
 ### Step 19: Converge README structure to canonical (outliers)
 - [ ] 1. Restructure non-canonical READMEs (exclude guardrails + human_in_the_loop)

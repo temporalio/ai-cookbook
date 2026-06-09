@@ -1,7 +1,7 @@
 <!-- 
 description: Build a simple deep research system embodying the standard
 deep research architecture.
-tags: [agents, toolcalling, python]
+tags: [deep_research, python, openai]
 priority: 399
 -->
 

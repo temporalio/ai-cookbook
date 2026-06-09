@@ -1,6 +1,6 @@
 <!-- 
 description: Integrate LiteLLM into a Temporal Workflow in Python.
-tags:[python, litellm, provider-neutral]
+tags: [foundations, python, litellm]
 priority: 920
 -->
 

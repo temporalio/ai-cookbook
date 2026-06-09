@@ -1,6 +1,6 @@
 <!-- 
 description: Extract retry information from HTTP response headers and make it available to Temporal's retry mechanisms.
-tags:[foundations, openai, python]
+tags: [foundations, python, openai]
 priority: 920
 -->
 

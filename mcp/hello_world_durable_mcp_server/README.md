@@ -1,6 +1,6 @@
 <!--
 description: A durable MCP server that uses Temporal workflows for reliable execution of weather tools.
-tags: [mcp, python, workflows]
+tags: [mcp, python]
 priority: 775
 -->
 # Durable MCP Weather Server

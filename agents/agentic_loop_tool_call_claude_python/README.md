@@ -1,6 +1,6 @@
 <!--
 description: A basic agentic loop using Claude (Anthropic) with tool calling.
-tags: [agents, python, claude]
+tags: [agents, python, anthropic]
 priority: 775
 -->
 # Basic Agentic Loop with Claude and Tool Calling

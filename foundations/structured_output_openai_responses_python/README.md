@@ -1,6 +1,6 @@
 <!-- 
 description: Use Temporal and OpenAI Responses API to reliably request output conforming to a specific data structure. 
-tags:[foundations, openai, python]
+tags: [foundations, python, openai]
 priority: 980
 -->
 
