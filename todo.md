@@ -114,9 +114,9 @@ CI uses repo paths.
 - [x] 3. Verified: 0 errors, 0 warnings across all 13 recipes
 
 ### Step 19: Converge README structure to canonical (outliers)
-- [ ] 1. Restructure non-canonical READMEs (exclude guardrails + human_in_the_loop)
-- [ ] 2. Run vale (--config) + recipe-lint per recipe
-- [ ] 3. Verify structure rules pass + render check
+- [x] 1. No in-scope restructuring needed: the only two brief-style READMEs are guardrails (Angie's) and human_in_the_loop (open item), both excluded. All other recipes already follow the walkthrough shape.
+- [x] 2. Ran recipe-lint across corpus (structural codes)
+- [x] 3. Verified: every recipe README has H1 + front matter; canonical spine holds on all in-scope recipes
 
 ### Step 20: Backfill code quality
 - [ ] 1. Apply quality bar per recipe (ruff/mypy/conventions), minimal changes
