@@ -81,9 +81,9 @@ CI uses repo paths.
 - [x] 3. Frontmatter validated; live --plugin-dir end-to-end run deferred to Step 17 (no plugin.json yet)
 
 ### Step 13: Wire toolkit into CI (non-blocking)
-- [ ] 1. Add lint-recipes.yml (changed-recipe detection, recipe-lint + vale by repo path, report, warn-not-block, error→block)
-- [ ] 2. Confirm frontmatter + python-projects remain hard gates
-- [ ] 3. Verify with a draft non-conforming PR
+- [x] 1. Add lint-recipes.yml (changed-recipe detection + matrix; recipe-lint gates on error, Vale advisory; findings → job summary)
+- [x] 2. Confirm frontmatter + python-projects workflows remain hard gates (untouched; all 3 parse OK)
+- [x] 3. Verify gating locally (warnings→exit 0; missing tests→exit 1); YAML valid. Live non-conforming-PR check is manual (no PR opened this run)
 
 ## Phase 2 — Reconcile generation + packaging
 

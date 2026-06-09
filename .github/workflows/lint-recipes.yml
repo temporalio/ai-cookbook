@@ -1,0 +1,95 @@
+name: Lint Recipes
+
+# Advisory consistency lint for changed recipes. recipe-lint's error-severity findings
+# (e.g. missing mandatory tests/) fail the job; warnings and Vale findings are reported
+# but do NOT block. The recipe-writing skill / recipe-reviewer agent is the enforcer.
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'agents/**'
+      - 'foundations/**'
+      - 'deep_research/**'
+      - 'mcp/**'
+      - 'toolkit/**'
+      - '.github/workflows/lint-recipes.yml'
+
+concurrency:
+  group: lint-recipes-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  VALE_VERSION: "3.6.0"
+
+jobs:
+  detect-changes:
+    name: Detect Changed Recipes
+    runs-on: ubuntu-latest
+    outputs:
+      recipes: ${{ steps.find.outputs.recipes }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Find changed recipe directories
+        id: find
+        run: |
+          # A recipe is a directory with a pyproject.toml under one of the categories.
+          ALL=$(find agents foundations deep_research mcp -maxdepth 2 -name pyproject.toml 2>/dev/null \
+                | xargs -n1 dirname | sort -u)
+          CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD" 2>/dev/null || echo "")
+          AFFECTED=""
+          for recipe in $ALL; do
+            if echo "$CHANGED_FILES" | grep -q "^${recipe}/"; then
+              AFFECTED="${AFFECTED}${recipe}"$'\n'
+            fi
+          done
+          if [ -z "$AFFECTED" ]; then
+            echo "recipes=[]" >> "$GITHUB_OUTPUT"
+          else
+            JSON=$(echo "$AFFECTED" | grep -v '^$' | jq -R -s -c 'split("\n") | map(select(length > 0))')
+            echo "recipes=$JSON" >> "$GITHUB_OUTPUT"
+          fi
+
+  lint:
+    name: Lint ${{ matrix.recipe }}
+    needs: detect-changes
+    if: needs.detect-changes.outputs.recipes != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        recipe: ${{ fromJson(needs.detect-changes.outputs.recipes) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install Vale
+        run: |
+          curl -sfL "https://github.com/errata-ai/vale/releases/download/v${VALE_VERSION}/vale_${VALE_VERSION}_Linux_64-bit.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin vale
+
+      - name: recipe-lint (errors fail; warnings reported)
+        run: |
+          echo "## recipe-lint: ${{ matrix.recipe }}" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          uv run --project toolkit/tools/recipe-lint recipe-lint "${{ matrix.recipe }}" | tee -a "$GITHUB_STEP_SUMMARY"
+          status=${PIPESTATUS[0]}
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+      - name: Vale (advisory — never blocks)
+        if: always()
+        run: |
+          echo "## Vale: ${{ matrix.recipe }}" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          vale --config toolkit/.vale.ini "${{ matrix.recipe }}/README.md" | tee -a "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
