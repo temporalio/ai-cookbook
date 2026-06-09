@@ -1,0 +1,13 @@
+{
+  "name": "ai-cookbook-frontmatter-validator",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Validates recipe README front matter for the Temporal AI Cookbook (parity with the docs-site js-yaml parse).",
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0"
+  }
+}

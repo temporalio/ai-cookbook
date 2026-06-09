@@ -65,7 +65,18 @@ priority: 500
 -->
 ```
 
-Required fields: `description` (plain text), `tags` (array including category, language, and LLM provider), `priority` (integer; higher = appears earlier).
+The validator parses with the same YAML library the docs site uses and tiers its findings:
+
+- **Hard errors (fail CI — they break the docs build):** missing `description`, missing
+  H1 title, or invalid YAML.
+- **Warnings (reported, non-blocking):** `tags` not in the controlled vocabulary
+  (`toolkit/skills/recipe-writing/references/tags.json`), `tags:[` spacing, wrong tag order
+  (`category, language, provider`), missing/non-integer `priority`, or forbidden
+  `last_updated`/`title` keys.
+
+Consistency is enforced by the `recipe-writing` skill and the `recipe-lint` tool under
+`toolkit/`, not by hard CI gates. See `toolkit/skills/recipe-writing/references/` for the
+full conventions.
 
 **Tests must pass** before a PR is merged. CI detects changed recipe directories and runs `uv sync && pytest tests/ --timeout=30` for each.
 

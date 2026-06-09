@@ -10,37 +10,37 @@ CI uses repo paths.
 ## Phase 0 — Foundation: single source of truth + validator fix
 
 ### Step 1: Scaffold the recipe-writing skill
-- [ ] 1. Create toolkit/skills/recipe-writing/ + four reference stubs
-- [ ] 2. Write SKILL.md (3rd-person trigger desc + read-references-first + tool invocations via ${CLAUDE_PLUGIN_ROOT})
-- [ ] 3. Stub reference files with H1 + TODO placeholder
-- [ ] 4. Verify skill loads via --plugin-dir; paths exist
+- [x] 1. Create toolkit/skills/recipe-writing/ + four reference stubs
+- [x] 2. Write SKILL.md (3rd-person trigger desc + read-references-first + tool invocations via ${CLAUDE_PLUGIN_ROOT})
+- [x] 3. Stub reference files with H1 + TODO placeholder
+- [x] 4. Verify paths exist + SKILL.md frontmatter valid (live --plugin-dir load deferred to Step 17, when plugin.json exists)
 
 ### Step 2: Author references/structure.md (canonical README walkthrough)
-- [ ] 1. Document the mandatory shape + light code-sandwich + H1 rule + allowed variation
-- [ ] 2. Include a correct example excerpt from hello_world_openai_responses
-- [ ] 3. Verify against 3 walkthrough recipes; note deviations for Phase 3
+- [x] 1. Document the mandatory shape + light code-sandwich + H1 rule + allowed variation
+- [x] 2. Include a correct example excerpt from hello_world_openai_responses
+- [x] 3. Verify against 3 walkthrough recipes; note deviations for Phase 3
 
 ### Step 3: Author references/layout.md (layout + slug/URL contract)
-- [ ] 1. Document stable core, optional dirs, mandatory tests, naming, slug/URL contract, standardize-away
-- [ ] 2. Decide + document the __init__.py convention
-- [ ] 3. Verify against all 13 recipe layouts; list deviations
+- [x] 1. Document stable core, optional dirs, mandatory tests, naming, slug/URL contract, standardize-away
+- [x] 2. Decide + document the __init__.py convention (optional; if present, must be empty — lint flags non-empty, not missing)
+- [x] 3. Verify against all 13 recipe layouts; list deviations (package-name dups, stray entry files, __init__.py gaps, MCP variant)
 
 ### Step 4: Author references/frontmatter.md (schema + governed values)
-- [ ] 1. Document README-only, schema, HTML-comment rationale, spacing, ordering, accept-list, priority bands, exclusions, YAML validity
-- [ ] 2. Inventory all tags; produce canonical accept-list + synonym map as tags.json (source of truth)
-- [ ] 3. Verify; list per-recipe violations (Step 18 worklist)
+- [x] 1. Document README-only, schema, HTML-comment rationale, spacing, ordering, accept-list, priority bands, exclusions, YAML validity
+- [x] 2. Inventory all tags; produce canonical accept-list + synonym map as tags.json (source of truth)
+- [x] 3. Verify; list per-recipe violations (Step 18 worklist)
 
 ### Step 5: Author references/code-conventions.md (Temporal rules + quality bar)
-- [ ] 1. Document each Python rule with rationale + tiny example
-- [ ] 2. Mark each rule mechanically-checkable vs judgment-only
-- [ ] 3. Verify rules against two real recipes
+- [x] 1. Document each Python rule with rationale + tiny example
+- [x] 2. Mark each rule mechanically-checkable vs judgment-only
+- [x] 3. Verify rules against two real recipes (guardrails + hello_world — all 13 rules confirmed real/current)
 
 ### Step 6: Rewrite the front-matter validator (real YAML, tiered severity)
-- [ ] 1. Add .github/scripts/package.json (js-yaml) + install in CI
-- [ ] 2. Rewrite validator: js-yaml parse, hard-error vs warning tiers, accept-list (tags.json), ordering, exclusions
-- [ ] 3. Write validator tests (node:test) + npm test script + run in CI
-- [ ] 4. Reconcile CONTRIBUTING.md + CLAUDE.md claims
-- [ ] 5. Verify against whole repo (exit 0 + expected warnings)
+- [x] 1. Add .github/scripts/package.json (js-yaml) + npm ci/test/install in CI workflow
+- [x] 2. Rewrite validator (ESM, js-yaml, hard-error vs warning tiers, accept-list from tags.json, ordering, exclusions, docs-sync parity)
+- [x] 3. Write validator tests (node:test, 13 tests) + npm test script + run in CI; all pass
+- [x] 4. Reconcile CONTRIBUTING.md + CLAUDE.md claims (description hard-required; tags/priority warnings)
+- [x] 5. Verify against whole repo: exit 0, 14 warnings matching the Step-18 worklist
 
 ## Phase 1 — Validation tooling
 

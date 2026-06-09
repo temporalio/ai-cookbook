@@ -9,7 +9,8 @@ on:
       - main
     paths:
       - '**/README.md'
-      - '.github/scripts/validate-frontmatter.js'
+      - '.github/scripts/**'
+      - 'toolkit/skills/recipe-writing/references/tags.json'
       - '.github/workflows/validate-frontmatter.yml'
 
 concurrency:
@@ -33,15 +34,22 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Make validation script executable
-        run: chmod +x .github/scripts/validate-frontmatter.js
+      - name: Install validator dependencies
+        working-directory: .github/scripts
+        run: npm ci
+
+      - name: Run validator unit tests
+        working-directory: .github/scripts
+        run: npm test
 
       - name: Validate front matter in recipe READMEs
         run: node .github/scripts/validate-frontmatter.js
 
-      - name: Report success
+      - name: Report result
         if: success()
         run: |
-          echo "✅ All recipe READMEs have valid front matter"
+          echo "✅ No docs-breaking front matter errors."
           echo ""
-          echo "This validates that all top-level recipe READMEs contain required front matter fields."
+          echo "Hard errors (missing description, missing H1, invalid YAML) fail this job."
+          echo "Consistency issues (tag vocabulary, spacing, ordering, priority) are reported"
+          echo "as warnings and do not block — the recipe-writing skill is the enforcer."

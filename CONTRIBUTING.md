@@ -48,9 +48,19 @@ priority: 500
 -->
 ```
 
-- `description` — plain text, one sentence
-- `tags` — array; include at least the category (e.g. `agents`, `foundations`), language (`python`), and LLM provider (`openai`, `claude`, `litellm`) where applicable
-- `priority` — an integer; higher numbers appear earlier in listings
+- `description` — plain text, one sentence. **Required** — a missing `description` (or a
+  missing H1, or invalid YAML) breaks the docs build and **fails CI**.
+- `tags` — array, ordered `category, language, provider`, drawn from the controlled
+  vocabulary in `toolkit/skills/recipe-writing/references/tags.json` (categories `agents`,
+  `foundations`, `deep_research`, `mcp`; language `python`; providers `openai`,
+  `anthropic`, `litellm`). Checked as a **warning** (reported, non-blocking).
+- `priority` — an integer; higher numbers appear earlier in listings. Checked as a
+  **warning**.
+
+CI validates front matter with the same YAML parser the docs site uses. Only the
+docs-breakers above fail the build; tag-vocabulary, spacing, ordering, and `priority`
+issues are reported as warnings. See `toolkit/skills/recipe-writing/references/frontmatter.md`
+for the full rules.
 
 ## Running Tests
 

@@ -7,7 +7,7 @@ is verified by running the tooling against the existing recipe corpus.
 
 ## Current Status
 
-- [ ] **Phase 0 — Foundation** (steps 1–6): single source of truth + validator fix
+- [x] **Phase 0 — Foundation** (steps 1–6): single source of truth + validator fix
 - [ ] **Phase 1 — Validation tooling** (steps 7–13): recipe-lint, Vale, review command, CI
 - [ ] **Phase 2 — Reconcile generation + packaging** (steps 14–17): SSOT wiring, plugin
 - [ ] **Phase 3 — Backfill consistency** (steps 18–21): converge the corpus

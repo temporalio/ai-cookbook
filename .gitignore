@@ -110,4 +110,7 @@ __pypackages__/
 # BPE working artifact — the generated commit message, never tracked
 commit-msg.md
 
+# Node dependencies for the front-matter validator (.github/scripts) and any tooling
+node_modules/
+
 
