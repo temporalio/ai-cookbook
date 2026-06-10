@@ -3,5 +3,5 @@
   "outputDirectory": ".docs-build",
   "installCommand": "echo 'Dependencies installed during build script'",
   "framework": null,
-  "ignoreCommand": "bash -c 'exit 0'"
+  "ignoreCommand": ""
 }
