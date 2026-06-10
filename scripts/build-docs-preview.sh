@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Builds the Temporal docs site using the local ai-cookbook checkout for Vercel previews.
 set -euo pipefail
 
 COOKBOOK_DIR="$(cd "$(dirname "$0")/.." && pwd)"
