@@ -14,7 +14,7 @@ Thanks for your interest in contributing! The cookbook is a collection of self-c
 ### Optional (for the authoring toolkit)
 
 - [`just`](https://just.systems) — task runner for the toolkit's check commands
-  (`cookbook-toolkit/justfile`); the quickest way to run them. See [Authoring tooling](#authoring-tooling).
+  (`justfile`); the quickest way to run them. See [Authoring tooling](#authoring-tooling).
 - [`vale`](https://vale.sh/) — prose linter for recipe READMEs (`brew install vale`). Only
   needed to run the Vale checks locally.
 
@@ -57,13 +57,13 @@ you write consistent recipes. The recipe conventions live in one place —
 conventions) — and everything else references them.
 
 - **Run the checks via [`just`](https://just.systems)** (the convenient entry point;
-  `cookbook-toolkit/justfile`):
+  `justfile`):
 
   ```bash
-  cd cookbook-toolkit && just            # list commands
-  just check <category>/<recipe>_python  # recipe-lint + Vale on one recipe
-  just report                            # full report across every recipe
-  just frontmatter                       # validate front matter for all READMEs
+  just            # list commands
+  just toolkit-check <category>/<recipe>_python  # recipe-lint + Vale on one recipe
+  just toolkit-report                            # full report across every recipe
+  just toolkit-frontmatter                       # validate front matter for all READMEs
   ```
 
 - **Or run the tools directly.** Lint a recipe (structure, layout, naming, links,
@@ -81,8 +81,8 @@ conventions) — and everything else references them.
   claude --plugin-dir <path-to-repo>/cookbook-toolkit
   ```
 
-  Then `/new-recipe <category>/<name>` scaffolds a recipe from the template, `/review-recipe
-  <dir>` runs a full review, and `/recipe-ify` / `/recipe-scout` generate recipes from a
+  Then `/ai-cookbook:new-recipe <category>/<name>` scaffolds a recipe from the template, `/ai-cookbook:review-recipe
+  <dir>` runs a full review, and `/ai-cookbook:recipe-ify` / `/ai-cookbook:recipe-scout` generate recipes from a
   description or an external repo.
 
 - **Prose**: a small [Vale](https://vale.sh/) ruleset (`vale --config cookbook-toolkit/.vale.ini

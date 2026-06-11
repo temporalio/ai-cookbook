@@ -35,4 +35,4 @@ jobs:
       - name: Full audit (just report)
         run: |
           set -o pipefail
-          cd cookbook-toolkit && just report | tee -a "$GITHUB_STEP_SUMMARY"
+          just toolkit-report | tee -a "$GITHUB_STEP_SUMMARY"

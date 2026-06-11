@@ -1,34 +1,30 @@
-# ABOUTME: Task runner for the cookbook-toolkit deterministic checks.
-# Wraps recipe-lint, Vale, and the front-matter validator; runs from the repo root.
-# The AI tools (recipe-writing skill, recipe-reviewer agent, /recipe-ify, /recipe-scout,
-# /review-recipe) run inside a Claude Code session and are not invocable from here.
-
-root := justfile_directory() / ".."
+# ABOUTME: Task runner for the cookbook-toolkit deterministic checks. Run from the repo root.
+# The AI tools (recipe-writing skill, recipe-reviewer agent, /ai-cookbook:* commands) run
+# inside a Claude Code session and are not invocable from here.
 
 # List available commands.
 default:
     @just --list
 
 # Lint one recipe (structure, layout, naming, links, Temporal/Python conventions).
-lint recipe:
-    cd {{root}} && uv run --project cookbook-toolkit/tools/recipe-lint recipe-lint {{recipe}}
+toolkit-lint recipe:
+    uv run --project cookbook-toolkit/tools/recipe-lint recipe-lint {{recipe}}
 
 # Check one recipe's README prose with Vale.
-vale recipe:
-    cd {{root}} && vale --config cookbook-toolkit/.vale.ini {{recipe}}/README.md
+toolkit-vale recipe:
+    vale --config cookbook-toolkit/.vale.ini {{recipe}}/README.md
 
 # Run both deterministic checks on one recipe.
-check recipe: (lint recipe) (vale recipe)
+toolkit-check recipe: (toolkit-lint recipe) (toolkit-vale recipe)
 
 # Validate front matter across all recipe READMEs.
-frontmatter:
-    cd {{root}} && node .github/scripts/validate-frontmatter.js
+toolkit-frontmatter:
+    node .github/scripts/validate-frontmatter.js
 
 # Full consistency report across every recipe (recipe-lint + Vale + front matter).
-report:
+toolkit-report:
     #!/usr/bin/env bash
     set -uo pipefail
-    cd "{{root}}"
     echo "# Cookbook consistency report"
     echo
     echo "## Front matter"

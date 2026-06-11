@@ -8,7 +8,7 @@ argument-hint: <pattern description or proposal card>
 
 Generate a complete, runnable, PR-ready AI Cookbook recipe for the pattern in `$ARGUMENTS`
 — a freeform description ("a RAG pipeline recipe using OpenAI") or a proposal card from
-`/recipe-scout`.
+`/ai-cookbook:recipe-scout`.
 
 **Audience:** AI engineers comfortable with LLMs and agents but new to Temporal. The AI
 pattern is the hero; Temporal is the invisible durability layer underneath. Make the AI

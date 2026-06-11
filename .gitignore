@@ -117,3 +117,7 @@ node_modules/
 
 # BPE goal scratch artifact — not tracked
 goal.md
+
+# Editor swap files
+*.swp
+*.swo

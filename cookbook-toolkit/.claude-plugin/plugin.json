@@ -1,5 +1,5 @@
 {
-  "name": "ai-cookbook-toolkit",
+  "name": "ai-cookbook",
   "version": "0.1.0",
   "description": "Authoring and consistency toolkit for the Temporal AI Cookbook: the recipe-writing skill (single source of truth), generation and review commands, and the recipe-lint CLI.",
   "author": {

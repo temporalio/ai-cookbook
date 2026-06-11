@@ -73,4 +73,4 @@ Rank the top 2–4. For each, write a proposal card:
 After the cards, add an **Excluded patterns** section: interesting candidates filtered out,
 one line each.
 
-To build a recipe from a card, pass it to `/recipe-ify`.
+To build a recipe from a card, pass it to `/ai-cookbook:recipe-ify`.
