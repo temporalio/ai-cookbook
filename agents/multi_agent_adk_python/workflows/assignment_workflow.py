@@ -27,7 +27,7 @@ with workflow.unsafe.imports_passed_through():
     from google.genai.types import Content, Part
     from temporalio.contrib.google_adk_agents import TemporalModel
 
-    from _activity_tool import activity_tool
+    from workflows._activity_tool import activity_tool
     from activities.tools import (
         tool_get_fleet_status,
         tool_get_order_priorities,

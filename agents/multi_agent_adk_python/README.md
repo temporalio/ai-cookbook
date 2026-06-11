@@ -130,12 +130,13 @@ multi_agent_adk_python/
 ├── models/
 │   └── models.py            # AssignmentInput / AssignmentOutput (pydantic)
 ├── workflows/
-│   └── assignment_workflow.py  # agents + workflow inline
-├── _activity_tool.py        # ADK ↔ Temporal tool adapter
+│   ├── assignment_workflow.py  # agents + workflow inline
+│   └── _activity_tool.py       # ADK ↔ Temporal tool adapter
 ├── worker.py
 ├── start_workflow.py
 └── tests/
-    └── test_activities.py
+    ├── test_activities.py
+    └── test_workflow.py        # workflow logic with a mocked invoke_model
 ```
 
 ### Activities as agent tools
@@ -198,7 +199,7 @@ _fleet_status_tool = activity_tool(
 )
 ```
 
-The local `_activity_tool.py` adds **graceful failure** on top of the
+The local `workflows/_activity_tool.py` adds **graceful failure** on top of the
 upstream `temporalio.contrib.google_adk_agents.workflow.activity_tool`:
 when an activity execution fails (retry policy exhausted, non-retryable
 application error, timeout), the wrapper catches the `ActivityError`

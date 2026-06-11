@@ -48,6 +48,12 @@ def activity_tool(activity_def: Callable, **kwargs: Any) -> Callable:
 
     wrapper.__name__ = activity_def.__name__
     wrapper.__doc__ = activity_def.__doc__
+    # Copy the activity's annotations too, not just the signature. ADK builds
+    # tool schemas via ``typing.get_type_hints(wrapper)``; without this the
+    # hints come from ``wrapper(*args, **kw)`` so every real parameter is
+    # missing, which raises ``KeyError`` for activities whose module uses
+    # ``from __future__ import annotations`` (stringized hints).
+    wrapper.__annotations__ = dict(getattr(activity_def, "__annotations__", {}))
     setattr(wrapper, "__signature__", inspect.signature(activity_def))
 
     return wrapper

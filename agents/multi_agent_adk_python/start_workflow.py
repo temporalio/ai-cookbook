@@ -2,6 +2,7 @@ import asyncio
 import uuid
 
 from temporalio.client import Client
+from temporalio.contrib.pydantic import pydantic_data_converter
 
 from models.models import AssignmentInput
 from workflows.assignment_workflow import (
@@ -11,7 +12,10 @@ from workflows.assignment_workflow import (
 
 
 async def main():
-    client = await Client.connect("localhost:7233")
+    client = await Client.connect(
+        "localhost:7233",
+        data_converter=pydantic_data_converter,
+    )
 
     order = AssignmentInput(
         order_id="order-001",
