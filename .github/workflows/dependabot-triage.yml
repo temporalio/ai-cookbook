@@ -38,6 +38,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: uvx 'dependency-scout>=0.2.0' triage "${{ github.event.pull_request.html_url }}" --local --dry-run
 
       - name: Triage PR (manual — specific URL)
@@ -45,6 +46,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: uvx 'dependency-scout>=0.2.0' triage "${{ inputs.pr_url }}" --local --dry-run
 
       - name: Triage all open Dependabot PRs (manual — no URL given)
@@ -52,4 +54,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
         run: uvx 'dependency-scout>=0.2.0' triage --repo temporalio/ai-cookbook --local --dry-run
