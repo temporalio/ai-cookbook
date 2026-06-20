@@ -38,18 +38,24 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: uvx 'dependency-scout>=0.2.0' triage "${{ github.event.pull_request.html_url }}" --local --dry-run
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+          SOCKET_API_KEY: ${{ secrets.SOCKET_API_KEY }}
+        run: uvx 'dependency-scout>=0.2.2' triage "${{ github.event.pull_request.html_url }}" --local --dry-run
 
       - name: Triage PR (manual — specific URL)
         if: github.event_name == 'workflow_dispatch' && inputs.pr_url != ''
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: uvx 'dependency-scout>=0.2.0' triage "${{ inputs.pr_url }}" --local --dry-run
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+          SOCKET_API_KEY: ${{ secrets.SOCKET_API_KEY }}
+        run: uvx 'dependency-scout>=0.2.2' triage "${{ inputs.pr_url }}" --local --dry-run
 
       - name: Triage all open Dependabot PRs (manual — no URL given)
         if: github.event_name == 'workflow_dispatch' && inputs.pr_url == ''
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: uvx 'dependency-scout>=0.2.0' triage --repo temporalio/ai-cookbook --local --dry-run
+          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+          SOCKET_API_KEY: ${{ secrets.SOCKET_API_KEY }}
+        run: uvx 'dependency-scout>=0.2.2' triage --repo temporalio/ai-cookbook --local --dry-run
