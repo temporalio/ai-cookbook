@@ -20,85 +20,36 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - name: Checkout dependency-scout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
-        with:
-          repository: temporal-community/dependency-scout
-
       - name: Setup uv
         uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
 
-      - name: Install dependencies
-        run: uv sync
-
-      # --- Temporal connection: local dev server (no secrets needed) -----------
-      - name: Install Temporal CLI
-        if: secrets.TEMPORAL_ADDRESS == ''
-        run: curl -sSf https://temporal.download/cli.sh | sh
-
-      - name: Start local Temporal server
-        if: secrets.TEMPORAL_ADDRESS == ''
-        run: |
-          temporal server start-dev --headless &
-          sleep 5
-
-      # --- Temporal connection: Temporal Cloud (when secrets are configured) ---
-      - name: Write Temporal Cloud TLS certificates
-        if: secrets.TEMPORAL_ADDRESS != ''
-        run: |
-          echo "${{ secrets.TEMPORAL_CLIENT_CERT }}" > /tmp/temporal-client.pem
-          echo "${{ secrets.TEMPORAL_CLIENT_KEY }}" > /tmp/temporal-client.key
-          chmod 600 /tmp/temporal-client.pem /tmp/temporal-client.key
-
-      # -------------------------------------------------------------------------
-      - name: Start worker
-        env:
-          TEMPORAL_ADDRESS: ${{ secrets.TEMPORAL_ADDRESS || 'localhost:7233' }}
-          TEMPORAL_NAMESPACE: ${{ secrets.TEMPORAL_NAMESPACE || 'default' }}
-          TEMPORAL_TLS_CERT: ${{ secrets.TEMPORAL_ADDRESS != '' && '/tmp/temporal-client.pem' || '' }}
-          TEMPORAL_TLS_KEY: ${{ secrets.TEMPORAL_ADDRESS != '' && '/tmp/temporal-client.key' || '' }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: |
-          uv run python -m worker &
-          echo "WORKER_PID=$!" >> "$GITHUB_ENV"
-          sleep 5
+      # Installed from PyPI; `--local` makes it fully self-contained — it boots an
+      # ephemeral in-process Temporal server + worker for the single invocation,
+      # so there's no source checkout, no Temporal CLI, and no worker process to
+      # manage. The verdict comment / merge / close behavior is controlled by
+      # .github/dependency-scout.yml in this repo.
+      #
+      # NOTE: --dry-run is enabled below so the first runs only log verdicts
+      # (no comments, merges, or closes). Once the verdicts look right, remove
+      # --dry-run from the three steps to let it act.
 
       - name: Triage PR (event-triggered)
         if: github.event_name == 'pull_request_target'
         env:
-          TEMPORAL_ADDRESS: ${{ secrets.TEMPORAL_ADDRESS || 'localhost:7233' }}
-          TEMPORAL_NAMESPACE: ${{ secrets.TEMPORAL_NAMESPACE || 'default' }}
-          TEMPORAL_TLS_CERT: ${{ secrets.TEMPORAL_ADDRESS != '' && '/tmp/temporal-client.pem' || '' }}
-          TEMPORAL_TLS_KEY: ${{ secrets.TEMPORAL_ADDRESS != '' && '/tmp/temporal-client.key' || '' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          uv run dependency-scout triage "${{ github.event.pull_request.html_url }}"
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: uvx 'dependency-scout>=0.2.0' triage "${{ github.event.pull_request.html_url }}" --local --dry-run
 
       - name: Triage PR (manual — specific URL)
         if: github.event_name == 'workflow_dispatch' && inputs.pr_url != ''
         env:
-          TEMPORAL_ADDRESS: ${{ secrets.TEMPORAL_ADDRESS || 'localhost:7233' }}
-          TEMPORAL_NAMESPACE: ${{ secrets.TEMPORAL_NAMESPACE || 'default' }}
-          TEMPORAL_TLS_CERT: ${{ secrets.TEMPORAL_ADDRESS != '' && '/tmp/temporal-client.pem' || '' }}
-          TEMPORAL_TLS_KEY: ${{ secrets.TEMPORAL_ADDRESS != '' && '/tmp/temporal-client.key' || '' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          uv run dependency-scout triage "${{ inputs.pr_url }}"
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: uvx 'dependency-scout>=0.2.0' triage "${{ inputs.pr_url }}" --local --dry-run
 
       - name: Triage all open Dependabot PRs (manual — no URL given)
         if: github.event_name == 'workflow_dispatch' && inputs.pr_url == ''
         env:
-          TEMPORAL_ADDRESS: ${{ secrets.TEMPORAL_ADDRESS || 'localhost:7233' }}
-          TEMPORAL_NAMESPACE: ${{ secrets.TEMPORAL_NAMESPACE || 'default' }}
-          TEMPORAL_TLS_CERT: ${{ secrets.TEMPORAL_ADDRESS != '' && '/tmp/temporal-client.pem' || '' }}
-          TEMPORAL_TLS_KEY: ${{ secrets.TEMPORAL_ADDRESS != '' && '/tmp/temporal-client.key' || '' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          uv run dependency-scout triage --repo temporalio/ai-cookbook
-
-      - name: Stop worker
-        if: always()
-        run: |
-          kill "$WORKER_PID" 2>/dev/null || true
-          rm -f /tmp/temporal-client.pem /tmp/temporal-client.key
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: uvx 'dependency-scout>=0.2.0' triage --repo temporalio/ai-cookbook --local --dry-run
