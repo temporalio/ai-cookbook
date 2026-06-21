@@ -1,57 +1,50 @@
-name: Dependency Scout Triage
+  name: Dependency Scout Triage
 
-on:
-  pull_request_target:
-    types: [opened, reopened, synchronize]
-  workflow_dispatch:
-    inputs:
-      pr_url:
-        description: "PR URL to triage (leave blank to triage all open Dependabot PRs)"
-        required: false
+  on:
+    pull_request_target:
+      types: [opened, reopened, synchronize]
+    workflow_dispatch:
+      inputs:
+        pr_url:
+          description: "PR URL to triage (leave blank to triage all open Dependabot PRs)"
+          required: false
 
-permissions:
-  contents: write
-  pull-requests: write
+  permissions: {}
 
-jobs:
-  triage:
-    runs-on: ubuntu-latest
-    if: github.actor == 'dependabot[bot]' || github.event_name == 'workflow_dispatch'
-    timeout-minutes: 15
+  jobs:
+    triage:
+      runs-on: ubuntu-latest
+      if: github.actor == 'dependabot[bot]' || github.event_name == 'workflow_dispatch'
+      timeout-minutes: 15
+      permissions: {}
+      steps:
+        - name: Setup uv
+          uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
 
-    steps:
-      - name: Setup uv
-        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
+        - name: Mint App token
+          id: app-token
+          uses: actions/create-github-app-token@v2
+          with:
+            app-id: ${{ vars.SCOUT_APP_ID }}
+            private-key: ${{ secrets.SCOUT_APP_PRIVATE_KEY }}
 
-      # Installed from PyPI; `--local` makes it fully self-contained — it boots an
-      # ephemeral in-process Temporal server + worker for the single invocation,
-      # so there's no source checkout, no Temporal CLI, and no worker process to
-      # manage. The verdict comment / merge / close behavior is controlled by
-      # .github/dependency-scout.yml in this repo.
-
-      - name: Triage PR (event-triggered)
-        if: github.event_name == 'pull_request_target'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
-          SOCKET_API_KEY: ${{ secrets.SOCKET_API_KEY }}
-        run: uvx 'dependency-scout>=0.8.0' triage "${{ github.event.pull_request.html_url }}" --local
-
-      - name: Triage PR (manual — specific URL)
-        if: github.event_name == 'workflow_dispatch' && inputs.pr_url != ''
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
-          SOCKET_API_KEY: ${{ secrets.SOCKET_API_KEY }}
-        run: uvx 'dependency-scout>=0.8.0' triage "${{ inputs.pr_url }}" --local
-
-      - name: Triage all open Dependabot PRs (manual — no URL given)
-        if: github.event_name == 'workflow_dispatch' && inputs.pr_url == ''
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
-          SOCKET_API_KEY: ${{ secrets.SOCKET_API_KEY }}
-        run: uvx 'dependency-scout>=0.8.0' triage --repo temporalio/ai-cookbook --local
+        # --local boots an ephemeral in-process Temporal server + worker for the single
+        # run — no source checkout, no Temporal CLI, no worker to manage. Comment/merge/
+        # close behavior is controlled by .github/dependency-scout.yml in this repo.
+        - name: Triage
+          env:
+            GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+            ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+            NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
+            SOCKET_API_KEY: ${{ secrets.SOCKET_API_KEY }}
+            PR_URL: ${{ github.event.pull_request.html_url }}
+            INPUT_PR_URL: ${{ inputs.pr_url }}
+          run: |
+            if [ "${{ github.event_name }}" = "pull_request_target" ]; then
+              target=("$PR_URL")
+            elif [ -n "$INPUT_PR_URL" ]; then
+              target=("$INPUT_PR_URL")
+            else
+              target=(--repo temporalio/ai-cookbook)
+            fi
+            uvx 'dependency-scout>=0.9.1' triage "${target[@]}" --local
