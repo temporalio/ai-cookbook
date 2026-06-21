@@ -28,10 +28,6 @@ jobs:
       # so there's no source checkout, no Temporal CLI, and no worker process to
       # manage. The verdict comment / merge / close behavior is controlled by
       # .github/dependency-scout.yml in this repo.
-      #
-      # NOTE: --dry-run is enabled below so the first runs only log verdicts
-      # (no comments, merges, or closes). Once the verdicts look right, remove
-      # --dry-run from the three steps to let it act.
 
       - name: Triage PR (event-triggered)
         if: github.event_name == 'pull_request_target'
@@ -40,7 +36,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
           SOCKET_API_KEY: ${{ secrets.SOCKET_API_KEY }}
-        run: uvx 'dependency-scout>=0.2.2' triage "${{ github.event.pull_request.html_url }}" --local --dry-run
+        run: uvx 'dependency-scout>=0.5.0' triage "${{ github.event.pull_request.html_url }}" --local
 
       - name: Triage PR (manual — specific URL)
         if: github.event_name == 'workflow_dispatch' && inputs.pr_url != ''
@@ -49,7 +45,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
           SOCKET_API_KEY: ${{ secrets.SOCKET_API_KEY }}
-        run: uvx 'dependency-scout>=0.2.2' triage "${{ inputs.pr_url }}" --local --dry-run
+        run: uvx 'dependency-scout>=0.5.0' triage "${{ inputs.pr_url }}" --local
 
       - name: Triage all open Dependabot PRs (manual — no URL given)
         if: github.event_name == 'workflow_dispatch' && inputs.pr_url == ''
@@ -58,4 +54,4 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
           SOCKET_API_KEY: ${{ secrets.SOCKET_API_KEY }}
-        run: uvx 'dependency-scout>=0.2.2' triage --repo temporalio/ai-cookbook --local --dry-run
+        run: uvx 'dependency-scout>=0.5.0' triage --repo temporalio/ai-cookbook --local
