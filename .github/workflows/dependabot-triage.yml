@@ -36,7 +36,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
           SOCKET_API_KEY: ${{ secrets.SOCKET_API_KEY }}
-        run: uvx 'dependency-scout>=0.5.0' triage "${{ github.event.pull_request.html_url }}" --local
+        run: uvx 'dependency-scout>=0.8.0' triage "${{ github.event.pull_request.html_url }}" --local
 
       - name: Triage PR (manual — specific URL)
         if: github.event_name == 'workflow_dispatch' && inputs.pr_url != ''
@@ -45,7 +45,7 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
           SOCKET_API_KEY: ${{ secrets.SOCKET_API_KEY }}
-        run: uvx 'dependency-scout>=0.5.0' triage "${{ inputs.pr_url }}" --local
+        run: uvx 'dependency-scout>=0.8.0' triage "${{ inputs.pr_url }}" --local
 
       - name: Triage all open Dependabot PRs (manual — no URL given)
         if: github.event_name == 'workflow_dispatch' && inputs.pr_url == ''
@@ -54,4 +54,4 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
           SOCKET_API_KEY: ${{ secrets.SOCKET_API_KEY }}
-        run: uvx 'dependency-scout>=0.5.0' triage --repo temporalio/ai-cookbook --local
+        run: uvx 'dependency-scout>=0.8.0' triage --repo temporalio/ai-cookbook --local
