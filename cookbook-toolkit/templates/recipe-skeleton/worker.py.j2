@@ -1,19 +1,20 @@
 import asyncio
 
-from activities.llm_call import call_llm
 from temporalio.client import Client
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.worker import Worker
-from workflows.recipe_workflow import RecipeWorkflow
+
+from activities.{{ activity_module }} import {{ activity_func }}
+from workflows.recipe_workflow import {{ workflow_class }}
 
 
 async def main() -> None:
     client = await Client.connect("localhost:7233", data_converter=pydantic_data_converter)
     worker = Worker(
         client,
-        task_queue="RECIPE_SLUG-task-queue",
-        workflows=[RecipeWorkflow],
-        activities=[call_llm],
+        task_queue="{{ task_queue }}",
+        workflows=[{{ workflow_class }}],
+        activities=[{{ activity_func }}],
     )
     print("Worker started, ctrl+c to exit.")
     await worker.run()

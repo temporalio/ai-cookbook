@@ -1,19 +1,20 @@
 import pytest
-from activities.llm_call import CallLLMRequest
 from temporalio import activity
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
-from workflows.recipe_workflow import RecipeWorkflow
 
-TASK_QUEUE = "RECIPE_SLUG-task-queue"
+from activities.{{ activity_module }} import {{ request_class }}
+from workflows.recipe_workflow import {{ workflow_class }}
+
+TASK_QUEUE = "{{ task_queue }}"
 
 
 @pytest.mark.asyncio
 @pytest.mark.timeout(30)
 async def test_workflow_returns_activity_result() -> None:
-    @activity.defn(name="call_llm")
-    async def mock_call_llm(request: CallLLMRequest) -> str:
+    @activity.defn(name="{{ activity_func }}")
+    async def mock_activity(request: {{ request_class }}) -> str:
         return "mocked response"
 
     async with (
@@ -21,14 +22,14 @@ async def test_workflow_returns_activity_result() -> None:
         Worker(
             env.client,
             task_queue=TASK_QUEUE,
-            workflows=[RecipeWorkflow],
-            activities=[mock_call_llm],
+            workflows=[{{ workflow_class }}],
+            activities=[mock_activity],
         ),
     ):
         result = await env.client.execute_workflow(
-            RecipeWorkflow.run,
+            {{ workflow_class }}.run,
             "hi",
-            id="test-recipe",
+            id="test-{{ slug }}",
             task_queue=TASK_QUEUE,
         )
     assert result == "mocked response"

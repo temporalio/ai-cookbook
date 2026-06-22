@@ -3,15 +3,15 @@ from datetime import timedelta
 from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
-    from activities.llm_call import CallLLMRequest, call_llm
+    from activities.{{ activity_module }} import {{ request_class }}, {{ activity_func }}
 
 
 @workflow.defn
-class RecipeWorkflow:
+class {{ workflow_class }}:
     @workflow.run
     async def run(self, prompt: str) -> str:
         return await workflow.execute_activity(
-            call_llm,
-            CallLLMRequest(prompt=prompt),
+            {{ activity_func }},
+            {{ request_class }}(prompt=prompt),
             start_to_close_timeout=timedelta(seconds=30),
         )

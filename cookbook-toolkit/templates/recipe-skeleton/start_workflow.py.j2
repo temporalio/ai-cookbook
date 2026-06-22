@@ -2,16 +2,17 @@ import asyncio
 
 from temporalio.client import Client
 from temporalio.contrib.pydantic import pydantic_data_converter
-from workflows.recipe_workflow import RecipeWorkflow
+
+from workflows.recipe_workflow import {{ workflow_class }}
 
 
 async def main() -> None:
     client = await Client.connect("localhost:7233", data_converter=pydantic_data_converter)
     result = await client.execute_workflow(
-        RecipeWorkflow.run,
+        {{ workflow_class }}.run,
         "Tell me about durable execution.",
-        id="RECIPE_SLUG-example",
-        task_queue="RECIPE_SLUG-task-queue",
+        id="{{ slug }}-example",
+        task_queue="{{ task_queue }}",
     )
     print(f"Result: {result}")
 

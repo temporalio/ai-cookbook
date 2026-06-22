@@ -6,3 +6,7 @@ target-version = "py310"
 
 [lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[lint.isort]
+# Recipes are flat packages: these local modules are first-party, not third-party.
+known-first-party = ["activities", "workflows", "worker", "codec"]

@@ -1,0 +1,18 @@
+from dataclasses import dataclass
+
+from temporalio import activity
+
+
+@dataclass
+class {{ request_class }}:
+    prompt: str
+    model: str = "{{ default_model }}"
+
+
+@activity.defn
+async def {{ activity_func }}(request: {{ request_class }}) -> str:
+    # TODO: implement the {{ primary_provider or 'LLM' }} call here.
+    # Construct the client with max_retries=0 (Temporal owns retries) and re-raise
+    # permanent API errors as ApplicationError(non_retryable=True); let transient
+    # errors propagate so Temporal retries them.
+    raise NotImplementedError("Implement this recipe's Activity logic.")
