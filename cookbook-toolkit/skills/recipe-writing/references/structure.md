@@ -122,10 +122,10 @@ The canonical shape is confirmed against `foundations/hello_world_openai_respons
 `foundations/hello_world_litellm_python`, and `agents/tool_call_openai_python`: all use
 `## Create the {Component}` sections in build order ending in `## Running`.
 
-Known deviations to converge in Phase 3 (Step 19):
+Some recipes deviate from this shape:
 
-- `agents/human_in_the_loop_python`: richer Overview / Setup / Architecture / Key
-  Patterns shape. *(Its own PR + rationale; may be sanctioned as a variant.)*
+- `agents/human_in_the_loop_python` uses a richer Overview / Setup / Architecture / Key
+  Patterns shape, a sanctioned variant.
 - Larger recipes (`deep_research/basic_openai_python`, `foundations/claim_check_pattern_python`,
   `mcp/hello_world_durable_mcp_server`) use the walkthrough shape with extra sections,
   acceptable as long as the H1 → Create-the-X → Running spine holds.

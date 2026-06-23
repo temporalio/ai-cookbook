@@ -81,27 +81,10 @@ handled as a separate, isolated change (never folded into consistency work).
 
 ## Verified against the corpus
 
-Cross-checked against all 13 recipes. The stable core holds everywhere; `tests/` is
-present in every recipe today. Known deviations to converge in Phase 3 (Steps 18/20) and
-to flag in `recipe-lint` (Step 8):
+The stable core holds across the recipes, and `tests/` is present in every one. One
+sanctioned variation to know about:
 
-- **Package names lag the directory, badly, with duplicates.** Four recipes share the
-  name `cookbook-basic-python` (`hello_world_openai_responses_python`,
-  `http_retry_enhancement_python`, `tool_call_openai_python`,
-  `agentic_loop_tool_call_openai_python`); two share `deep-research-basic-openai-python`
-  (`basic_openai_python` and, by copy-paste, `structured_output_openai_responses_python`);
-  others drop the `cookbook-` prefix (`human-in-the-loop-python`,
-  `claim-check-pattern-python`) or are unrelated (`weather` for the MCP server). Converge
-  every package to a unique `cookbook-{recipe-name}-python`.
-- **Stray entry files**: `hello_world.py` in `hello_world_openai_responses_python` and
-  `http_retry_enhancement_python`; `claude_test.py` in `agentic_loop_tool_call_claude_python`.
-- **Non-empty `__init__.py` files** (must be emptied; relocate their code to a named
-  module): the agentic-loop `tools/__init__.py` files hold the tool registry (~800-1200
-  bytes, the substantive case), and `human_in_the_loop_python` (`models/__init__.py`,
-  plus tiny `activities/`/`workflows/`) and `claim_check_pattern_python` (`shared/`) have
-  small content. Missing `__init__.py` files elsewhere are fine and need no change.
-- **MCP recipes are a sanctioned variant.** `mcp/hello_world_durable_mcp_server` has no
-  `start_workflow.py` (an MCP server is the entrypoint, via `mcp_servers/`) and its
-  directory omits the `_python` suffix. `recipe-lint` must special-case `mcp/` recipes:
-  require `mcp_servers/` (or equivalent) instead of `start_workflow.py`, and do not demand
-  the `_python` suffix.
+- **MCP recipes.** `mcp/hello_world_durable_mcp_server` has no `start_workflow.py` (the MCP
+  server is the entrypoint, via `mcp_servers/`) and its directory omits the `_python`
+  suffix. `recipe-lint` special-cases `mcp/` recipes: it requires `mcp_servers/` (or
+  equivalent) instead of `start_workflow.py`, and does not demand the `_python` suffix.

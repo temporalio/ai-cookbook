@@ -61,8 +61,8 @@ or `providers`.
   `provider-neutral` → `litellm`.
 - **Unknown tags are warnings.** The topic one-offs currently in the corpus
   (`toolcalling`, `claim-check`, `s3`, `workflows`) are **not** in the vocabulary, remove
-  them. (A broader, Temporal-wide tag vocabulary is a separate effort; see plan Open items.
-  Keep the cookbook list small until then.)
+  them. (A broader, Temporal-wide tag vocabulary is a separate effort. Keep the cookbook
+  list small until then.)
 
 ## Priority bands
 
@@ -84,21 +84,3 @@ requires that `priority` is present and an integer.
 
 Never put `last_updated` or `title` in front matter. Both are derived by the docs sync
 (`title` from the H1; `last_updated` from git author date). Including them is a warning.
-
-## Current violations (Step 18 worklist)
-
-From the corpus inventory:
-
-- **Spacing `tags:[` (no space)**: `claim_check_pattern_python`, `hello_world_litellm_python`,
-  `hello_world_openai_responses_python`, `http_retry_enhancement_python`,
-  `structured_output_openai_responses_python`.
-- **Synonyms to canonicalize**: `agentic_loop_tool_call_claude_python` (`claude` →
-  `anthropic`); `hello_world_litellm_python` (`provider-neutral` → `litellm`).
-- **Unknown topic tags to remove**: `basic_openai_python` (`toolcalling`),
-  `claim_check_pattern_python` (`claim-check`, `s3`), `hello_world_durable_mcp_server`
-  (`workflows`).
-- **Category tag wrong/missing**: `deep_research/basic_openai_python` is tagged `agents`
-  (should be `deep_research`); `hello_world_litellm_python` has no category tag (should
-  lead with `foundations`).
-- **Ordering**: fix once categories are added (e.g. `hello_world_litellm_python` should be
-  `[foundations, python, litellm]`).

@@ -32,7 +32,7 @@ client = AsyncAnthropic(max_retries=0)   # correct
 client = AsyncAnthropic()                 # incorrect, client retries on
 ```
 
-**Scope, read before implementing the check (Step 9).** `max_retries` is *exclusively* an
+**Scope.** `max_retries` is *exclusively* an
 LLM/HTTP client-library concern (the OpenAI/Anthropic/httpx SDK constructor). It is a
 **different axis** from Temporal's Activity retries, which are configured separately via a
 `RetryPolicy` / `maximum_attempts` on `execute_activity` and are *expected* to be present.

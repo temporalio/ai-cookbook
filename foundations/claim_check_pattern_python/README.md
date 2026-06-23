@@ -1,6 +1,6 @@
 <!-- 
 description: Use the Claim Check pattern to handle large payloads to workflows and activities.
-tags: [foundations, python]
+tags:[foundations, claim-check, python, s3]
 priority: 400
 -->
 

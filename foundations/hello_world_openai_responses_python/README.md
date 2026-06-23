@@ -1,6 +1,6 @@
 <!-- 
 description: Simple example demonstrating how to call an LLM from Temporal using the OpenAI Python API library.
-tags: [foundations, python, openai]
+tags:[foundations, openai, python]
 priority: 999
 -->
 
