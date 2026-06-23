@@ -39,11 +39,13 @@ jobs:
 
       - name: Find changed recipe directories
         id: find
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
           # A recipe is a directory with a pyproject.toml under one of the categories.
           ALL=$(find agents foundations deep_research mcp -maxdepth 2 -name pyproject.toml 2>/dev/null \
                 | xargs -n1 dirname | sort -u)
-          CHANGED_FILES=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD" 2>/dev/null || echo "")
+          CHANGED_FILES=$(git diff --name-only "origin/${BASE_REF}...HEAD" 2>/dev/null || echo "")
           AFFECTED=""
           for recipe in $ALL; do
             if echo "$CHANGED_FILES" | grep -q "^${recipe}/"; then
@@ -78,18 +80,22 @@ jobs:
             | sudo tar -xz -C /usr/local/bin vale
 
       - name: recipe-lint (errors fail; warnings reported)
+        env:
+          RECIPE: ${{ matrix.recipe }}
         run: |
-          echo "## recipe-lint: ${{ matrix.recipe }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "## recipe-lint: $RECIPE" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
-          uv run --project cookbook-toolkit/tools/recipe-lint recipe-lint "${{ matrix.recipe }}" | tee -a "$GITHUB_STEP_SUMMARY"
+          uv run --project cookbook-toolkit/tools/recipe-lint recipe-lint "$RECIPE" | tee -a "$GITHUB_STEP_SUMMARY"
           status=${PIPESTATUS[0]}
           echo '```' >> "$GITHUB_STEP_SUMMARY"
           exit "$status"
 
-      - name: Vale (advisory — never blocks)
+      - name: Vale (advisory, never blocks)
         if: always()
+        env:
+          RECIPE: ${{ matrix.recipe }}
         run: |
-          echo "## Vale: ${{ matrix.recipe }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "## Vale: $RECIPE" >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
-          vale --config cookbook-toolkit/.vale.ini "${{ matrix.recipe }}/README.md" | tee -a "$GITHUB_STEP_SUMMARY" || true
+          vale --config cookbook-toolkit/.vale.ini "$RECIPE/README.md" | tee -a "$GITHUB_STEP_SUMMARY" || true
           echo '```' >> "$GITHUB_STEP_SUMMARY"
