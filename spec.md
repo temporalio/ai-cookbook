@@ -349,3 +349,29 @@ no rework.
 - **Temporal-wide tag vocabulary** — A controlled tag accept-list spanning all of
   Temporal's content (not just the cookbook). Vital but out of scope here; Mason owns
   this as a separate task.
+
+## Addendum: card-pipeline redesign
+
+After the original toolkit landed and was tested, generation was split into a
+deterministic structure step and an AI prose/logic step. The earlier `recipe-ify`
+command produced the entire recipe in one LLM pass, which made structure (package name,
+task queue, directory layout, front matter) nondeterministic and prone to lint drift.
+
+The redesign introduces a **proposal card** as the hand-off format and a deterministic
+scaffolder:
+
+- **Proposal card** — a single machine-ingestible YAML file with a `recipe:` block
+  (deterministic fields, validated against `card-schema.json`) and a `context:` block
+  (prose/logic inputs for the LLM). Defined in
+  `cookbook-toolkit/skills/recipe-writing/references/proposal-card.md`.
+- **`recipe-scaffold`** — a Python + Jinja `uv` CLI
+  (`cookbook-toolkit/tools/recipe-scaffold`) that renders the recipe skeleton from a
+  card's `recipe:` block. No LLM, identical every run, lint-clean by construction.
+- **`recipe-scout`** now emits cards instead of freeform bullets.
+- **`recipe-generate`** (renamed from `recipe-ify`) takes a card, runs `recipe-scaffold`,
+  then uses the card's `context:` block to fill the Activity logic and README prose into
+  the scaffolded stubs.
+- **`new-recipe`** delegates scaffolding to `recipe-scaffold` for the no-card path.
+
+Pipeline: `recipe-scout` → card → `recipe-scaffold` (structure) → `recipe-generate`
+(logic + prose) → `recipe-lint`. A contributor can hand-author a card and skip scout.

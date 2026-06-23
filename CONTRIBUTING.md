@@ -81,9 +81,9 @@ conventions) — and everything else references them.
   claude --plugin-dir <path-to-repo>/cookbook-toolkit
   ```
 
-  Then `/ai-cookbook:new-recipe <category>/<name>` scaffolds a recipe from the template, `/ai-cookbook:review-recipe
-  <dir>` runs a full review, and `/ai-cookbook:recipe-ify` / `/ai-cookbook:recipe-scout` generate recipes from a
-  description or an external repo.
+  Then `/ai-cookbook:new-recipe <category>/<name>` scaffolds a recipe skeleton, `/ai-cookbook:review-recipe
+  <dir>` runs a full review, `/ai-cookbook:recipe-scout <repo-url>` proposes recipes from an external repo as
+  cards, and `/ai-cookbook:recipe-generate <card.yaml>` builds a full recipe from a card.
 
 - **Prose**: a small [Vale](https://vale.sh/) ruleset (`vale --config cookbook-toolkit/.vale.ini
   <recipe>/README.md`) flags marketing / AI-giveaway language. CI runs `recipe-lint` and

@@ -137,7 +137,41 @@ CI uses repo paths.
 - [x] 2. Toolchain verified locally: validator 0 docs-breakers; recipe-lint 0 error-severity across 13 recipes; recipe-lint 31 tests + validator 13 tests pass; Vale 0 errors/3 advisory. (Recipe suites unchanged → gated by existing validate-python-projects CI.)
 - [x] 3. Live checks (CI green on PR; --plugin-dir /help; new-recipe→review-recipe cycle) are manual/interactive — deferred to a real session/PR, not runnable in this autonomous run
 
+## Phase 4 — Card-pipeline redesign (post-testing)
+
+Split generation into a deterministic structure step and an AI prose/logic step. Scout emits
+a machine-ingestible card; `recipe-scaffold` (Python + Jinja) renders the skeleton; the
+renamed `recipe-generate` fills the stubs. Pipeline: scout → card → scaffold → generate.
+
+### Step C1: Card format
+- [x] 1. card-schema.json (JSON Schema draft 2020-12): required `recipe:` block (name, category, language, provider, title, description, priority, optional components) + optional `context:` block
+- [x] 2. proposal-card.md documents the two blocks with a worked example; controlled vocab matches tags.json
+
+### Step C2: recipe-scaffold tool
+- [x] 1. uv package recipe_scaffold: load_card + jsonschema validation; ScaffoldContext derives package, task_queue, dir_name, request_class, default_model + dep per provider
+- [x] 2. render() uses StrictUndefined Jinja, strips .j2, refuses non-empty dest without --force
+- [x] 3. CLI: --card OR --name/--category/--title/--description/--priority/--provider, --into, --force
+- [x] 4. Verified: 10 tests pass, ruff clean, mypy --strict clean
+
+### Step C3: Jinja skeleton templates
+- [x] 1. Converted recipe-skeleton to 7 .j2 templates (pyproject, README, worker, start_workflow, activities/llm_call, workflows/recipe_workflow, tests/test_workflow); activity is a NotImplementedError stub with a provider TODO
+
+### Step C4: recipe-scout emits cards
+- [x] 1. recipe-scout Step 2 emits a YAML card per proposal-card.md (recipe: + context:) instead of freeform bullets; points to /ai-cookbook:recipe-generate
+
+### Step C5: recipe-ify → recipe-generate
+- [x] 1. Renamed recipe-ify.md → recipe-generate.md; card-only input; Step 1 runs recipe-scaffold, Steps 3-4 fill stubs from card.context and verify with recipe-lint + pytest
+
+### Step C6: new-recipe delegates to recipe-scaffold
+- [x] 1. new-recipe runs recipe-scaffold (no more skeleton-copy + ALL_CAPS placeholder replacement, which the Jinja templates removed)
+
+### Step C7: doc + reference updates
+- [x] 1. recipe-lint ruff.toml declares activities/workflows/worker/codec first-party so scaffold output is lint-clean
+- [x] 2. CONTRIBUTING.md, CLAUDE.md, recipe-reviewer.md updated: recipe-ify → recipe-generate, card pipeline documented
+- [x] 3. Verified end-to-end: card (with components) → scaffold → recipe-lint reports no findings; README passes front-matter validation
+
 ## Open items (tracked separately, not part of the 21 steps)
 
 - [ ] Deliver a PR reconciling `human_in_the_loop_python` to canonical, with rationale (outcome may sanction a richer variant)
 - [ ] Temporal-wide tag vocabulary across all content properties (Mason owns)
+- [ ] Live --plugin-dir checks for the card pipeline (`/ai-cookbook:recipe-scout` → `/ai-cookbook:recipe-generate`) in a real interactive session

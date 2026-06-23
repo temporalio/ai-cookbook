@@ -1,51 +1,77 @@
 ---
-description: Generate a complete, PR-ready cookbook recipe from a pattern description or proposal card
+description: Generate a complete, PR-ready cookbook recipe from a proposal card
 allowed-tools: Read, Write, Bash, Glob
-argument-hint: <pattern description or proposal card>
+argument-hint: <path to a proposal-card YAML file>
 ---
 
-# Recipe-ify
+# Recipe-generate
 
-Generate a complete, runnable, PR-ready AI Cookbook recipe for the pattern in `$ARGUMENTS`
-— a freeform description ("a RAG pipeline recipe using OpenAI") or a proposal card from
-`/ai-cookbook:recipe-scout`.
+Turn the proposal card at `$ARGUMENTS` into a complete, runnable, PR-ready AI Cookbook
+recipe. The card is a YAML file in the format from
+`${CLAUDE_PLUGIN_ROOT}/skills/recipe-writing/references/proposal-card.md` — usually emitted
+by `/ai-cookbook:recipe-scout`, or hand-authored against that format.
+
+This command does **not** invent structure. `recipe-scaffold` renders the deterministic
+skeleton from the card's `recipe:` block; your job is to fill the stubs with real Activity
+logic and README prose using the card's `context:` block.
 
 **Audience:** AI engineers comfortable with LLMs and agents but new to Temporal. The AI
 pattern is the hero; Temporal is the invisible durability layer underneath. Make the AI
 concept clear and don't over-explain Temporal mechanics.
 
-## Follow the conventions — do not restate them
+## Step 1 — Scaffold from the card
 
-Read these references first and follow them as the authoritative source. Do **not** inline
-or paraphrase the conventions; they live in exactly one place:
+Run the deterministic scaffolder. It validates the card against `card-schema.json`, fails
+fast on a malformed card, and renders a lint-clean skeleton at `{category}/{name}_python`:
+
+```
+uv run --project ${CLAUDE_PLUGIN_ROOT}/tools/recipe-scaffold \
+  recipe-scaffold --card $ARGUMENTS --into .
+```
+
+If it errors, the card is invalid — fix the card and rerun. Do not hand-create the directory.
+
+After it runs you have all the files from `layout.md` in place: `pyproject.toml`, `README.md`,
+`worker.py`, `start_workflow.py`, `activities/llm_call.py` (a stub raising
+`NotImplementedError`), `workflows/recipe_workflow.py`, and `tests/test_workflow.py`. The
+front matter, package name, task queue, and provider dependency are already correct.
+
+## Step 2 — Follow the conventions — do not restate them
+
+Read these references and follow them as the authoritative source. Do **not** inline or
+paraphrase the conventions:
 
 - `${CLAUDE_PLUGIN_ROOT}/skills/recipe-writing/references/structure.md` — the canonical
   README walkthrough.
 - `${CLAUDE_PLUGIN_ROOT}/skills/recipe-writing/references/layout.md` — files, directories,
-  naming, and mandatory tests.
-- `${CLAUDE_PLUGIN_ROOT}/skills/recipe-writing/references/frontmatter.md` — front-matter
-  schema, tag accept-list, and priority bands.
+  naming, mandatory tests.
 - `${CLAUDE_PLUGIN_ROOT}/skills/recipe-writing/references/code-conventions.md` — the
   Temporal/Python rules and quality bar.
 
-## Generate
+## Step 3 — Fill the stubs
 
-1. Choose the category (`foundations`, `agents`, `deep_research`, `mcp`) and recipe name; the
-   directory is `{category}/{recipe-name}_python`.
-2. Produce **all** files per `layout.md` — runnable, not stubs: `pyproject.toml`,
-   `README.md`, `worker.py`, `start_workflow.py`, `activities/`, `workflows/`, and `tests/`
-   (mandatory; mock the LLM/API so the suite passes with no API key).
-3. Write the README in the **canonical walkthrough shape** from `structure.md` (H1 → intro →
-   `## Create the {Component}` code-sandwich sections → `## Running`). Not the brief
-   overview style.
-4. Apply every rule in `code-conventions.md` (`max_retries=0`, `pydantic_data_converter`,
-   `start_to_close_timeout`, `ApplicationError` at boundaries, current model names, …) and
-   `frontmatter.md` (schema, tag accept-list and order, priority band).
+Using the card's `context:` block (`problem`, `source_excerpt`, `structure_outline`,
+`closest_recipe`) as the design input:
 
-## After generating
+1. Replace the `NotImplementedError` Activity stub with the real LLM call and pattern logic,
+   applying every rule in `code-conventions.md` (`max_retries=0` on the client constructor
+   only, `pydantic_data_converter`, `start_to_close_timeout`, `ApplicationError` at
+   boundaries, current model names, …).
+2. Flesh out the workflow to orchestrate the pattern from `structure_outline`.
+3. Make the tests pass with no API key (mock the LLM/API). Keep the mandatory `tests/`.
+4. Rewrite `README.md` into the **canonical walkthrough shape** from `structure.md` (H1 →
+   intro → `## Create the {Component}` code-sandwich sections → `## Running`), using the
+   card's `problem` for the intro. Leave the front matter the scaffolder produced intact.
 
-1. Run `uv run --project ${CLAUDE_PLUGIN_ROOT}/tools/recipe-lint recipe-lint {category}/{recipe-name}_python`
+Do not edit the deterministic surface the scaffolder owns (package name, task queue,
+directory name, front-matter tags) unless the card was wrong — in which case fix the card and
+rerun Step 1.
+
+## Step 4 — Verify and report
+
+1. Run `uv run --project ${CLAUDE_PLUGIN_ROOT}/tools/recipe-lint recipe-lint {category}/{name}_python`
    and fix every error and warning it reports.
-2. Report: the created directory; how to run it (`uv sync`, then the worker and
-   `start_workflow`); any env vars needed (API keys); and any deliberate simplifications
-   made to keep the recipe bite-sized.
+2. Run `uv sync && uv run pytest tests/` in the recipe directory and confirm the suite passes.
+3. Report: the created directory; how to run it (`uv sync`, then the worker and
+   `start_workflow`); any env vars needed (API keys); and any deliberate simplifications made
+   to keep the recipe bite-sized.

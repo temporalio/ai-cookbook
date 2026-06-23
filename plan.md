@@ -646,10 +646,36 @@ plugin tree). This step just finalizes the manifest and the load instructions.
 - The front-matter validator parses with `js-yaml`, matches the docs build, and tiers
   hard-errors vs warnings correctly.
 - Vale runs on every README with a small, high-signal rule set via `--config cookbook-toolkit/.vale.ini`.
-- `/new-recipe` → `/review-recipe` is a working author loop; `/recipe-ify` generates
-  canonical, lint-clean recipes.
+- `/new-recipe` → `/review-recipe` is a working author loop; `/recipe-scout` → card →
+  `/recipe-generate` generates canonical, lint-clean recipes (see Phase 4).
 - CI reports consistency non-blockingly and hard-gates only docs-breakers and tests.
 - The `cookbook-toolkit/` plugin loads via `--plugin-dir` without disturbing the `agents/` recipe
   category, and all intra-plugin references resolve through `${CLAUDE_PLUGIN_ROOT}`.
 - After Phase 3: the corpus is consistent — front matter clean, READMEs canonical (except
   the two coordinated open-item recipes), code meets the quality bar — with zero renames.
+
+## Phase 4 — Card-pipeline redesign
+
+Steps C1–C7 (see `todo.md`). Generation is split into a deterministic structure step and an
+AI prose/logic step, joined by a machine-ingestible proposal card.
+
+- **C1 — Card format**: `card-schema.json` (JSON Schema draft 2020-12) + `proposal-card.md`.
+  Required `recipe:` block (deterministic) and optional `context:` block (LLM input); the
+  controlled vocabulary matches `tags.json`.
+- **C2 — `recipe-scaffold`**: a Python + Jinja `uv` CLI at
+  `cookbook-toolkit/tools/recipe-scaffold`. Loads + validates a card, derives a
+  `ScaffoldContext` (package, task queue, directory, request class, default model + dep per
+  provider), and renders the skeleton with a `StrictUndefined` Jinja environment.
+- **C3 — Jinja skeleton**: the recipe-skeleton becomes seven `.j2` templates; the Activity is
+  a `NotImplementedError` stub with a provider TODO. Scaffold owns structure, the AI step owns
+  logic and prose.
+- **C4 — `recipe-scout`**: emits cards (`recipe:` + `context:`) instead of freeform bullets.
+- **C5 — `recipe-generate`** (renamed from `recipe-ify`): card-only. Runs `recipe-scaffold`,
+  then fills the stubs from `context:` and verifies with `recipe-lint` + pytest.
+- **C6 — `new-recipe`**: delegates the no-card path to `recipe-scaffold`.
+- **C7 — Docs + lint config**: `recipe-lint` ruff config declares the recipe's local modules
+  first-party so scaffold output is lint-clean; CONTRIBUTING/CLAUDE/reviewer updated.
+
+Pipeline: `recipe-scout` → card → `recipe-scaffold` (structure) → `recipe-generate` (logic +
+prose) → `recipe-lint`. Verified end-to-end: a card with a `components` block scaffolds to a
+recipe that `recipe-lint` reports with no findings and that passes front-matter validation.

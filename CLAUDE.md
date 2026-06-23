@@ -90,10 +90,16 @@ the linter, commands, reviewer agent, and CI all reference them — never restat
 - `cookbook-toolkit/tools/recipe-lint` — a `uv` CLI checking recipe structure, layout, naming,
   links, and Temporal/Python conventions. Error-severity findings (e.g. missing `tests/`)
   fail CI; the rest are advisory warnings.
+- `cookbook-toolkit/tools/recipe-scaffold` — a `uv` CLI that deterministically renders a recipe
+  skeleton from a proposal card (or explicit fields) using the Jinja templates in
+  `cookbook-toolkit/templates/recipe-skeleton/`. The card format is defined in
+  `cookbook-toolkit/skills/recipe-writing/references/proposal-card.md` and `card-schema.json`.
 - `cookbook-toolkit/styles/` + `cookbook-toolkit/.vale.ini` — a minimal Vale prose ruleset.
 - Plugin components (load with `claude --plugin-dir <repo>/cookbook-toolkit`): the `recipe-writing`
-  skill, the `recipe-reviewer` agent, and the `recipe-ify` / `recipe-scout` / `new-recipe` /
-  `review-recipe` commands. They reference their own files via `${CLAUDE_PLUGIN_ROOT}`.
+  skill, the `recipe-reviewer` agent, and the `recipe-scout` / `recipe-generate` / `new-recipe` /
+  `review-recipe` commands. They reference their own files via `${CLAUDE_PLUGIN_ROOT}`. The
+  recipe pipeline is `recipe-scout` (emit card) → `recipe-scaffold` (deterministic skeleton)
+  → `recipe-generate` (LLM fills logic + prose).
 - The plugin is rooted in `cookbook-toolkit/` (not the repo root) so the cookbook's `agents/` recipe
   category stays outside the plugin's component tree. CI wires both tools in advisorily via
   `.github/workflows/lint-recipes.yml`.

@@ -15,8 +15,8 @@ judgment they cannot apply.
 
 - **Pre-PR review.** A contributor finished a recipe and wants it checked before opening a
   pull request. Review the whole recipe directory.
-- **Post-generation check.** `recipe-ify` or `new-recipe` just produced a recipe. Verify it
-  matches the conventions and is runnable.
+- **Post-generation check.** `recipe-generate` or `new-recipe` just produced a recipe. Verify
+  it matches the conventions and is runnable.
 - **Targeted style check.** Someone asks whether a recipe's README, front matter, layout,
   or code follows the cookbook style.
 
