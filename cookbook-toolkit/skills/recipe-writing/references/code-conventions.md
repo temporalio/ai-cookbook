@@ -102,8 +102,9 @@ class `PascalCase`; activity functions `snake_case`.
 
 ### 7. Dependency pins  ·  *mechanical*
 
-`pyproject.toml` must declare `requires-python = ">=3.10,<3.14"` and
-`temporalio>=1.15.0,<2`.
+`pyproject.toml` must declare `requires-python = ">=3.10"` and
+`temporalio>=1.15.0,<2`. Do not add an upper Python cap: recipes are runnable apps, and a
+cap needlessly excludes newer Python releases.
 
 ### 8. Current model names  ·  *mechanical*
 
