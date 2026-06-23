@@ -6,7 +6,7 @@ The Python/Temporal rules every recipe follows. Each rule notes its **check type
 - **judgment** → checked by the `recipe-reviewer` agent. Needs reading comprehension.
 
 These are conventions the existing recipes already embody (verified against
-`agents/guardrails_hard_rules_python` and `foundations/hello_world_openai_responses_python`).
+`agents/tool_call_openai_python` and `foundations/hello_world_openai_responses_python`).
 
 ## Canonical Temporal sources
 

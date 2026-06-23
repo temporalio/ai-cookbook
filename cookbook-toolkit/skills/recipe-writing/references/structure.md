@@ -124,8 +124,6 @@ The canonical shape is confirmed against `foundations/hello_world_openai_respons
 
 Known deviations to converge in Phase 3 (Step 19):
 
-- `agents/guardrails_hard_rules_python`: brief style (Prerequisites / Run it / Expected
-  output), no inline code. *(Coordinate with Angie; see plan Open items.)*
 - `agents/human_in_the_loop_python`: richer Overview / Setup / Architecture / Key
   Patterns shape. *(Its own PR + rationale; may be sanctioned as a variant.)*
 - Larger recipes (`deep_research/basic_openai_python`, `foundations/claim_check_pattern_python`,
