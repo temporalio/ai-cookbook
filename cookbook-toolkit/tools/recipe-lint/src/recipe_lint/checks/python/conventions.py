@@ -85,7 +85,7 @@ def findings_for_source(source: str, filename: str) -> list[Finding]:
                 Finding(
                     "warning",
                     "stale-model",
-                    f"stale model name '{node.value}' — use a current model",
+                    f"stale model name '{node.value}', use a current model",
                     file=filename,
                     line=node.lineno,
                 )

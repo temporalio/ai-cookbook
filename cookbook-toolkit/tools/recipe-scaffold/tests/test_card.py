@@ -3,7 +3,7 @@
 import pytest
 from jsonschema import ValidationError
 
-from recipe_scaffold.card import context_from_card, context_from_fields, load_card
+from recipe_scaffold.card import CardError, context_from_card, context_from_fields, load_card
 
 
 def test_context_from_fields_derives_names() -> None:
@@ -68,5 +68,17 @@ def test_load_card_validates(tmp_path) -> None:  # type: ignore[no-untyped-def]
 
     bad = tmp_path / "bad.yaml"
     bad.write_text("recipe:\n  name: x-y\n  category: mcp\n")  # missing required fields
-    with pytest.raises(ValidationError):
+    with pytest.raises(CardError):
         load_card(bad)
+
+
+def test_load_card_unquoted_colon_gives_hint(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """A prose value with an unquoted colon parses as a mapping; the error should explain."""
+    card = tmp_path / "colon.yaml"
+    card.write_text(
+        "recipe:\n  name: x-y\n  category: mcp\n  language: python\n"
+        "  title: T\n  description: D.\n  priority: 1\n"
+        "context:\n  notes:\n    - Test strategy: this colon breaks yaml\n"
+    )
+    with pytest.raises(CardError, match="unquoted colon"):
+        load_card(card)

@@ -8,6 +8,7 @@ import json
 import sys
 from pathlib import Path
 
+from recipe_lint.checks.python.quality import fix_style
 from recipe_lint.dispatch import run_checks
 from recipe_lint.findings import Finding, exit_code, format_report
 
@@ -29,11 +30,20 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("recipe_dir", type=Path, help="Path to the recipe directory.")
     parser.add_argument("--format", choices=["text", "json"], default="text")
+    parser.add_argument(
+        "--fix",
+        action="store_true",
+        help="Apply ruff autofixes and formatting (using the toolkit config) before reporting.",
+    )
     args = parser.parse_args(argv)
 
     recipe_dir: Path = args.recipe_dir
     if not recipe_dir.is_dir():
         parser.error(f"not a directory: {recipe_dir}")
+
+    if args.fix:
+        for line in fix_style(recipe_dir):
+            print(f"fix: {line}")
 
     findings = run_checks(recipe_dir)
 

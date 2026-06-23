@@ -3,9 +3,9 @@
 A **proposal card** is the hand-off between `recipe-scout` and `recipe-generate`. It is a
 single machine-ingestible YAML file with two blocks:
 
-- **`recipe:`** — deterministic fields. `recipe-scaffold` (the Python/Jinja tool) consumes
-  these to render the recipe skeleton — no LLM involved, identical every time, lint-clean.
-- **`context:`** — prose/logic inputs. `recipe-generate`'s LLM reads these to write the
+- **`recipe:`**: deterministic fields. `recipe-scaffold` (the Python/Jinja tool) consumes
+  these to render the recipe skeleton, no LLM involved, identical every time, lint-clean.
+- **`context:`**: prose/logic inputs. `recipe-generate`'s LLM reads these to write the
   Activity logic and the README walkthrough prose into the scaffolded stubs.
 
 The schema is authoritative: [`card-schema.json`](card-schema.json). `recipe-scaffold`
@@ -41,12 +41,30 @@ context:
   structure_outline: >
     Workflow runs one classify Activity; the Activity calls the LLM with a forced tool,
     then applies deterministic hard rules that can override the verdict to "block".
-  closest_recipe: tool_call_openai_python — adds a deterministic post-LLM override layer.
+  closest_recipe: tool_call_openai_python, adds a deterministic post-LLM override layer.
   wishlist_gap: Guardrails
   size_estimate: ~250 lines
   notes:
     - Constrain tool_choice on the final turn only, so the model is forced to emit a verdict.
 ```
+
+## Write the YAML so it parses
+
+Prose values often contain a colon ("Test strategy: mock the LLM"), and a colon followed by a
+space in an unquoted YAML scalar turns the value into a mapping, which fails card validation.
+Quote any `notes` item, `description`, `closest_recipe`, or `size_estimate` that contains a
+colon, or use a block scalar:
+
+```yaml
+notes:
+  - "Test strategy: mock call_llm so the first turn emits a tool_use, the second a final answer."
+  - >-
+    Source pins an older model; use a current model literal so recipe-lint's stale-model
+    check passes.
+```
+
+`recipe-scaffold` reports the offending field path with this hint when it happens, but quoting
+colon-bearing prose up front avoids the round trip.
 
 ## `recipe:` fields (deterministic)
 
@@ -67,7 +85,7 @@ The `category`/`language`/`provider` values are the same controlled vocabulary a
 ## `context:` fields (LLM input)
 
 `problem`, `source_excerpt`, `structure_outline`, `closest_recipe`, `wishlist_gap`,
-`size_estimate` — the reviewer-facing rationale `recipe-scout` produces. `recipe-generate`
+`size_estimate`: the reviewer-facing rationale `recipe-scout` produces. `recipe-generate`
 reads them to fill the scaffolded stubs into a runnable recipe; they are not used by the
 deterministic scaffolder.
 
@@ -76,7 +94,7 @@ capture (a gotcha in the source, a concurrency or ordering constraint, a test st
 `recipe-scout` puts what it can't file elsewhere here instead of dropping it, and
 `recipe-generate` reads it. When a shape recurs in `notes` across many cards, promote it to a
 first-class field rather than guessing the full schema up front. The overflow lives only in
-`context:` (read by the LLM), never in `recipe:` — the scaffolder consumes `recipe:`
+`context:` (read by the LLM), never in `recipe:`: the scaffolder consumes `recipe:`
 deterministically and cannot honor a field it doesn't know.
 
 ## Pipeline

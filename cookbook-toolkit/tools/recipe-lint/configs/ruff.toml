@@ -8,5 +8,18 @@ target-version = "py310"
 select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [lint.isort]
-# Recipes are flat packages: these local modules are first-party, not third-party.
-known-first-party = ["activities", "workflows", "worker", "codec"]
+# Recipes are flat packages: the recipe's own modules are first-party, not
+# third-party. Keep this in sync with the optional directories in layout.md.
+known-first-party = [
+    "activities",
+    "workflows",
+    "worker",
+    "codec",
+    "models",
+    "tools",
+    "helpers",
+    "agents",
+    "util",
+    "shared",
+    "mcp_servers",
+]

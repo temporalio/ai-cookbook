@@ -71,9 +71,29 @@ def test_empty_init_is_clean(tmp_path: Path) -> None:
 
 def test_stray_entry_file_is_warning(tmp_path: Path) -> None:
     d = _good_recipe(tmp_path)
-    (d / "hello_world.py").write_text("print('hi')\n")
+    # A duplicate entrypoint: content looks like a starter, not a helper.
+    (d / "hello_world.py").write_text(
+        "import asyncio\n"
+        "from temporalio.client import Client\n\n"
+        "async def main() -> None:\n"
+        "    client = await Client.connect('localhost:7233')\n"
+        "    await client.execute_workflow('W.run', id='x', task_queue='q')\n\n"
+        'if __name__ == "__main__":\n'
+        "    asyncio.run(main())\n"
+    )
     findings = structure.check_stray_entry(d)
     assert any(f.code == "stray-entry" for f in findings)
+
+
+def test_toplevel_helper_module_is_clean(tmp_path: Path) -> None:
+    d = _good_recipe(tmp_path)
+    # A legitimate top-level helper module (no entrypoint markers) must not be
+    # flagged: contributors should not have to move it into a subpackage.
+    (d / "context_window.py").write_text(
+        "def window_messages(messages: list[dict], max_recent: int) -> list[dict]:\n"
+        "    return messages[-max_recent:]\n"
+    )
+    assert structure.check_stray_entry(d) == []
 
 
 def test_mcp_recipe_does_not_require_start_workflow(tmp_path: Path) -> None:

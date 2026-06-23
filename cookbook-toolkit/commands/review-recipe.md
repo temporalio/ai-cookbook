@@ -17,9 +17,10 @@ one prioritized report.
      `deep_research/`, and `mcp/` and ask the user which to review.
 
 2. Launch the **recipe-reviewer** agent (via the Task tool) against that directory. The
-   agent reads the four references in `${CLAUDE_PLUGIN_ROOT}/skills/recipe-writing/references/`,
-   runs `recipe-lint` and `vale`, runs the recipe's tests, and applies the judgment-only
-   checks. Wait for its report.
+   agent reads the references in `${CLAUDE_PLUGIN_ROOT}/skills/recipe-writing/references/`,
+   runs `recipe-lint` and `vale`, runs the recipe's tests, applies the judgment-only
+   checks, and verifies Temporal correctness against the canonical Temporal sources (the
+   `temporal:temporal-developer` skill and the `temporal-docs` MCP). Wait for its report.
 
 3. Combine the agent's findings into one report:
 

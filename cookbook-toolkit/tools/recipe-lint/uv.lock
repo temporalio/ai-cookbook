@@ -257,21 +257,17 @@ wheels = [
 name = "recipe-lint"
 version = "0.1.0"
 source = { editable = "." }
-
-[package.dev-dependencies]
-dev = [
+dependencies = [
     { name = "mypy" },
     { name = "pytest" },
     { name = "ruff" },
 ]
 
 [package.metadata]
-
-[package.metadata.requires-dev]
-dev = [
+requires-dist = [
     { name = "mypy" },
     { name = "pytest", specifier = ">=8" },
-    { name = "ruff" },
+    { name = "ruff", specifier = ">=0.15,<0.16" },
 ]
 
 [[package]]

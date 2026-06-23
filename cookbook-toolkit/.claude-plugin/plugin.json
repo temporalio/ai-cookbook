@@ -5,5 +5,11 @@
   "author": {
     "name": "Temporal Technologies"
   },
-  "keywords": ["temporal", "ai-cookbook", "recipes", "linting", "consistency", "authoring"]
+  "keywords": ["temporal", "ai-cookbook", "recipes", "linting", "consistency", "authoring"],
+  "mcpServers": {
+    "temporal-docs": {
+      "type": "http",
+      "url": "https://temporal.mcp.kapa.ai"
+    }
+  }
 }

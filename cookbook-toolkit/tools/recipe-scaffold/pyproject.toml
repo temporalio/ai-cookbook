@@ -3,23 +3,21 @@ name = "recipe-scaffold"
 version = "0.1.0"
 description = "Deterministically scaffolds a Temporal AI Cookbook recipe from a proposal card (Jinja templates)."
 requires-python = ">=3.11"
+# This toolkit is a validator/generator: the tools it relies on (ruff, mypy,
+# pytest, type stubs) are real requirements, not dev extras.
 dependencies = [
     "jinja2>=3.1",
     "pyyaml>=6",
     "jsonschema>=4",
+    "ruff>=0.15,<0.16",
+    "mypy",
+    "pytest>=8",
+    "types-pyyaml",
+    "types-jsonschema",
 ]
 
 [project.scripts]
 recipe-scaffold = "recipe_scaffold.cli:main"
-
-[dependency-groups]
-dev = [
-    "pytest>=8",
-    "ruff",
-    "mypy",
-    "types-pyyaml",
-    "types-jsonschema",
-]
 
 [build-system]
 requires = ["hatchling"]

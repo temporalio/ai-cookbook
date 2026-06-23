@@ -1,0 +1,7 @@
+extends: existence
+message: "Avoid em-dashes and en-dashes ('%s'). Use a period, comma, parentheses, colon, or semicolon instead. Plain hyphens (-) are fine for ranges and compound words."
+level: error
+nonword: true
+tokens:
+  - '—'
+  - '–'

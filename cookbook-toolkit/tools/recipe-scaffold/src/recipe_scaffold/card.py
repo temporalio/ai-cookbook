@@ -113,10 +113,51 @@ def _schema() -> dict[str, Any]:
     return schema
 
 
+class CardError(Exception):
+    """A proposal card failed to load or validate, with a human-facing message."""
+
+
+def _format_path(parts: Any) -> str:
+    out = ""
+    for part in parts:
+        if isinstance(part, int):
+            out += f"[{part}]"
+        else:
+            out += f".{part}" if out else str(part)
+    return out or "(root)"
+
+
+def _explain_validation_error(path: Path, exc: jsonschema.ValidationError) -> str:
+    loc = _format_path(exc.absolute_path)
+    # The most common authoring mistake: a prose value with an unquoted colon
+    # (e.g. a notes item "Test strategy: ...") parses as a YAML mapping, so the
+    # schema sees a dict where it wants a string.
+    if exc.validator == "type" and exc.validator_value == "string" and isinstance(exc.instance, dict):
+        keys = ", ".join(repr(k) for k in exc.instance)
+        return (
+            f"{path}: '{loc}' parsed as a YAML mapping (keys: {keys}), but it must be a string. "
+            "This usually means an unquoted colon in the value. Wrap it in double quotes "
+            'or use a block scalar, e.g.  - "Test strategy: mock the LLM"  or  - >-'
+        )
+    return f"{path}: invalid card at '{loc}': {exc.message}"
+
+
 def load_card(path: Path) -> dict[str, Any]:
-    """Parse a YAML card and validate it against card-schema.json. Raises on invalid input."""
-    data: dict[str, Any] = yaml.safe_load(path.read_text())
-    jsonschema.validate(data, _schema())
+    """Parse a YAML card and validate it against card-schema.json.
+
+    Raises CardError with a human-facing message on malformed YAML or schema
+    violations, so the CLI can print guidance instead of a stack trace.
+    """
+    try:
+        data: dict[str, Any] = yaml.safe_load(path.read_text())
+    except yaml.YAMLError as exc:
+        raise CardError(f"{path}: not valid YAML: {exc}") from exc
+    if not isinstance(data, dict):
+        raise CardError(f"{path}: expected a YAML mapping with a 'recipe:' block.")
+    try:
+        jsonschema.validate(data, _schema())
+    except jsonschema.ValidationError as exc:
+        raise CardError(_explain_validation_error(path, exc)) from exc
     return data
 
 

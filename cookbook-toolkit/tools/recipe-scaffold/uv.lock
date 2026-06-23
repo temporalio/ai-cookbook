@@ -437,13 +437,9 @@ source = { editable = "." }
 dependencies = [
     { name = "jinja2" },
     { name = "jsonschema" },
-    { name = "pyyaml" },
-]
-
-[package.dev-dependencies]
-dev = [
     { name = "mypy" },
     { name = "pytest" },
+    { name = "pyyaml" },
     { name = "ruff" },
     { name = "types-jsonschema" },
     { name = "types-pyyaml" },
@@ -453,14 +449,10 @@ dev = [
 requires-dist = [
     { name = "jinja2", specifier = ">=3.1" },
     { name = "jsonschema", specifier = ">=4" },
-    { name = "pyyaml", specifier = ">=6" },
-]
-
-[package.metadata.requires-dev]
-dev = [
     { name = "mypy" },
     { name = "pytest", specifier = ">=8" },
-    { name = "ruff" },
+    { name = "pyyaml", specifier = ">=6" },
+    { name = "ruff", specifier = ">=0.15,<0.16" },
     { name = "types-jsonschema" },
     { name = "types-pyyaml" },
 ]

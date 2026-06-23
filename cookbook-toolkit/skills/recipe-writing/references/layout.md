@@ -14,9 +14,9 @@ Every recipe has these, and `recipe-lint` treats them as required:
 | `README.md` | The published docs page (see `structure.md`). |
 | `worker.py` | Registers workflows + activities with Temporal and runs the Worker. |
 | `start_workflow.py` | Submits a workflow execution. |
-| `activities/` | Activities — LLM calls, web requests, side effects. |
+| `activities/` | Activities, LLM calls, web requests, side effects. |
 | `workflows/` | Workflow definitions (pure orchestration). |
-| `tests/` | Test suite. **Mandatory** — see below. |
+| `tests/` | Test suite. **Mandatory**: see below. |
 
 ### Tests are mandatory
 
@@ -42,10 +42,10 @@ Add these only when the recipe needs them:
 
 ## `__init__.py` convention
 
-`__init__.py` is **optional** — a directory does not need one (recipes set
+`__init__.py` is **optional**: a directory does not need one (recipes set
 `pythonpath = ["."]` in `[tool.pytest.ini_options]`, so imports work without it). But
-**if an `__init__.py` exists, it must be empty.** Do not put code — re-exports, registries,
-logic — in an `__init__.py`. Put that in a named module instead.
+**if an `__init__.py` exists, it must be empty.** Do not put code, re-exports, registries,
+logic, in an `__init__.py`. Put that in a named module instead.
 
 `recipe-lint` does **not** flag a missing `__init__.py`; it flags a **non-empty** one.
 
@@ -69,13 +69,13 @@ slugifies the directory name into the page path (e.g.
 `foundations/hello_world_openai_responses_python` →
 `docs.temporal.io/ai-cookbook/hello-world-openai-responses-python`).
 
-**Renaming a recipe directory breaks its published URL.** Do not rename casually — a
+**Renaming a recipe directory breaks its published URL.** Do not rename casually, a
 rename requires a coordinated `SLUG_ALIASES` entry in `temporalio/documentation` and is
 handled as a separate, isolated change (never folded into consistency work).
 
 ## Standardize away
 
-- **No stray top-level entry files** that duplicate `start_workflow.py` — e.g.
+- **No stray top-level entry files** that duplicate `start_workflow.py`: e.g.
   `hello_world.py`, `claude_test.py`. Use `start_workflow.py` (and `worker.py`) as the
   entrypoints.
 
@@ -85,7 +85,7 @@ Cross-checked against all 13 recipes. The stable core holds everywhere; `tests/`
 present in every recipe today. Known deviations to converge in Phase 3 (Steps 18/20) and
 to flag in `recipe-lint` (Step 8):
 
-- **Package names lag the directory — badly, with duplicates.** Four recipes share the
+- **Package names lag the directory, badly, with duplicates.** Four recipes share the
   name `cookbook-basic-python` (`hello_world_openai_responses_python`,
   `http_retry_enhancement_python`, `tool_call_openai_python`,
   `agentic_loop_tool_call_openai_python`); two share `deep-research-basic-openai-python`
@@ -96,8 +96,8 @@ to flag in `recipe-lint` (Step 8):
 - **Stray entry files**: `hello_world.py` in `hello_world_openai_responses_python` and
   `http_retry_enhancement_python`; `claude_test.py` in `agentic_loop_tool_call_claude_python`.
 - **Non-empty `__init__.py` files** (must be emptied; relocate their code to a named
-  module): the agentic-loop `tools/__init__.py` files hold the tool registry (~800–1200
-  bytes — the substantive case), and `human_in_the_loop_python` (`models/__init__.py`,
+  module): the agentic-loop `tools/__init__.py` files hold the tool registry (~800-1200
+  bytes, the substantive case), and `human_in_the_loop_python` (`models/__init__.py`,
   plus tiny `activities/`/`workflows/`) and `claim_check_pattern_python` (`shared/`) have
   small content. Missing `__init__.py` files elsewhere are fine and need no change.
 - **MCP recipes are a sanctioned variant.** `mcp/hello_world_durable_mcp_server` has no

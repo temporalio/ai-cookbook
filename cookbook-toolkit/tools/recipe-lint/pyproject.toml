@@ -3,17 +3,18 @@ name = "recipe-lint"
 version = "0.1.0"
 description = "Lints Temporal AI Cookbook recipes for structural, layout, and code conventions."
 requires-python = ">=3.11"
-dependencies = []
+# This toolkit is a validator: the tools it runs (ruff, mypy, pytest) are its
+# real requirements, not dev extras. ruff is pinned so the linter and the
+# `--fix` autofixer use the same ruff against the shared configs/ruff.toml and
+# never disagree.
+dependencies = [
+    "ruff>=0.15,<0.16",
+    "mypy",
+    "pytest>=8",
+]
 
 [project.scripts]
 recipe-lint = "recipe_lint.cli:main"
-
-[dependency-groups]
-dev = [
-    "pytest>=8",
-    "ruff",
-    "mypy",
-]
 
 [build-system]
 requires = ["hatchling"]

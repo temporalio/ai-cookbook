@@ -110,6 +110,9 @@ __pypackages__/
 # BPE working artifact — the generated commit message, never tracked
 commit-msg.md
 
+# Proposal cards are scratch inputs to recipe-generate, not committed artifacts
+cards/
+
 # Node dependencies for the front-matter validator (.github/scripts) and any tooling
 node_modules/
 

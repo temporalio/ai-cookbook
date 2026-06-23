@@ -7,7 +7,13 @@ import argparse
 import sys
 from pathlib import Path
 
-from recipe_scaffold.card import ScaffoldContext, context_from_card, context_from_fields, load_card
+from recipe_scaffold.card import (
+    CardError,
+    ScaffoldContext,
+    context_from_card,
+    context_from_fields,
+    load_card,
+)
 from recipe_scaffold.scaffold import render
 
 
@@ -43,7 +49,10 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--force", action="store_true", help="Overwrite a non-empty target directory.")
     args = parser.parse_args(argv)
 
-    ctx = _resolve_context(args)
+    try:
+        ctx = _resolve_context(args)
+    except CardError as exc:
+        raise SystemExit(f"error: {exc}") from exc
     dest = Path(args.into) / ctx.category / ctx.dir_name
     written = render(ctx, dest, force=args.force)
 

@@ -2,11 +2,23 @@
 
 The Python/Temporal rules every recipe follows. Each rule notes its **check type**:
 
-- **mechanical** → enforced by `recipe-lint` (Steps 8–10). Deterministic, AST/parse-based.
+- **mechanical** → enforced by `recipe-lint` (Steps 8-10). Deterministic, AST/parse-based.
 - **judgment** → checked by the `recipe-reviewer` agent. Needs reading comprehension.
 
 These are conventions the existing recipes already embody (verified against
 `agents/guardrails_hard_rules_python` and `foundations/hello_world_openai_responses_python`).
+
+## Canonical Temporal sources
+
+The rules in this file are the recurring, mostly lint-checkable ones. They are not the whole
+of correct Temporal usage. For anything beyond them (determinism, signals, queries, updates,
+child workflows, continue-as-new, cancellation, heartbeats, activity timeout and retry
+semantics, replay), the **Temporal Developer skill** (`temporal:temporal-developer`) and the
+**Temporal Docs MCP** (`temporal-docs`, `https://temporal.mcp.kapa.ai`) are the canonical
+source of truth. Consult them instead of relying on memory. Both ship with this toolkit (the
+MCP is declared in the plugin manifest; the skill is a required companion, see the toolkit
+README). Scout, generate, and review all defer to these sources for Temporal-correctness
+judgments: a pattern you cannot confirm against them is a finding, not a pass.
 
 ## Durability rules
 
@@ -17,10 +29,10 @@ durable error handling and double-retry.
 
 ```python
 client = AsyncAnthropic(max_retries=0)   # correct
-client = AsyncAnthropic()                 # incorrect — client retries on
+client = AsyncAnthropic()                 # incorrect, client retries on
 ```
 
-**Scope — read before implementing the check (Step 9).** `max_retries` is *exclusively* an
+**Scope, read before implementing the check (Step 9).** `max_retries` is *exclusively* an
 LLM/HTTP client-library concern (the OpenAI/Anthropic/httpx SDK constructor). It is a
 **different axis** from Temporal's Activity retries, which are configured separately via a
 `RetryPolicy` / `maximum_attempts` on `execute_activity` and are *expected* to be present.
@@ -47,7 +59,7 @@ serialization diverges between runtime and tests.
 ```python
 client = await Client.connect("localhost:7233", data_converter=pydantic_data_converter)  # correct
 env = await WorkflowEnvironment.start_time_skipping(data_converter=pydantic_data_converter)  # correct (tests)
-client = await Client.connect("localhost:7233")  # incorrect — Pydantic payloads won't round-trip
+client = await Client.connect("localhost:7233")  # incorrect, Pydantic payloads won't round-trip
 ```
 
 ### 3. Every `execute_activity` sets `start_to_close_timeout`  ·  *mechanical*
@@ -57,7 +69,7 @@ long LLM/research calls).
 
 ```python
 await workflow.execute_activity(classify, req, start_to_close_timeout=timedelta(seconds=30))  # correct
-await workflow.execute_activity(classify, req)  # incorrect — no timeout
+await workflow.execute_activity(classify, req)  # incorrect, no timeout
 ```
 
 ### 4. Boundary errors raise `ApplicationError(..., non_retryable=True)`  ·  *mechanical (best-effort) + judgment*
@@ -73,7 +85,7 @@ except anthropic.AuthenticationError as exc:
 
 `recipe-lint` flags an activity that calls an LLM/HTTP client but never raises a
 non-retryable `ApplicationError` (best-effort). Whether the *right* errors are classified
-is judgment — the reviewer agent checks that.
+is judgment, the reviewer agent checks that.
 
 ### 5. Workflows are pure orchestration  ·  *mechanical (best-effort) + judgment*
 
@@ -107,11 +119,11 @@ Async workflow/activity tests use `@pytest.mark.asyncio` and `@pytest.mark.timeo
 and run against `WorkflowEnvironment.start_time_skipping(...)` (with the Pydantic
 converter, per rule 2).
 
-### 10. Tests mock external calls — no real API key  ·  *judgment*
+### 10. Tests mock external calls: no real API key  ·  *judgment*
 
 The suite must pass with no credentials. Activities that hit an LLM/API are mocked (e.g.
 `patch(...)` the client, or register a mock activity in the test Worker). That the mocking
-genuinely avoids network calls is judgment — the reviewer agent verifies it.
+genuinely avoids network calls is judgment, the reviewer agent verifies it.
 
 ## Quality bar  (from the `python` skill)
 
@@ -121,12 +133,12 @@ genuinely avoids network calls is judgment — the reviewer agent verifies it.
 
 ### 12. Strict type checking  ·  *mechanical*
 
-`mypy --strict` (or equivalent) passes — type hints on functions, no implicit `Any`.
+`mypy --strict` (or equivalent) passes, type hints on functions, no implicit `Any`.
 
 ### 13. Modern, readable Python  ·  *judgment*
 
 Modern idioms (`X | None`, `list[str]`, dataclasses/Pydantic for contracts), clear names,
-no dead code. Judgment — the reviewer agent flags smells `ruff`/`mypy` miss.
+no dead code. Judgment, the reviewer agent flags smells `ruff`/`mypy` miss.
 
 ## Summary: what recipe-lint implements vs what the agent reviews
 

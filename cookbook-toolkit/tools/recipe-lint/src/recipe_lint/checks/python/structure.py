@@ -13,6 +13,18 @@ from recipe_lint.findings import Finding
 # Top-level .py files that are legitimate entrypoints (not "stray").
 _ALLOWED_TOPLEVEL = {"worker.py", "start_workflow.py", "send_approval.py"}
 
+# The stray-entry rule targets *duplicate entrypoints* (e.g. hello_world.py,
+# claude_test.py) that should be worker.py/start_workflow.py instead. It must NOT
+# flag legitimate top-level helper modules (e.g. context_window.py, models.py),
+# so a top-level file is only "stray" when its content looks like an entrypoint.
+_ENTRYPOINT_MARKERS = (
+    '__name__ == "__main__"',
+    "__name__ == '__main__'",
+    "asyncio.run(",
+    "execute_workflow",
+    "Worker(",
+)
+
 
 def _is_mcp(recipe_dir: Path) -> bool:
     """MCP recipes are a sanctioned variant: a server entrypoint instead of start_workflow.py."""
@@ -98,14 +110,23 @@ def check_task_queue(recipe_dir: Path) -> list[Finding]:
 
 
 def check_stray_entry(recipe_dir: Path) -> list[Finding]:
+    """Flag a *duplicate entrypoint* at the top level, not a helper module.
+
+    Top-level helper modules (e.g. context_window.py) are allowed; only a
+    top-level file whose content looks like a worker/starter entrypoint is
+    flagged, since worker.py and start_workflow.py are the only entrypoints.
+    """
     findings: list[Finding] = []
     for f in recipe_dir.glob("*.py"):
-        if f.name not in _ALLOWED_TOPLEVEL:
+        if f.name in _ALLOWED_TOPLEVEL:
+            continue
+        if any(marker in f.read_text() for marker in _ENTRYPOINT_MARKERS):
             findings.append(
                 Finding(
                     "warning",
                     "stray-entry",
-                    f"stray top-level entry file '{f.name}' (use start_workflow.py)",
+                    f"top-level '{f.name}' looks like an extra entrypoint; "
+                    "use worker.py and start_workflow.py as the only entrypoints",
                     file=f.name,
                 )
             )
