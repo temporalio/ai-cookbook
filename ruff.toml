@@ -1,5 +1,7 @@
-# ABOUTME: Toolkit-standard ruff config recipe-lint applies when checking a recipe.
+# ABOUTME: Repo-root ruff config shared by every recipe. ruff discovers it by walking
+# up from a recipe, so recipe-lint, local `ruff`, and editor integrations all agree.
 # Mirrors the python skill defaults; target-version py310 since recipes support 3.10+.
+# Recipes must NOT carry their own [tool.ruff] — a nearer config would shadow this one.
 
 line-length = 120
 target-version = "py310"

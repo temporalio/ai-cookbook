@@ -1,5 +1,6 @@
-# ABOUTME: Quality-bar check for recipe-lint: runs ruff against a recipe via the
-# toolkit-provided config. Degrades gracefully when ruff is not installed.
+# ABOUTME: Quality-bar check for recipe-lint: runs ruff against a recipe using the
+# repo-root ruff.toml that ruff discovers by walking up. Degrades gracefully when
+# ruff is not installed.
 #
 # mypy is intentionally NOT run across the corpus here: strict mypy needs each recipe's
 # installed dependencies, and the LLM SDKs are largely untyped, so it produces noise
@@ -16,8 +17,6 @@ from pathlib import Path
 from recipe_lint.dispatch import CHECKS
 from recipe_lint.findings import Finding
 
-_RUFF_CONFIG = Path(__file__).resolve().parents[4] / "configs" / "ruff.toml"
-
 
 def _find_ruff() -> str | None:
     """Resolve the ruff executable. Pinned as a runtime dep, so it is on PATH
@@ -25,12 +24,11 @@ def _find_ruff() -> str | None:
     return shutil.which("ruff")
 
 
-def _config_args() -> list[str]:
-    return ["--config", str(_RUFF_CONFIG)] if _RUFF_CONFIG.is_file() else []
-
-
 def fix_style(recipe_dir: Path) -> list[str]:
-    """Apply ruff's autofixes and formatter to a recipe, using the toolkit config.
+    """Apply ruff's autofixes and formatter to a recipe.
+
+    No --config: ruff discovers the repo-root ruff.toml by walking up from the
+    recipe, the same config a contributor's editor or local ruff resolves.
 
     Returns human-readable summary lines. Run by `recipe-lint --fix` before the
     report, so the same ruff and config that flag style issues also fix them.
@@ -41,14 +39,15 @@ def fix_style(recipe_dir: Path) -> list[str]:
 
     summary: list[str] = []
     check = subprocess.run(  # noqa: S603
-        [ruff, "check", "--fix", "--quiet", *_config_args(), str(recipe_dir)],
+        [ruff, "check", "--fix", "--quiet", str(recipe_dir)],
         capture_output=True,
         text=True,
         check=False,
     )
-    summary.append("ruff check --fix: " + ("applied fixes" if check.returncode == 0 else "fixed what it could; some findings remain"))
+    outcome = "applied fixes" if check.returncode == 0 else "fixed what it could; some findings remain"
+    summary.append(f"ruff check --fix: {outcome}")
     fmt = subprocess.run(  # noqa: S603
-        [ruff, "format", "--quiet", *_config_args(), str(recipe_dir)],
+        [ruff, "format", "--quiet", str(recipe_dir)],
         capture_output=True,
         text=True,
         check=False,
@@ -62,7 +61,7 @@ def check_ruff(recipe_dir: Path) -> list[Finding]:
     if ruff is None:
         return [Finding("warning", "ruff-missing", "ruff not installed; skipped the ruff quality check")]
 
-    cmd = [ruff, "check", "--quiet", "--output-format", "json", *_config_args(), str(recipe_dir)]
+    cmd = [ruff, "check", "--quiet", "--output-format", "json", str(recipe_dir)]
 
     proc = subprocess.run(cmd, capture_output=True, text=True, check=False)  # noqa: S603
     out = proc.stdout.strip()
@@ -95,7 +94,7 @@ def check_format(recipe_dir: Path) -> list[Finding]:
         return []
 
     proc = subprocess.run(  # noqa: S603
-        [ruff, "format", "--check", *_config_args(), str(recipe_dir)],
+        [ruff, "format", "--check", str(recipe_dir)],
         capture_output=True,
         text=True,
         check=False,

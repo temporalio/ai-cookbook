@@ -5,8 +5,8 @@ description = "Lints Temporal AI Cookbook recipes for structural, layout, and co
 requires-python = ">=3.11"
 # This toolkit is a validator: the tools it runs (ruff, mypy, pytest) are its
 # real requirements, not dev extras. ruff is pinned so the linter and the
-# `--fix` autofixer use the same ruff against the shared configs/ruff.toml and
-# never disagree.
+# `--fix` autofixer use the same ruff against the repo-root ruff.toml (which
+# ruff discovers by walking up from a recipe) and never disagree.
 dependencies = [
     "ruff>=0.15,<0.16",
     "mypy",
