@@ -44,6 +44,8 @@ context:
   closest_recipe: tool_call_openai_python — adds a deterministic post-LLM override layer.
   wishlist_gap: Guardrails
   size_estimate: ~250 lines
+  notes:
+    - Constrain tool_choice on the final turn only, so the model is forced to emit a verdict.
 ```
 
 ## `recipe:` fields (deterministic)
@@ -68,6 +70,14 @@ The `category`/`language`/`provider` values are the same controlled vocabulary a
 `size_estimate` — the reviewer-facing rationale `recipe-scout` produces. `recipe-generate`
 reads them to fill the scaffolded stubs into a runnable recipe; they are not used by the
 deterministic scaffolder.
+
+`notes` is the overflow channel: a list for anything load-bearing that the fields above don't
+capture (a gotcha in the source, a concurrency or ordering constraint, a test strategy).
+`recipe-scout` puts what it can't file elsewhere here instead of dropping it, and
+`recipe-generate` reads it. When a shape recurs in `notes` across many cards, promote it to a
+first-class field rather than guessing the full schema up front. The overflow lives only in
+`context:` (read by the LLM), never in `recipe:` — the scaffolder consumes `recipe:`
+deterministically and cannot honor a field it doesn't know.
 
 ## Pipeline
 

@@ -50,7 +50,12 @@
         "structure_outline": { "type": "string", "description": "How the recipe is structured: workflow, key activity, tool/API." },
         "closest_recipe": { "type": "string", "description": "Nearest existing recipe and what this adds/changes." },
         "wishlist_gap": { "type": "string", "description": "Coverage-wishlist item this fills, if any." },
-        "size_estimate": { "type": "string", "description": "Rough total line count for the finished recipe." }
+        "size_estimate": { "type": "string", "description": "Rough total line count for the finished recipe." },
+        "notes": {
+          "type": "array",
+          "description": "Overflow channel: anything load-bearing for building the recipe that does not fit the fields above (gotchas, concurrency or ordering constraints, test strategy). recipe-generate reads these; recurring shapes can be promoted to first-class fields over time.",
+          "items": { "type": "string" }
+        }
       }
     }
   }

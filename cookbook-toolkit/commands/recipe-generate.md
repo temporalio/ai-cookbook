@@ -51,7 +51,7 @@ paraphrase the conventions:
 ## Step 3 — Fill the stubs
 
 Using the card's `context:` block (`problem`, `source_excerpt`, `structure_outline`,
-`closest_recipe`) as the design input:
+`closest_recipe`, and any `notes`) as the design input:
 
 1. Replace the `NotImplementedError` Activity stub with the real LLM call and pattern logic,
    applying every rule in `code-conventions.md` (`max_retries=0` on the client constructor

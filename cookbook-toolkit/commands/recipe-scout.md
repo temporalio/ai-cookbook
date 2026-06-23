@@ -80,7 +80,9 @@ format from `proposal-card.md`, valid against `card-schema.json`:
   10–25 line excerpt or pseudocode showing it clearest), `structure_outline` (the workflow /
   key activity / tool shape, following `structure.md`), `closest_recipe` (nearest existing
   recipe and what differs), `wishlist_gap` (if any), `size_estimate` (rough line count; flag
-  anything over ~400 lines as too complex).
+  anything over ~400 lines as too complex), and `notes` (an overflow list for anything
+  load-bearing that doesn't fit the fields above: a gotcha in the source, a concurrency or
+  ordering constraint, a test strategy). Put it in `notes` rather than dropping it.
 
 Keep the controlled-vocabulary fields (`category`, `language`, `provider`) exactly as listed
 so the card validates and the rendered front matter is correct by construction.
