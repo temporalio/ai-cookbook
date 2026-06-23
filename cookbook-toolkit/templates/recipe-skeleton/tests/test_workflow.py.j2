@@ -1,0 +1,35 @@
+import pytest
+from temporalio import activity
+from temporalio.contrib.pydantic import pydantic_data_converter
+from temporalio.testing import WorkflowEnvironment
+from temporalio.worker import Worker
+
+from activities.{{ activity_module }} import {{ request_class }}
+from workflows.recipe_workflow import {{ workflow_class }}
+
+TASK_QUEUE = "{{ task_queue }}"
+
+
+@pytest.mark.asyncio
+@pytest.mark.timeout(30)
+async def test_workflow_returns_activity_result() -> None:
+    @activity.defn(name="{{ activity_func }}")
+    async def mock_activity(request: {{ request_class }}) -> str:
+        return "mocked response"
+
+    async with (
+        await WorkflowEnvironment.start_time_skipping(data_converter=pydantic_data_converter) as env,
+        Worker(
+            env.client,
+            task_queue=TASK_QUEUE,
+            workflows=[{{ workflow_class }}],
+            activities=[mock_activity],
+        ),
+    ):
+        result = await env.client.execute_workflow(
+            {{ workflow_class }}.run,
+            "hi",
+            id="test-{{ slug }}",
+            task_queue=TASK_QUEUE,
+        )
+    assert result == "mocked response"

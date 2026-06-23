@@ -107,4 +107,20 @@ __pypackages__/
 # Keep lockfiles tracked in this repo (uv.lock is committed), so do NOT ignore them.
 # uv: no special ignores required beyond virtualenvs above
 
+# BPE working artifact — the generated commit message, never tracked
+commit-msg.md
 
+# Proposal cards are scratch inputs to recipe-generate, not committed artifacts
+cards/
+
+# Node dependencies for the front-matter validator (.github/scripts) and any tooling
+node_modules/
+
+
+
+# BPE goal scratch artifact — not tracked
+goal.md
+
+# Editor swap files
+*.swp
+*.swo

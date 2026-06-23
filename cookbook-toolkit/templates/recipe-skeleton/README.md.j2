@@ -1,0 +1,48 @@
+<!--
+description: {{ description }}
+tags: [{{ tags | join(', ') }}]
+priority: {{ priority }}
+-->
+
+# {{ title }}
+
+TODO: one or two sentences on what this recipe demonstrates and the pattern it teaches.
+The LLM call happens in a Temporal Activity, so Temporal handles retries and durability.
+
+## Create the Activity
+
+TODO: describe what the Activity does and why. Construct the {{ primary_provider or 'LLM' }}
+client with `max_retries=0` (Temporal owns retries) and re-raise permanent API errors as a
+non-retryable `ApplicationError`.
+
+*File: activities/{{ activity_module }}.py*
+
+```python
+@activity.defn
+async def {{ activity_func }}(request: {{ request_class }}) -> str:
+    ...  # TODO: call the model and return the result
+```
+
+## Create the Workflow
+
+TODO: the Workflow is pure orchestration — it calls the Activity with an explicit
+`start_to_close_timeout` and returns the result.
+
+*File: workflows/recipe_workflow.py*
+
+## Create the Worker
+
+*File: worker.py*
+
+## Create the Workflow Starter
+
+*File: start_workflow.py*
+
+## Running
+
+```bash
+temporal server start-dev
+uv sync
+uv run python -m worker              # terminal 1
+uv run python -m start_workflow      # terminal 2
+```

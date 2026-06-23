@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://temporal.io/ai-cookbook/card-schema.json",
+  "title": "Cookbook recipe proposal card",
+  "description": "A recipe-scout proposal card. The `recipe` block is machine-consumed by recipe-scaffold to render the recipe skeleton deterministically; the `context` block is read by recipe-generate's LLM to write the recipe logic and README prose.",
+  "type": "object",
+  "required": ["recipe"],
+  "additionalProperties": false,
+  "properties": {
+    "recipe": {
+      "type": "object",
+      "description": "Deterministic fields consumed by recipe-scaffold.",
+      "required": ["name", "category", "language", "title", "description", "priority"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "kebab-case recipe name; drives the directory ({name}_python), package (cookbook-{name}-python), and task queue ({name}-task-queue).",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "category": { "enum": ["agents", "foundations", "deep_research", "mcp"] },
+        "language": { "enum": ["python"] },
+        "provider": {
+          "type": "array",
+          "description": "Zero or more LLM providers; the first drives the scaffolded client + SDK dependency.",
+          "items": { "enum": ["openai", "anthropic", "litellm"] }
+        },
+        "title": { "type": "string", "description": "Human title; becomes the README H1." },
+        "description": { "type": "string", "description": "One plain sentence; the README front-matter description." },
+        "priority": { "type": "integer", "description": "Front-matter priority (band per frontmatter.md)." },
+        "components": {
+          "type": "object",
+          "description": "Optional component names to stub. Defaults are used when omitted.",
+          "additionalProperties": false,
+          "properties": {
+            "workflow_class": { "type": "string" },
+            "activities": { "type": "array", "items": { "type": "string" } },
+            "tools": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    },
+    "context": {
+      "type": "object",
+      "description": "Prose/logic inputs the LLM uses in recipe-generate. Not consumed by the scaffolder.",
+      "additionalProperties": false,
+      "properties": {
+        "problem": { "type": "string", "description": "What goes wrong without this pattern (2-3 sentences)." },
+        "source_excerpt": { "type": "string", "description": "10-25 line excerpt (or pseudocode) showing the pattern." },
+        "structure_outline": { "type": "string", "description": "How the recipe is structured: workflow, key activity, tool/API." },
+        "closest_recipe": { "type": "string", "description": "Nearest existing recipe and what this adds/changes." },
+        "wishlist_gap": { "type": "string", "description": "Coverage-wishlist item this fills, if any." },
+        "size_estimate": { "type": "string", "description": "Rough total line count for the finished recipe." },
+        "notes": {
+          "type": "array",
+          "description": "Overflow channel: anything load-bearing for building the recipe that does not fit the fields above (gotchas, concurrency or ordering constraints, test strategy). recipe-generate reads these; recurring shapes can be promoted to first-class fields over time.",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

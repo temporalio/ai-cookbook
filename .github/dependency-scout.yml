@@ -1,4 +1,4 @@
-auto_merge_enabled: true
+auto_merge_enabled: false
 auto_merge_min_confidence: 0.90
 min_release_age_hours: 168
 block_classifications: [red]

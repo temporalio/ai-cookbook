@@ -1,0 +1,27 @@
+# ABOUTME: Repo-root ruff config shared by every recipe. ruff discovers it by walking
+# up from a recipe, so recipe-lint, local `ruff`, and editor integrations all agree.
+# Mirrors the python skill defaults; target-version py310 since recipes support 3.10+.
+# Recipes must NOT carry their own [tool.ruff] — a nearer config would shadow this one.
+
+line-length = 120
+target-version = "py310"
+
+[lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[lint.isort]
+# Recipes are flat packages: the recipe's own modules are first-party, not
+# third-party. Keep this in sync with the optional directories in layout.md.
+known-first-party = [
+    "activities",
+    "workflows",
+    "worker",
+    "codec",
+    "models",
+    "tools",
+    "helpers",
+    "agents",
+    "util",
+    "shared",
+    "mcp_servers",
+]

@@ -1,0 +1,20 @@
+Temporal
+Temporal Cloud
+Workflow
+Workflows
+Activity
+Activities
+Worker
+Workers
+Signal
+Query
+Namespace
+Task Queue
+OpenAI
+Anthropic
+Claude
+LiteLLM
+MCP
+Pydantic
+uv
+pytest

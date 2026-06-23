@@ -1,0 +1,38 @@
+name: Full Recipe Audit
+
+# Manual, on-demand audit of EVERY recipe (not just changed ones). Runs recipe-lint + Vale
+# across the whole corpus plus the front-matter validator, via `just report`, and writes
+# the full report to the run summary. Fails only on error-severity findings (e.g. a recipe
+# missing its mandatory tests/); the consistency warnings are surfaced but do not fail.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  VALE_VERSION: "3.6.0"
+
+jobs:
+  audit:
+    name: Audit all recipes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Set up just
+        uses: extractions/setup-just@v2
+
+      - name: Install Vale
+        run: |
+          curl -sfL "https://github.com/errata-ai/vale/releases/download/v${VALE_VERSION}/vale_${VALE_VERSION}_Linux_64-bit.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin vale
+
+      - name: Full audit (just report)
+        run: |
+          set -o pipefail
+          just toolkit-report | tee -a "$GITHUB_STEP_SUMMARY"

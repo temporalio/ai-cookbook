@@ -65,9 +65,44 @@ priority: 500
 -->
 ```
 
-Required fields: `description` (plain text), `tags` (array including category, language, and LLM provider), `priority` (integer; higher = appears earlier).
+The validator parses with the same YAML library the docs site uses and tiers its findings:
+
+- **Hard errors (fail CI — they break the docs build):** missing `description`, missing
+  H1 title, or invalid YAML.
+- **Warnings (reported, non-blocking):** `tags` not in the controlled vocabulary
+  (`cookbook-toolkit/skills/recipe-writing/references/tags.json`), `tags:[` spacing, wrong tag order
+  (`category, language, provider`), missing/non-integer `priority`, or forbidden
+  `last_updated`/`title` keys.
+
+Consistency is enforced by the `recipe-writing` skill and the `recipe-lint` tool under
+`cookbook-toolkit/`, not by hard CI gates. See `cookbook-toolkit/skills/recipe-writing/references/` for the
+full conventions.
 
 **Tests must pass** before a PR is merged. CI detects changed recipe directories and runs `uv sync && pytest tests/ --timeout=30` for each.
+
+## Toolkit (`cookbook-toolkit/`)
+
+`cookbook-toolkit/` is a local Claude Code plugin and linter for authoring consistent recipes. The
+recipe conventions are defined once in `cookbook-toolkit/skills/recipe-writing/references/`
+(structure, layout, frontmatter, code-conventions) and `cookbook-toolkit/skills/recipe-writing/references/tags.json`;
+the linter, commands, reviewer agent, and CI all reference them — never restate them.
+
+- `cookbook-toolkit/tools/recipe-lint` — a `uv` CLI checking recipe structure, layout, naming,
+  links, and Temporal/Python conventions. Error-severity findings (e.g. missing `tests/`)
+  fail CI; the rest are advisory warnings.
+- `cookbook-toolkit/tools/recipe-scaffold` — a `uv` CLI that deterministically renders a recipe
+  skeleton from a proposal card (or explicit fields) using the Jinja templates in
+  `cookbook-toolkit/templates/recipe-skeleton/`. The card format is defined in
+  `cookbook-toolkit/skills/recipe-writing/references/proposal-card.md` and `card-schema.json`.
+- `cookbook-toolkit/styles/` + `cookbook-toolkit/.vale.ini` — a minimal Vale prose ruleset.
+- Plugin components (load with `claude --plugin-dir <repo>/cookbook-toolkit`): the `recipe-writing`
+  skill, the `recipe-reviewer` agent, and the `recipe-scout` / `recipe-generate` / `new-recipe` /
+  `review-recipe` commands. They reference their own files via `${CLAUDE_PLUGIN_ROOT}`. The
+  recipe pipeline is `recipe-scout` (emit card) → `recipe-scaffold` (deterministic skeleton)
+  → `recipe-generate` (LLM fills logic + prose).
+- The plugin is rooted in `cookbook-toolkit/` (not the repo root) so the cookbook's `agents/` recipe
+  category stays outside the plugin's component tree. CI wires both tools in advisorily via
+  `.github/workflows/lint-recipes.yml`.
 
 ## Local Development Prerequisites
 
