@@ -12,7 +12,9 @@ def _good_recipe(root: Path, name: str = "thing_python") -> Path:
     (d / "workflows").mkdir()
     (d / "tests").mkdir()
     (d / "tests" / "test_it.py").write_text("def test_x() -> None:\n    assert True\n")
-    (d / "pyproject.toml").write_text('[project]\nname = "cookbook-thing-python"\n')
+    (d / "pyproject.toml").write_text(
+        '[project]\nname = "cookbook-thing-python"\nrequires-python = ">=3.10"\n'
+    )
     (d / "README.md").write_text("<!--\ndescription: x\ntags: [foundations, python]\npriority: 500\n-->\n\n# Thing\n")
     (d / "worker.py").write_text('task_queue = "thing-task-queue"\n')
     (d / "start_workflow.py").write_text('task_queue = "thing-task-queue"\n')
@@ -25,12 +27,36 @@ def test_clean_recipe_has_no_findings(tmp_path: Path) -> None:
         structure.check_required_files(d)
         + structure.check_required_dirs(d)
         + structure.check_package_name(d)
+        + structure.check_python_floor(d)
         + structure.check_task_queue(d)
         + structure.check_stray_entry(d)
         + structure.check_readme_frontmatter(d)
         + structure.check_links(d)
     )
     assert findings == [], findings
+
+
+def test_python_floor_missing_is_warning(tmp_path: Path) -> None:
+    d = _good_recipe(tmp_path)
+    (d / "pyproject.toml").write_text('[project]\nname = "cookbook-thing-python"\n')
+    assert any(f.code == "python-floor" for f in structure.check_python_floor(d))
+
+
+def test_python_floor_wrong_is_warning(tmp_path: Path) -> None:
+    d = _good_recipe(tmp_path)
+    (d / "pyproject.toml").write_text(
+        '[project]\nname = "cookbook-thing-python"\nrequires-python = ">=3.11"\n'
+    )
+    assert any(f.code == "python-floor" for f in structure.check_python_floor(d))
+
+
+def test_python_floor_upper_cap_is_allowed(tmp_path: Path) -> None:
+    # The floor is what matters; an upper cap is neither required nor forbidden.
+    d = _good_recipe(tmp_path)
+    (d / "pyproject.toml").write_text(
+        '[project]\nname = "cookbook-thing-python"\nrequires-python = ">=3.10,<3.14"\n'
+    )
+    assert structure.check_python_floor(d) == []
 
 
 def test_missing_tests_is_error(tmp_path: Path) -> None:

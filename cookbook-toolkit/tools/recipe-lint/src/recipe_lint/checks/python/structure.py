@@ -97,6 +97,38 @@ def check_package_name(recipe_dir: Path) -> list[Finding]:
     return []
 
 
+def check_python_floor(recipe_dir: Path) -> list[Finding]:
+    """requires-python must declare a `>=3.10` floor; the upper bound is not constrained."""
+    pyproject = recipe_dir / "pyproject.toml"
+    if not pyproject.is_file():
+        return []
+    try:
+        data = tomllib.loads(pyproject.read_text())
+    except (tomllib.TOMLDecodeError, OSError):
+        return []  # check_package_name reports the parse error
+    req = data.get("project", {}).get("requires-python")
+    if not req:
+        return [
+            Finding(
+                "warning",
+                "python-floor",
+                "pyproject.toml is missing requires-python; declare a `>=3.10` floor",
+                file="pyproject.toml",
+            )
+        ]
+    lower = next((c.strip() for c in str(req).split(",") if c.strip().startswith(">=")), None)
+    if lower is None or lower.replace(" ", "") != ">=3.10":
+        return [
+            Finding(
+                "warning",
+                "python-floor",
+                f"requires-python floor should be `>=3.10` (found '{req}')",
+                file="pyproject.toml",
+            )
+        ]
+    return []
+
+
 def check_task_queue(recipe_dir: Path) -> list[Finding]:
     expected = f"{_slug(recipe_dir)}-task-queue"
     findings: list[Finding] = []
@@ -184,6 +216,7 @@ CHECKS["python"].extend(
         check_required_dirs,
         check_empty_init,
         check_package_name,
+        check_python_floor,
         check_task_queue,
         check_stray_entry,
         check_readme_frontmatter,
