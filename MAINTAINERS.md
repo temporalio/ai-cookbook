@@ -4,7 +4,7 @@ Maintainers that are part of Project Leadership make decisions about the project
 ## Product owner
 The Product Owner is responsible for taking in feedback from stakeholders and maintaining the project backlog and product roadmap. They also hold a cadence with technical reviewers to ensure contributors are getting timely attention to their submissions.
 
-- [Angie Byron](https://github.com/webchick) (interim)
+- [Duncan Mackenzie](https://github.com/Duncanma)
 
 ## Technical strategist
 The Technical Strategist works with the Product Owner to define and prioritize the product roadmap, and is available to consult on technical matters.
@@ -26,9 +26,6 @@ AI Cookbook is a cross-functional initiative, and liaisons represent their funct
 
 ### DevRel liaison
 - [Cecil Philip](https://github.com/cecilphillip)
-
-### Documentation and Tooling liaison
-- [Duncan Mackenzie](https://github.com/Duncanma)
 
 # Technical reviewers
 Technical reviewers ensure that contributors' submissions are looked at in a timely manner, provide architectural guidance, etc.
