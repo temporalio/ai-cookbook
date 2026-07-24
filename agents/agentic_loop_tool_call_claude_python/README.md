@@ -1,9 +1,9 @@
 <!--
-description: A basic agentic loop using Claude (Anthropic) with tool calling.
+description: Build a durable agentic loop in Python with Claude tool calling and Temporal.
 tags: [agents, python, claude]
 priority: 775
 -->
-# Basic Agentic Loop with Claude and Tool Calling
+# Basic agentic loop with Claude and tool calling
 
 This example implements an agentic loop using Claude (Anthropic) that has a set of tools available. If the agent determines that no tools are needed to satisfy a user request, it will return the response directly. If Claude determines a tool should be used, it will return with the name of the chosen tool and any needed parameters. The agent then invokes the appropriate tool.
 
@@ -20,7 +20,7 @@ This recipe highlights the following key design decisions:
 
 Also see this foundational [recipe for basic tool calling](https://docs.temporal.io/ai-cookbook/tool-calling-python).
 
-## Application Components
+## Application components
 
 This example includes the following components:
 - The [Workflow](#create-the-agent-agentic-loop) that contains the agentic loop and tool calling logic; this is the core of the agent implementation.
@@ -30,7 +30,7 @@ This example includes the following components:
 - The [Worker](#create-the-worker) that manages the Workflow and the Activities.
 - An application that [initiates an interaction](#initiate-an-interaction-with-the-agent) with the agent.
 
-## Create the Agent (Agentic Loop)
+## Create the agent (agentic loop)
 
 ### Create the main agentic loop
 
@@ -160,7 +160,7 @@ We create a wrapper for the `create` method of the `AsyncAnthropic` client objec
 
 We set `max_retries=0` when creating the `AsyncAnthropic` client. This moves the responsibility for retries from the Anthropic client to Temporal. This means that the Activity should interpret any errors coming from Claude's API call and return the appropriate error type so that the Workflow knows if it should retry the Activity or not.
 
-In this implementation, we allow for the model, system instructions, messages, lis6t of tools, and max_tokens (required) to be passed in.
+In this implementation, we allow for the model, system instructions, messages, list of tools, and max_tokens (required) to be passed in.
 
 *File: activities/claude_responses.py*
 ```python
@@ -308,7 +308,7 @@ If no tools are needed, respond in haikus.
 
 ## Create tool definitions
 
-Tools are defined in the `tools` directory and should be thought of as independent from the agent implementation; as described above, dynamic Activities are leveraged for this loose coupling.
+Tools are defined in the `tools` directory and should be thought of as independent from the agent implementation; as described above, dynamic Activities are used for this loose coupling.
 
 The `__init__.py` file holds tools for providing location (`get_location_info`), IP address (`get_ip_address`), and weather alerts (`get_weather_alerts`).
 - The `get_tools` method returns the set of tool definitions that will be passed to Claude.
@@ -392,7 +392,7 @@ async def get_location_info(req: GetLocationRequest) -> str:
 
 ## Create the Worker
 
-The worker is the process that dispatches work to the various parts of the agent implementation - the orchestrator and the Activities for Claude and tool invocations.
+The Worker is the process that dispatches work to the various parts of the agent implementation - the orchestrator and the Activities for Claude and tool invocations.
 
 *File: worker.py*
 
@@ -436,7 +436,7 @@ if __name__ == "__main__":
 
 ## Initiate an interaction with the agent
 
-In order to interact with this simple AI agent, we create a Temporal client and execute a Workflow.
+To interact with this simple AI agent, we create a Temporal client and execute a Workflow.
 
 *File: start_workflow.py*
 ```python
