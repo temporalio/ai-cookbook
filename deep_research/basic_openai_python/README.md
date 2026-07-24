@@ -1,11 +1,10 @@
 <!-- 
-description: Build a simple deep research system embodying the standard
-deep research architecture.
-tags: [agents, toolcalling, python]
+description: Build a multi-agent deep research system in Python with Temporal and the OpenAI Responses API.
+tags: [agents, python, openai]
 priority: 399
 -->
 
-# Deep Research
+# Deep research
 
 Deep research systems combine multiple agents with information retrieval from
 the web or other sources to produce evidence-based reports on specific topics.
@@ -105,10 +104,10 @@ class ResearchReport(BaseModel):
     follow_up_questions: List[str]
 ```
 
-## Create the Agents
+## Create the agents
 
 The deep research system uses four specialized agents, each implemented as
-Temporal activities. In this implementation, each agent is implemented as a
+Temporal Activities. In this implementation, each agent is implemented as a
 single call to the OpenAI Responses API.
 
 This is possible because we are using structured outputs, which guarantee the
@@ -117,10 +116,10 @@ response will be in the correct format, eliminating the need for retries.
 The web search agent also requires only a single API call because OpenAI
 integrates the web search tool into the Responses API.
 
-These agents run in the Workflow and use the `invoke_model` activity to make
+These agents run in the Workflow and use the `invoke_model` Activity to make
 OpenAI API calls. It is critical to set the `start_to_close_timeout` for these
-activities to a value that is long enough to complete the task. If it is too
-short, the activity will fail with a timeout error, causing a retry loop that
+Activities to a value that is long enough to complete the task. If it is too
+short, the Activity will fail with a timeout error, causing a retry loop that
 never completes. Response times for reasoning models such as `GPT-5` can vary
 significantly depending on the nature of the request. Web search times also vary
 depending on the size and content of the documents located by the search.
