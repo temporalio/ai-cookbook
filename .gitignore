@@ -95,6 +95,9 @@ venv.bak/
 .python-version
 __pypackages__/
 
+# Vercel docs preview build output
+.docs-build/
+
 # Editors and OS files
 .DS_Store
 .idea/
@@ -108,3 +111,4 @@ __pypackages__/
 # uv: no special ignores required beyond virtualenvs above
 
 
+.vercel
