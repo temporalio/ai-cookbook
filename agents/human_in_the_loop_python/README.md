@@ -1,15 +1,15 @@
 <!--
-description: Support human in the loop (HITL) in agentic flows.
-tags: [agents, python]
+description: Add human-in-the-loop approval to a durable AI agent using Temporal Signals in Python.
+tags: [agents, python, openai]
 priority: 750
 -->
-# Human-in-the-Loop AI Agent
+# Human-in-the-loop AI agent
 
 This example demonstrates how to build an AI agent that requires human approval; we use Temporal Signals to bring that user input into the agent.
 
 ## Overview
 
-The workflow implements the agent flow:
+The Workflow implements the agent flow:
 1. Uses an LLM to analyze a user request and propose an action. 
 2. If the proposed action is deemed risky, pauses and waits for human approval via Temporal Signal
 3. Executes the action if auto-approved (if not risky) or human approved, or cancels if rejected/timed out
@@ -17,7 +17,7 @@ The workflow implements the agent flow:
 Key features:
 - **Resource efficient waiting**: Can wait for approval for hours, days or indefinitely; while waiting, the agent consumes no compute resources.
 - **Signal-based approval**: External systems send approval decisions via Temporal Signals
-- **Durable timers**: Time limits placed on human int he loop steps survive any execution distruptions.
+- **Durable timers**: Time limits placed on human-in-the-loop steps survive any execution disruptions.
 - **Complete audit trail**: All decisions are logged for compliance
 
 ## Prerequisites
@@ -59,11 +59,11 @@ In another terminal:
 uv run python -m start_workflow "Delete all test data from the production database"
 ```
 
-The workflow will start, analyze the request, and pause for approval. Watch the worker output for instructions.
+The Workflow will start, analyze the request, and pause for approval. Watch the Worker output for instructions.
 
-### Send Approval Decision
+### Send approval decision
 
-The worker output will show the workflow ID and request ID. In another terminal, run the `send_approval` script to approve or reject:
+The Worker output will show the Workflow Id and request identifier. In another terminal, run the `send_approval` script to approve or reject:
 
 **To approve:**
 ```bash
@@ -75,9 +75,9 @@ uv run python -m send_approval <workflow-id> <request-id> approve "Looks good"
 uv run python -m send_approval <workflow-id> <request-id> reject "Too risky"
 ```
 
-### Testing Timeout
+### Testing timeout
 
-To test timeout behavior, simply don't send any approval signal. After 5 minutes (default), the workflow will automatically complete with a timeout result.
+To test timeout behavior, don't send any approval signal. After 5 minutes (default), the Workflow will automatically complete with a timeout result.
 
 ## Architecture
 
@@ -85,8 +85,8 @@ To test timeout behavior, simply don't send any approval signal. After 5 minutes
 - **Activities**:
   - `openai_responses.py`: Generic LLM invocation activity
   - `execute_action.py`: Executes approved actions
-    - The "execution" of approved actions in this sample simply logs messages.
-    - In a realistic scenario, a set of tools will have been provided to the LLM and the result might be a recommended tool call. In this case, if approved, the agent would invoke the tool via an activity. See the [agentic loop with tool calling](https://docs.temporal.io/ai-cookbook/agentic-loop-tool-call-openai-python) for guidance on how to use dynamic activities, allowing the tools to be loosely coupled from the agent implementation.
+    - The "execution" of approved actions in this sample logs messages.
+    - In a realistic scenario, a set of tools will have been provided to the LLM and the result might be a recommended tool call. In this case, if approved, the agent would invoke the tool via an Activity. See the [agentic loop with tool calling](https://docs.temporal.io/ai-cookbook/agentic-loop-tool-call-openai-python) for guidance on how to use dynamic Activities, allowing the tools to be loosely coupled from the agent implementation.
   - `notify_approval_needed.py`: Notifies external systems of approval requests
     - In this sample the notification comes in the form of messages printed in the terminal running the worker.
     - In a realistic scenario, the notification activity may send emails, deliver messages to slack, etc.
@@ -96,16 +96,16 @@ To test timeout behavior, simply don't send any approval signal. After 5 minutes
   - `start_workflow.py`: Starts workflow execution
   - `send_approval.py`: Helper script to send approval signals
 
-## Key Patterns
+## Key patterns
 
-We use a Temporal signal to inject information from the human into the waiting workflow. The signal is delivered from some UI (in this case the `send_approval.py` script) that uses a Temporal client to deliver the data.
+We use a Temporal Signal to inject information from the human into the waiting Workflow. The Signal is delivered from some UI (in this case the `send_approval.py` script) that uses a Temporal client to deliver the data.
 
 <img src="_assets/temporal_signal_handling.png">
 
 Within the agent implementation there are three main elements to the solution.
 
-### Local state within the workflow implementation
-This state will be written to via the signal handler and will be part of the condition that defines the wait point.
+### Local state within the Workflow implementation
+This state will be written to via the Signal handler and will be part of the condition that defines the wait point.
 ```python
 @workflow.defn
 class HumanInTheLoopWorkflow:
@@ -113,8 +113,8 @@ class HumanInTheLoopWorkflow:
         self.current_decision: Optional[ApprovalDecision] = None
         self.pending_request_id: Optional[str] = None
 ```
-### Signal Handler
-The workflow uses a signal handler to receive approval decisions asynchronously:
+### Signal handler
+The Workflow uses a Signal handler to receive approval decisions asynchronously:
 ```python
 @workflow.signal
 async def approval_decision(self, decision: ApprovalDecision):
@@ -123,8 +123,8 @@ async def approval_decision(self, decision: ApprovalDecision):
     ...
 ```
 
-### Waiting with Timeout
-The workflow waits for approval with a configurable timeout:
+### Waiting with timeout
+The Workflow waits for approval with a configurable timeout:
 ```python
 await workflow.wait_condition(
     lambda: self.approval_decision is not None,
