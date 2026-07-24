@@ -1,9 +1,9 @@
 <!--
-description: A basic agentic loop that invokes a dynamic set of tools. 
-tags: [agents, python]
+description: Build a durable agentic loop in Python that calls a dynamic set of tools with Temporal and the OpenAI Responses API.
+tags: [agents, python, openai]
 priority: 775
 -->
-# Basic Agentic Loop with Tool Calling
+# Basic agentic loop with OpenAI and tool calling
 
 This example implements a basic agentic loop that has a set of tools available. If the
 agent determines that no tools are needed to satisfy a user request, it will respond
@@ -14,14 +14,14 @@ appropriate tool.
 Tools are supplied to the [`responses` API](https://platform.openai.com/docs/api-reference/responses/create) through the [`tools` parameter](https://platform.openai.com/docs/api-reference/responses/create#responses-create-tools). The `tools` parameter is in `json` format and includes a description of the function as well as descriptions of each of the arguments.
 
 > [!WARNING]
-> The API used to generate the tools `json` is an internal function from the [Open AI API](https://github.com/openai/openai-python) and may therefore change in the future. There currently is no public API to generate the tool definition from a Pydantic model or a function signature.
+> The API used to generate the tools `json` is an internal function from the [OpenAI API](https://github.com/openai/openai-python) and may therefore change in the future. There currently is no public API to generate the tool definition from a Pydantic model or a function signature.
 
 Being external API calls, invoking the LLM and invoking any functions/tools are done within a Temporal Activity.
 
 This recipe highlights the following key design decisions:
 - We use dynamic Activities to allow the agent to be loosely coupled from specific
 tools. This sample isolates the tools in the `tools` directory; changing the tools
-requires NO changes to the agent implementation.
+requires no changes to the agent implementation.
 - Because there is an agentic loop, each LLM invocation is passed the accumulated 
 *conversation history*, that includes the initial user input as well as LLM and tool 
 calls.
@@ -31,10 +31,10 @@ calls.
 
 Also see this foundational [recipe for basic tool calling](https://docs.temporal.io/ai-cookbook/tool-calling-python).
 
-## Application Components
+## Application components
 
 This example includes the following components:
-- The [workflow](#create-the-agent-agentic-loop) that contains the agentic loop and tool calling logic; this is the core of the agent implementation.
+- The [Workflow](#create-the-agent-agentic-loop) that contains the agentic loop and tool calling logic; this is the core of the agent implementation.
 - The activities for [invoking the LLM](#create-the-activity-for-llm-invocations) and for [invoking tools](#create-the-activity-for-the-tool-invocation).
 - A [helper function](#create-the-helper-function) that creates tool definitions of the appropriate form.
 - Sample [tools](#create-tool-definitions).
@@ -42,11 +42,11 @@ This example includes the following components:
 - An application that [initiates an interaction](#initiate-an-interaction-with-the-agent) with the agent.
 
 
-## Create the Agent (Agentic Loop)
+## Create the agent (agentic loop)
 
 ### Create the main agentic loop
 
-The agent is implemented as a Temporal workflow that:
+The agent is implemented as a Temporal Workflow that:
 - implements an agentic loop. The loop will continue until the agent responds with
 no tool calls.
 
@@ -295,7 +295,7 @@ If no tools are needed, respond in haikus.
 ## Create tool definitions
 
 Tools are defined in the `tools` directory and should be thought of as independent 
-from the agent implementation; as described above, dynamic Activities are leveraged 
+from the agent implementation; as described above, dynamic Activities are used 
 for this loose coupling. 
 
 The `__init__.py` file holds two examples of tool sets,
@@ -390,11 +390,11 @@ def get_location_info(req: GetLocationRequest) -> str:
     return f"{result['city']}, {result['regionName']}, {result['country']}"
 ```
 
-See files in github for more tool definitions.
+See files in GitHub for more tool definitions.
 
 ## Create the Worker
 
-The worker is the process that dispatches work to the various parts of the agent implementation - the orchestrator and the activities for the LLM and tool invocations.
+The Worker is the process that dispatches work to the various parts of the agent implementation - the orchestrator and the Activities for the LLM and tool invocations.
 
 *File: worker.py*
 
@@ -438,7 +438,7 @@ if __name__ == "__main__":
 
 ## Initiate an interaction with the agent
 
-In order to interact with this simple AI agent, we create a Temporal client and execute a workflow.
+To interact with this simple AI agent, we create a Temporal client and execute a Workflow.
 
 *File:start_workflow.py*
 ```python
