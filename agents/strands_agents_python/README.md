@@ -1,28 +1,28 @@
 <!--
-description: Build a durable AI agent with the Strands Agents SDK plugin that answers AWS questions via the AWS Documentation MCP server and a live announcements tool
-tags: [agents, python, strands agents, bedrock, aws, mcp]
+description: Build a durable AI agent in Python with Temporal and the Strands Agents SDK plugin, combining an MCP server tool with an Activity-backed tool that calls a live HTTP feed.
+tags: [agents, python, bedrock]
 priority: 750
 -->
 
-# Durable Tools and MCP with Strands Agents SDK
+# Durable agent with MCP and Activity-backed tools using the Strands Agents SDK
 
-This recipe builds a durable AI agent using the [Strands Agents SDK Integration for Temporal](https://github.com/temporalio/sdk-python/tree/main/temporalio/contrib/strands). The `StrandsPlugin` makes every model call, tool call, and MCP interaction run as a durable Temporal Activity. The Workflow just creates an agent and invokes it.
+This recipe builds a durable AI agent using the [Strands Agents SDK Integration for Temporal](https://github.com/temporalio/sdk-python/tree/main/temporalio/contrib/strands). The `StrandsPlugin` makes every model call, tool call, and MCP interaction run as a durable Temporal Activity. The Workflow creates an agent and invokes it.
 
 The agent acts as an AWS assistant with two kinds of tools:
 
-- **An MCP tool** — the [AWS Documentation MCP server](https://github.com/awslabs/mcp/tree/main/src/aws-documentation-mcp-server), run locally with `uvx`, lets the agent search and read AWS docs.
-- **A non-deterministic, activity-backed tool** — `get_recent_aws_announcements` fetches the live AWS "What's New" RSS feed. Because it makes a network call, it is a Temporal Activity wrapped with `activity_as_tool`, giving it durable execution, retries, and timeouts.
+- **An MCP tool**: the [AWS Documentation MCP server](https://github.com/awslabs/mcp/tree/main/src/aws-documentation-mcp-server), run locally with `uvx`, lets the agent search and read AWS documentation.
+- **A non-deterministic, Activity-backed tool**: `get_recent_aws_announcements` fetches the live AWS "What's New" RSS feed. Because it makes a network call, it is a Temporal Activity wrapped with `activity_as_tool`, which gives it Durable Execution, retries, and timeouts.
 
-It uses the plugin's **default Bedrock model** (`BedrockModel()` → Claude Sonnet 4).
+It uses the Strands default Bedrock model. As of `strands-agents` 1.42.0 that model is Claude Sonnet 4.6, resolved through the `global.anthropic.claude-sonnet-4-6` inference profile.
 
 ## Prerequisites
 
-1. **AWS Bedrock access**: Request access to Claude Sonnet 4 in the [Bedrock console](https://console.aws.amazon.com/bedrock/).
-2. **AWS credentials**: See [Strands' Amazon Bedrock guide](https://strandsagents.com/docs/user-guide/concepts/model-providers/amazon-bedrock/) for credential setup and model configuration.
+1. **AWS Bedrock access**: Request access to Claude Sonnet 4.6 in the [Bedrock console](https://console.aws.amazon.com/bedrock/). To use a different model, pass a configured `BedrockModel` to `StrandsPlugin`.
+2. **AWS credentials and region**: See [Strands' Amazon Bedrock guide](https://strandsagents.com/docs/user-guide/concepts/model-providers/amazon-bedrock/) for credential setup and model configuration. Strands falls back to `us-west-2` when `AWS_REGION` is unset, so set the region where you have model access.
 3. **`uvx`**: Required to run the AWS Documentation MCP server (ships with [`uv`](https://docs.astral.sh/uv/)).
 4. **A running Temporal dev server**: `temporal server start-dev`.
 
-## Create the Activity-Backed Tool
+## Create the Activity-backed tool
 
 A non-deterministic tool (live HTTP call) is defined as a Temporal Activity. The blocking request is offloaded with `asyncio.to_thread`, and retries are left to Temporal. The docstring becomes the tool description the model sees.
 
@@ -61,7 +61,7 @@ async def get_recent_aws_announcements(limit: int = 5) -> list[dict]:
 
 ## Create the Workflow
 
-The Workflow creates a `TemporalAgent` (the workflow-safe replacement for the Strands `Agent`) and gives it two tools: the AWS Docs MCP server referenced by name via `TemporalMCPClient`, and the Activity wrapped with `activity_as_tool`. `invoke_async` drives the agentic loop — there is no manual loop to maintain.
+The Workflow creates a `TemporalAgent`, the replacement for the Strands `Agent` that is safe to use inside a Workflow, and gives it two tools: the AWS Documentation MCP server referenced by name through `TemporalMCPClient`, and the Activity wrapped with `activity_as_tool`. `invoke_async` drives the agentic loop, so there is no manual loop to maintain.
 
 *File: workflows/aws_assistant_workflow.py*
 
@@ -109,7 +109,7 @@ class AWSAssistantWorkflow:
 
 ## Create the Worker
 
-The worker registers the `StrandsPlugin` on the client. The plugin installs the Pydantic data converter, registers the model and MCP activities, and — because no `models` are configured — uses the default `BedrockModel()`. MCP servers are registered by name via `mcp_clients`, each as a factory that launches the server (here, the AWS Docs MCP server over stdio with `uvx`).
+The Worker registers the `StrandsPlugin` on the client. The plugin installs the Pydantic Data Converter, registers the model and MCP Activities, and uses the default `BedrockModel()` because no `models` are configured. MCP servers are registered by name through `mcp_clients`, each as a factory that launches the server (here, the AWS Documentation MCP server over stdio with `uvx`).
 
 *File: worker.py*
 
@@ -128,6 +128,7 @@ from workflows.aws_assistant_workflow import AWSAssistantWorkflow
 TASK_QUEUE = "strands-aws-assistant-task-queue"
 
 def make_aws_docs_client() -> MCPClient:
+    """Factory for the AWS Documentation MCP server, run locally via uvx."""
     return MCPClient(
         lambda: stdio_client(
             StdioServerParameters(
@@ -147,6 +148,7 @@ async def main():
         workflows=[AWSAssistantWorkflow],
         activities=[get_recent_aws_announcements],
     )
+    print(f"Worker started, task queue: {TASK_QUEUE}")
     await worker.run()
 
 if __name__ == "__main__":
@@ -155,7 +157,7 @@ if __name__ == "__main__":
 
 ## Create the Workflow Starter
 
-The starter connects a client configured with the same plugin (so the data converters match), prompts for a question, and executes the workflow.
+The starter connects a client configured with the same plugin, so the Data Converters match, prompts for a question, and executes the Workflow.
 
 *File: start_workflow.py*
 
@@ -168,6 +170,8 @@ from temporalio.contrib.strands import StrandsPlugin
 
 from workflows.aws_assistant_workflow import AWSAssistantWorkflow
 
+TASK_QUEUE = "strands-aws-assistant-task-queue"
+
 async def main():
     client = await Client.connect("localhost:7233", plugins=[StrandsPlugin()])
 
@@ -177,7 +181,7 @@ async def main():
         AWSAssistantWorkflow.run,
         user_input,
         id="strands-aws-assistant",
-        task_queue="strands-aws-assistant-task-queue",
+        task_queue=TASK_QUEUE,
         id_conflict_policy=WorkflowIDConflictPolicy.TERMINATE_EXISTING,
     )
     print(f"Result: {result}")
@@ -194,19 +198,25 @@ Start the Temporal dev server:
 temporal server start-dev
 ```
 
-In a new terminal, run the worker (with AWS credentials configured as in the prerequisites):
+In a new terminal, install dependencies:
+
+```bash
+uv sync
+```
+
+Run the Worker, with AWS credentials and region configured as described in the prerequisites:
 
 ```bash
 uv run python -m worker
 ```
 
-In another terminal, start the workflow:
+In another terminal, start the Workflow:
 
 ```bash
 uv run python -m start_workflow
 ```
 
-## Example Interactions
+## Example interactions
 
 Try questions that exercise both tools:
 
@@ -214,15 +224,17 @@ Try questions that exercise both tools:
 - "Summarize the latest AWS announcements."
 - "How do I configure a Lambda function URL?"
 
-The agent decides which tools to use. Open the [Temporal UI](http://localhost:8233) to see the model invocation, the `get_recent_aws_announcements` activity, and the `aws-docs` MCP list-tools/call-tool operations all recorded as Activities in the workflow history.
+The agent decides which tools to use. Open the [Temporal UI](http://localhost:8233) to see the model invocation, the `get_recent_aws_announcements` Activity, and the `aws-docs` MCP list-tools and call-tool operations recorded as Activities in the Event History.
 
 ## Troubleshooting
 
 **Credentials not found**: See [Strands' Amazon Bedrock guide](https://strandsagents.com/docs/user-guide/concepts/model-providers/amazon-bedrock/).
 
+**Access denied or model not found**: Confirm you have access to Claude Sonnet 4.6 in the Bedrock console for the region you are using, and that `AWS_REGION` names that region. Strands defaults to `us-west-2` when the region is unset.
+
 **`uvx: command not found`**: Install [`uv`](https://docs.astral.sh/uv/); `uvx` runs the AWS Documentation MCP server.
 
-## Learn More
+## Learn more
 
 - [Temporal Strands Agents Plugin](https://github.com/temporalio/sdk-python/tree/main/temporalio/contrib/strands)
 - [Strands' Amazon Bedrock guide](https://strandsagents.com/docs/user-guide/concepts/model-providers/amazon-bedrock/)
