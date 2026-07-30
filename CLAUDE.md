@@ -69,6 +69,28 @@ Required fields: `description` (plain text), `tags` (array including category, l
 
 **Tests must pass** before a PR is merged. CI detects changed recipe directories and runs `uv sync && pytest tests/ --timeout=30` for each.
 
+## README Style Guide
+
+Top-level recipe READMEs are published to [docs.temporal.io](https://docs.temporal.io) as MDX pages. The `# H1` becomes the page `title`, the front matter `description` becomes the meta `description`, and the body becomes the page body. Follow the [Temporal documentation style guide](https://github.com/temporalio/documentation/blob/main/STYLE.md) so new recipes match published docs.
+
+**Front matter**
+
+- `description`: one sentence that reads as an SEO meta description. Front-load keywords and name the stack (for example "Build a durable agentic loop in Python with Temporal and the OpenAI Responses API."). End with a period. Write `tags:` with a space after the colon.
+- `tags`: order as `[<category>, python, <provider>]` (for example `[agents, python, openai]`). Reuse existing tags; don't invent one-off tags.
+
+**Titles and headings**
+
+- Use sentence case: capitalize only the first word and proper nouns ("Basic agentic loop with tool calling", not "Basic Agentic Loop With Tool Calling").
+- Keep provider/product names capitalized (Temporal, OpenAI, Claude, MCP, LiteLLM, AI, HTTP).
+- Keep parallel titles across sibling recipes (for example the OpenAI and Claude agentic-loop recipes name their provider the same way).
+
+**Body prose**
+
+- Capitalize Temporal core terms as proper nouns in prose: Workflow, Activity, Worker, Signal, Event History. In code and code comments, follow the language's conventions (lowercase `workflow`, `activity`, etc.).
+- Use "Temporal Service" (not "Cluster") for a running backend, and spell out "identifier" outside core terms (use "Workflow Id", "request identifier").
+- Cut filler ("in order to", "simply", "easily", "just") and vague intensifiers ("powerful", "robust", "seamless", "leverage" → "use"). Prefer brevity.
+- Do not add emojis; use em dashes sparingly.
+
 ## Local Development Prerequisites
 
 - Python 3.10+

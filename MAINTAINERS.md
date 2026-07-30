@@ -4,7 +4,7 @@ Maintainers that are part of Project Leadership make decisions about the project
 ## Product owner
 The Product Owner is responsible for taking in feedback from stakeholders and maintaining the project backlog and product roadmap. They also hold a cadence with technical reviewers to ensure contributors are getting timely attention to their submissions.
 
-- [Angie Byron](https://github.com/webchick) (interim)
+- [Duncan Mackenzie](https://github.com/Duncanma)
 
 ## Technical strategist
 The Technical Strategist works with the Product Owner to define and prioritize the product roadmap, and is available to consult on technical matters.
@@ -12,7 +12,7 @@ The Technical Strategist works with the Product Owner to define and prioritize t
 - [Cornelia Davis](https://github.com/cdavisafc)
 
 ## Cross-functional liaisons
-AI Cookbook is a cross-functional initiative, and liaisons represent their functions' unique viewpoints and provide feedback into the priorities and roadmap of the project. They also help secure other folks from their respetive teams if needed to make progress on recipes and reviews.
+AI Cookbook is a cross-functional initiative, and liaisons represent their functions' unique viewpoints and provide feedback into the priorities and roadmap of the project. They also help secure folks from their respective teams if needed to make progress on new recipes and reviews.
 
 ### Solution Architect liaisons
 - Growth: [Josh Smith](https://github.com/joshmsmith)
@@ -24,11 +24,11 @@ AI Cookbook is a cross-functional initiative, and liaisons represent their funct
 ### AI Foundations liaison
 - [Donald Pickney](https://github.com/donald-pinckney)
 
-### DevRel liaison
-- [Cecil Philip](https://github.com/cecilphillip)
+### AI DevRel liaison
+- TBD
 
-### Documentation and Tooling liaison
-- [Duncan Mackenzie](https://github.com/Duncanma)
+### Validated Patterns liaison
+- [Cecil Philip](https://github.com/cecilphillip)
 
 # Technical reviewers
 Technical reviewers ensure that contributors' submissions are looked at in a timely manner, provide architectural guidance, etc.
@@ -57,6 +57,7 @@ Technical reviewers ensure that contributors' submissions are looked at in a tim
 Tooling maintainers give care and feeding to the infrastructure underpinning the project.
 
 ## Documentation Tooling
+- [Duncan Mackenzie](https://github.com/Duncanma)
 - [Lenny Chen](https://github.com/lennessyy)
 
 ## Automated Content + Standards Tooling

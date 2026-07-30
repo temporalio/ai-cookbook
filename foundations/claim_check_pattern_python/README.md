@@ -1,10 +1,10 @@
 <!-- 
-description: Use the Claim Check pattern to handle large payloads to workflows and activities.
-tags:[foundations, claim-check, python, s3]
+description: Use the Claim Check pattern with Temporal to keep large payloads out of Event History by offloading them to S3.
+tags: [foundations, python, s3, claim-check]
 priority: 400
 -->
 
-# Claim Check Pattern with Temporal
+# Claim check pattern with Temporal
 
 This recipe demonstrates how to use the Claim Check pattern to offload data from Temporal Server's Event History to external storage. This can be useful in conversational AI applications that include the full conversation history with each LLM call, creating large Event History that can exceed server size limits.
 
@@ -15,9 +15,9 @@ This recipe includes:
 - A lightweight codec server for a better Web UI experience
 - An AI/RAG example workflow that demonstrates the pattern end-to-end
 
-## How the Claim Check Pattern Works
+## How the Claim Check pattern works
 
-Each Temporal Workflow has an associated Event History that is stored in Temporal Server and used to provide durable execution. When using the Claim Check pattern, we store the payload content of the Event in separate storage system, then store a reference to that storage in the Temporal Event History instead.
+Each Temporal Workflow has an associated Event History that is stored in Temporal Server and used to provide durable execution. When using the Claim Check pattern, we store the payload content of the Event in a separate storage system, then store a reference to that storage in the Temporal Event History instead.
 
 The Claim Check Recipe implements a `PayloadCodec` that:
 
@@ -26,7 +26,7 @@ The Claim Check Recipe implements a `PayloadCodec` that:
 
 Workflows operate with small, lightweight keys while maintaining transparent access to full data through automatic encoding/decoding.
 
-## Claim Check Codec Implementation
+## Claim Check codec implementation
 
 The `ClaimCheckCodec` implements `PayloadCodec` and adds an inline threshold to keep small payloads inline. This avoids the latency costs of uploading/downloading the payload externally when it's not required.
 
@@ -222,7 +222,7 @@ class ClaimCheckCodec(PayloadCodec):
 - Where configured: `ClaimCheckCodec(max_inline_bytes=20 * 1024)` in `codec/claim_check.py`
 - Change by passing a different `max_inline_bytes` when constructing `ClaimCheckCodec`
 
-## Claim Check Plugin
+## Claim Check plugin
 
 The `ClaimCheckPlugin` integrates the codec with the Temporal client configuration.
 
@@ -253,11 +253,11 @@ class ClaimCheckPlugin(SimplePlugin):
         )
 ```
 
-## Example: AI / RAG Workflow using Claim Check
+## Example: AI/RAG Workflow using Claim Check
 
 This example ingests a large text, performs lightweight lexical retrieval, and answers a question with an LLM. Large intermediates (chunks, scores) are kept out of Temporal payloads via the Claim Check codec. Only the small final answer is returned inline.
 
-### Shared Models
+### Shared models
 
 *File: shared/models.py*
 
@@ -486,7 +486,7 @@ uv run python -m start_workflow
 
 To demonstrate payload size failures without claim check, you can disable it in your local wiring (e.g., omit the plugin/codec) and re-run. With claim check disabled, large payloads may exceed Temporal's default payload size limits and fail.
 
-## Codec Server for Web UI
+## Codec server for Web UI
 
 When claim check is enabled, the Web UI would otherwise show opaque keys. This codec server shows helpful text with a link to view the raw data on demand.
 
@@ -627,7 +627,7 @@ if __name__ == "__main__":
     web.run_app(build_codec_server(), host="127.0.0.1", port=8081)
 ```
 
-### Running the Codec Server
+### Running the codec server
 
 ```bash
 uv run python -m codec.codec_server
