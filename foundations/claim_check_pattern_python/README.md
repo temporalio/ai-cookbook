@@ -420,7 +420,7 @@ class AiRagWorkflow:
 
 - MinIO server (for local testing) or AWS S3 access (for production)
 - Temporal dev server
-- Python 3.9+
+- Python 3.10+
 
 ### Configuration
 
