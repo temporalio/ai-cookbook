@@ -7,7 +7,7 @@ from temporalio import activity
 from temporalio.common import RawValue
 from temporalio.contrib.pydantic import pydantic_data_converter
 from datetime import timedelta
-from typing import Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 from anthropic.types import Message, TextBlock, ToolUseBlock, Usage

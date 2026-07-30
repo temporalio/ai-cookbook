@@ -206,7 +206,7 @@ Implement a single tool invocation Activity, as a dynamic Activity (note the `@a
 *File: activities/tool_invoker.py*
 ```python
 from temporalio import activity
-from typing import Sequence
+from collections.abc import Sequence
 from temporalio.common import RawValue
 import inspect
 from pydantic import BaseModel
