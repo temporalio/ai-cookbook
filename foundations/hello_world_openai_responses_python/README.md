@@ -66,13 +66,18 @@ As per usual, the Activity retry configuration is set here in the Workflow. In t
 so the default retry policy is used (exponential backoff with 1s initial interval, 2.0 backoff coefficient, max interval
 100× initial, unlimited attempts, no non-retryable errors).
 
+The Activity module is imported inside `workflow.unsafe.imports_passed_through()`. Importing it pulls in the OpenAI
+client and, through it, `httpx`, which touches modules that the Workflow sandbox restricts at import time. Activity code
+runs outside the sandbox, so passing the module through is safe.
+
 *File: workflows/hello_world_workflow.py*
 
 ```python
 from temporalio import workflow
 from datetime import timedelta
 
-from activities import openai_responses
+with workflow.unsafe.imports_passed_through():
+    from activities import openai_responses
 
 
 @workflow.defn

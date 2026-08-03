@@ -213,7 +213,7 @@ and that function is then called with the supplied arguments.
 *File: activities/tool_invoker.py*
 ```python
 from temporalio import activity
-from typing import Sequence
+from collections.abc import Sequence
 from temporalio.common import RawValue
 import inspect
 from pydantic import BaseModel

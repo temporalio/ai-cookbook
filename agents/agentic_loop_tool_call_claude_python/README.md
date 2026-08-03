@@ -70,7 +70,7 @@ class AgentWorkflow:
             result = await workflow.execute_activity(
                 claude_responses.create,
                 claude_responses.ClaudeResponsesRequest(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-sonnet-4-5-20250929",
                     system=tool_helpers.HELPFUL_AGENT_SYSTEM_INSTRUCTIONS,
                     messages=messages,
                     tools=get_tools(),
@@ -158,13 +158,17 @@ The tool execution handler is invoked by the main agentic loop when Claude has c
 
 We create a wrapper for the `create` method of the `AsyncAnthropic` client object. This is a generic Activity that invokes Claude's Messages API.
 
-We set `max_retries=0` when creating the `AsyncAnthropic` client. This moves the responsibility for retries from the Anthropic client to Temporal. This means that the Activity should interpret any errors coming from Claude's API call and return the appropriate error type so that the Workflow knows if it should retry the Activity or not.
+We set `max_retries=0` when creating the `AsyncAnthropic` client. This moves the responsibility for retries from the Anthropic client to Temporal. The Activity then has to interpret the errors coming from Claude's API so the Workflow knows whether to retry.
+
+Errors that can never succeed on a retry, such as a 404 for a retired model identifier or a 401 for a bad API key, are re-raised as a non-retryable `ApplicationError`. Without this they would be retried under the default retry policy until the Workflow timed out, which hides the real problem. Transient errors such as rate limits and 5xx responses propagate unchanged so that Temporal retries them.
 
 In this implementation, we allow for the model, system instructions, messages, list of tools, and max_tokens (required) to be passed in.
 
 *File: activities/claude_responses.py*
 ```python
 from temporalio import activity
+from temporalio.exceptions import ApplicationError
+import anthropic
 from anthropic import AsyncAnthropic
 from anthropic.types import Message
 from dataclasses import dataclass
@@ -182,8 +186,6 @@ class ClaudeResponsesRequest:
 @activity.defn
 async def create(request: ClaudeResponsesRequest) -> Message:
     # We disable retry logic in Anthropic API client library so that Temporal can handle retries.
-    # In a real setting, you would need to handle any errors coming back from the Anthropic API,
-    # so that Temporal can appropriately retry in the manner that Anthropic API would.
     client = AsyncAnthropic(max_retries=0)
 
     try:
@@ -195,6 +197,22 @@ async def create(request: ClaudeResponsesRequest) -> Message:
             max_tokens=request.max_tokens,
         )
         return resp
+    except (
+        anthropic.BadRequestError,
+        anthropic.AuthenticationError,
+        anthropic.PermissionDeniedError,
+        anthropic.NotFoundError,
+        anthropic.UnprocessableEntityError,
+    ) as exc:
+        # These errors will never succeed on a retry: a retired model identifier, for
+        # example, returns 404. Retrying them under the default policy would loop
+        # forever instead of surfacing the problem. Everything else, such as rate
+        # limits and 5xx responses, propagates so Temporal can retry it.
+        raise ApplicationError(
+            str(exc),
+            type=exc.__class__.__name__,
+            non_retryable=True,
+        ) from exc
     finally:
         await client.close()
 ```
@@ -206,7 +224,7 @@ Implement a single tool invocation Activity, as a dynamic Activity (note the `@a
 *File: activities/tool_invoker.py*
 ```python
 from temporalio import activity
-from typing import Sequence
+from collections.abc import Sequence
 from temporalio.common import RawValue
 import inspect
 from pydantic import BaseModel
@@ -502,3 +520,11 @@ uv run python -m start_workflow "where am I?"
 uv run python -m start_workflow "what is my ip address?"
 uv run python -m start_workflow "tell me about recursion"
 ```
+
+## Troubleshooting
+
+**`not_found_error` naming the model**: Anthropic retires older model identifiers, and this recipe pins one in `workflows/agent.py`. Check the [list of current models](https://docs.claude.com/en/docs/about-claude/models/overview) and update the identifier. The Activity classifies this error as non-retryable, so the Workflow fails with the API message rather than retrying.
+
+**`authentication_error`**: `ANTHROPIC_API_KEY` is unset or invalid in the terminal running the Worker. The Activity, not `start_workflow`, makes the API call, so the key has to be set where the Worker runs.
+
+**Workflow runs but no tool is invoked**: Claude decides whether a tool is needed. Prompts like "tell me about recursion" are answered directly. Check the Event History in the [Temporal UI](http://localhost:8233) to see which Activities were scheduled.
