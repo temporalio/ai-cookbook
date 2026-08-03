@@ -3,7 +3,7 @@ name = "cookbook-agentic-loop-claude-python"
 version = "0.1"
 description = "Agentic loop with Claude (Anthropic) and tool calling"
 authors = [{ name = "Temporal Technologies Inc", email = "sdk@temporal.io" }]
-requires-python = ">=3.10,<3.14"
+requires-python = ">=3.10"
 readme = "README.md"
 license = "MIT"
 dependencies = [

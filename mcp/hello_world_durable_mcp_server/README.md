@@ -1,9 +1,9 @@
 <!--
-description: A durable MCP server that uses Temporal workflows for reliable execution of weather tools.
+description: Build a durable MCP server in Python that runs weather tools reliably with Temporal Workflows.
 tags: [mcp, python, workflows]
 priority: 775
 -->
-# Durable MCP Weather Server
+# Durable MCP weather server
 
 This example demonstrates how to build a durable MCP (Model Context Protocol) server using Temporal Workflows for Durable Execution. The server exposes weather tools that fetch alerts and forecasts from the National Weather Service API.
 
@@ -12,31 +12,31 @@ MCP tools are "actions" that the MCP server can perform. Within a given MCP tool
 - Call the National Weather Service API again to retrieve the forecast for that region
 - Format and return the response to the user
 
-In this one tool alone, we are taking several steps to complete a given action. We implement these steps in a Temporal Workflow, which ensures durability out-of-the-box. This means that whenever your MCP tool is called, it kicks off the Temporal Workflow, and every step (API call, function) is executed reliably and all the way to completion.
+In this one tool alone, we are taking several steps to complete a given action. We implement these steps in a Temporal Workflow, which provides durability. This means that whenever your MCP tool is called, it kicks off the Temporal Workflow, and every step (API call, function) is executed reliably and all the way to completion.
 
 We use [FastMCP](https://github.com/jlowin/fastmcp) to implement the MCP Server and create tools using the decorator `@mcp.tool`.
 
 > [!NOTE]
-> External API calls are made within Temporal Activities. This ensures that network requests are retried appropriately and failures are handled gracefully.
+> External API calls are made within Temporal Activities. This ensures that network requests are retried appropriately and failures are handled.
 
 This recipe highlights the following key design decisions:
-- **Separation of concerns**: MCP tools act as thin wrappers that start Temporal Workflows. All business logic lives in workflows, ensuring durability and reliability.
+- **Separation of concerns**: MCP tools act as thin wrappers that start Temporal Workflows. All business logic lives in Workflows, ensuring durability and reliability.
 - **Durable Execution**: By moving multi-step operations into Temporal Workflows, we guarantee that operations complete even in the face of failures, network issues, or process restarts.
 - **Activity-based external calls**: All external API calls (like NWS API requests) are made within Temporal Activities, which provides automatic retries and proper error handling.
-- **Retry policies**: Workflows use configurable retry policies to handle transient failures gracefully.
+- **Retry policies**: Workflows use configurable retry policies to handle transient failures.
 
 Also see this foundational [recipe for basic tool calling](https://docs.temporal.io/ai-cookbook/tool-calling-python) using the same weather tools.
 
-## Application Components
+## Application components
 
 This example includes the following components:
-- The [MCP server](#create-the-mcp-server) (mcp_server.py) that exposes tools via FastMCP and starts Temporal workflows
+- The [MCP server](#create-the-mcp-server) (mcp_server.py) that exposes tools via FastMCP and starts Temporal Workflows
 - The [Workflows](#create-the-workflows) (weather_workflows.py) that orchestrate the multi-step weather operations
 - The [Activity](#create-the-activity) (weather_activities.py) for making external API calls to the National Weather Service
 - The [Worker](#create-the-worker) (worker.py) (that manages the Workflows and Activities)
 - [Config for Claude Desktop](#configure-claude-desktop) (claude_desktop_config.json) for connecting the MCP server to Claude Desktop
 
-## Create the MCP Server
+## Create the MCP server
 
 The MCP server is implemented using FastMCP and exposes tools via the `@mcp.tool` decorator. Each tool is a thin wrapper that starts a Temporal Workflow and waits for the result. This design ensures that all business logic lives in durable Workflows.
 
@@ -102,7 +102,7 @@ if __name__ == "__main__":
 
 ## Create the Workflows
 
-The Workflows contain the business logic for fetching weather data. They orchestrate multiple steps, including API calls and data formatting. By implementing this logic in workflows, we ensure that operations complete reliably even if there are failures or interruptions.
+The Workflows contain the business logic for fetching weather data. They orchestrate multiple steps, including API calls and data formatting. By implementing this logic in Workflows, we ensure that operations complete reliably even if there are failures or interruptions.
 
 ### GetAlerts Workflow
 
@@ -251,7 +251,7 @@ async def make_nws_request(url: str) -> dict[str, Any] | None:
 
 ## Create the Worker
 
-The Worker is the process that excutes Activities and Workflows. 
+The Worker is the process that executes Activities and Workflows. 
 
 *File: worker.py*
 
@@ -328,7 +328,7 @@ This recipe uses Temporal's environment configuration system to connect to Tempo
 
    For TLS certificate authentication instead of API key, refer to the [Temporal environment configuration documentation](https://docs.temporal.io/develop/environment-configuration) for details.
 
-## Running the MCP Server
+## Running the MCP server
 
 1. Install dependencies:
    ```bash
@@ -357,4 +357,4 @@ You can now ask Claude something like `What is the weather like in San Francisco
 > [!NOTE]
 > The National Weather Service API only supports US locations. Asking about weather in non-US locations (e.g., "What is the weather in London?") will result in a 404 error from the API. 
 
-After tool execution, Claude Desktop will send the result over to the LLM (with other context) for human formating, and then returns that result to the user. You can see these and other MCP-related actions in the `mcp_server.log`.
+After tool execution, Claude Desktop will send the result over to the LLM (with other context) for human formatting, and then returns that result to the user. You can see these and other MCP-related actions in the `mcp_server.log`.
