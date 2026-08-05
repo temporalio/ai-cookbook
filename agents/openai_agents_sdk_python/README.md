@@ -1,29 +1,26 @@
 <!--
-description: Build a durable AI agent with OpenAI Agents SDK and Temporal that can intelligently choose tools to answer user questions
+description: Build a durable AI agent with the OpenAI Agents SDK and Temporal that chooses tools to answer user questions.
 tags: [agents, python, openai]
-<<<<<<< HEAD
 priority: 750
 -->
 
-# Durable Agent using OpenAI Agents SDK
+# Durable agent with tools using the OpenAI Agents SDK
 
-# Hello World - Agent with Tools
-
-In this example, we show you how to build a Durable Agent using the [OpenAI Agents SDK Integration for Temporal](https://github.com/temporalio/sdk-python/tree/main/temporalio/contrib/openai_agents). The AI agent we build will have access to [tools](https://github.com/temporalio/sdk-python/tree/main/temporalio/contrib/openai_agents#tool-calling) (Temporal Activities) to answer user questions. The agent can determine which tools to use based on the user's input and execute them as needed.
+In this example, we show you how to build a durable agent using the [OpenAI Agents SDK Integration for Temporal](https://github.com/temporalio/sdk-python/tree/main/temporalio/contrib/openai_agents). The AI agent we build will have access to [tools](https://github.com/temporalio/sdk-python/tree/main/temporalio/contrib/openai_agents#tool-calling) (Temporal Activities) to answer user questions. The agent can determine which tools to use based on the user's input and execute them as needed.
 
 This recipe highlights key implementation patterns:
 
-- **Agent-based architecture**: Uses the OpenAI Agents SDK to create an intelligent agent that can reason about which tools to use and handles LLM invocation for you.
-- **Tool integration**: Temporal Activities can be seamlessly used as tools by the agent. The integration offers the **activity_as_tool** helper function, which:
-  - Automatically generates OpenAI-compatible tool schemas from activity function signatures
-  - Wraps activities as agent tools that can be provided directly to the Agent
-  - Enables the agent to invoke Temporal Activities as tools leveraging Temporal's durable execution for tool calls
+- **Agent-based architecture**: Uses the OpenAI Agents SDK to create an agent that can reason about which tools to use and handles LLM invocation for you.
+- **Tool integration**: Temporal Activities can be used as tools by the agent. The integration offers the **activity_as_tool** helper function, which:
+  - Automatically generates OpenAI-compatible tool schemas from Activity function signatures
+  - Wraps Activities as agent tools that can be provided directly to the Agent
+  - Enables the agent to invoke Temporal Activities as tools, using Temporal's durable execution for tool calls
 - **Durable execution**: The agent's state and execution are managed by Temporal, providing reliability and observability
 - **Plugin configuration**: Uses the `OpenAIAgentsPlugin` to configure Temporal for OpenAI Agents SDK integration
 
 ## Create the Activity
 
-We create activities that serve as tools for the agent. These activities can perform various tasks like getting weather information or performing calculations.
+We create Activities that serve as tools for the agent. These Activities can perform tasks like getting weather information or performing calculations.
 
 *File: activities/tools.py*
 
@@ -52,7 +49,7 @@ async def calculate_circle_area(radius: float) -> float:
 
 ## Create the Workflow
 
-The workflow creates an agent with specific instructions and tools. The agent can then process user input and decide which tools to use to answer questions. Since LLM invocation is an external API call, this typically would happen in a Temporal Activity. However, because of the Temporal Integration with OpenAI Agents SDK, this is being handled for us and we do not need to implement the Activity ourselves.
+The Workflow creates an agent with specific instructions and tools. The agent can then process user input and decide which tools to use to answer questions. Since LLM invocation is an external API call, this typically would happen in a Temporal Activity. However, because of the Temporal integration with the OpenAI Agents SDK, this is handled for us and we do not need to implement the Activity ourselves.
 
 *File: workflows/hello_world_workflow.py*
 
@@ -134,7 +131,7 @@ if __name__ == "__main__":
 
 ## Create the Workflow Starter
 
-The starter script submits the agent workflow to Temporal for execution, then waits for the result and prints it out.
+The starter script submits the agent Workflow to Temporal for execution, then waits for the result and prints it out.
 It uses the `OpenAIAgentsPlugin` to match the Worker configuration.
 
 *File: start_workflow.py*
@@ -143,7 +140,7 @@ It uses the `OpenAIAgentsPlugin` to match the Worker configuration.
 import asyncio
 
 from temporalio.client import Client
-from temporalio.common import WorkflowIDReusePolicy
+from temporalio.common import WorkflowIDConflictPolicy
 from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
 from workflows.hello_world_workflow import HelloWorldAgent
 
@@ -166,7 +163,7 @@ async def main():
         user_input,
         id="my-workflow-id",
         task_queue="hello-world-openai-agent-task-queue",
-        id_reuse_policy=WorkflowIDReusePolicy.TERMINATE_IF_RUNNING,
+        id_conflict_policy=WorkflowIDConflictPolicy.TERMINATE_IF_RUNNING,
     )
     print(f"Result: {result}")
 
@@ -204,7 +201,7 @@ Start execution:
 uv run python -m start_workflow
 ```
 
-## Example Interactions
+## Example interactions
 
 Try asking the agent questions like:
 
@@ -212,4 +209,4 @@ Try asking the agent questions like:
 - "Calculate the area of a circle with radius 5"
 - "What's the weather in Tokyo and calculate the area of a circle with radius 3"
 
-The agent will determine which tools to use and provide intelligent responses based on the available tools. Use the [OpenAI Traces dashboard](https://platform.openai.com/traces) to visualize and monitor your workflows and tool calling.
+The agent will determine which tools to use and provide responses based on the available tools. Use the [OpenAI Traces dashboard](https://platform.openai.com/traces) to visualize and monitor your Workflows and tool calling.

@@ -1,17 +1,17 @@
 <!--
-description: Build a simple, non-looping agent that gives agency to the LLM to choose tools, and then invokes chosen tools. 
-tags: [agents, python]
+description: Build a simple, non-looping Python agent that lets the LLM choose tools and then invokes the chosen tools with Temporal and OpenAI.
+tags: [agents, python, openai]
 priority: 775
 -->
 
 # Tool calling agent
 
-In this example, we demonstrate how function calling (also known as tool calling) works with the [Open AI API](https://github.com/openai/openai-python) and Temporal. Tool calling allows the model to make decisions on which, if any, functions should be invoked. It also provides information to the LLM that will allow it to structure the response in such a way that the agent can easily invoke the functions.
+In this example, we demonstrate how function calling (also known as tool calling) works with the [OpenAI API](https://github.com/openai/openai-python) and Temporal. Tool calling allows the model to make decisions on which, if any, functions should be invoked. It also provides information to the LLM that will allow it to structure the response so that the agent can invoke the functions.
 
-Tools are supplied to the [`responses` API](https://platform.openai.com/docs/api-reference/responses/create) through the [`tools` parameter](https://platform.openai.com/docs/api-reference/responses/create#responses-create-tools). The `tools` parameter is in`json` and includes a description of the function as well as descriptions of each of the arguments.
+Tools are supplied to the [`responses` API](https://platform.openai.com/docs/api-reference/responses/create) through the [`tools` parameter](https://platform.openai.com/docs/api-reference/responses/create#responses-create-tools). The `tools` parameter is in `json` and includes a description of the function as well as descriptions of each of the arguments.
 
 > [!WARNING]
-> The API used to generate the tools json is an internal function from the [Open AI API](https://github.com/openai/openai-python) and may therefore change in the future. There currently is no public API to generate the tool definition from a Pydantic model or a function signature.
+> The API used to generate the tools json is an internal function from the [OpenAI API](https://github.com/openai/openai-python) and may therefore change in the future. There currently is no public API to generate the tool definition from a Pydantic model or a function signature.
 
 Being external API calls, invoking the LLM and invoking the function are each done within a Temporal Activity.
 
@@ -71,10 +71,10 @@ async def create(request: OpenAIResponsesRequest) -> Response:
 
 We create a wrapper for invoking the [National Weather Service API](https://www.weather.gov/documentation/services-web-api), specifically for the weather alerts endpoint.
 
-We follow the Temporal best practice of encapsulating all input parameters to the activity in
-data structure, even here where this is only one argument.
+We follow the Temporal best practice of encapsulating all input parameters to the Activity in
+a data structure, even here where this is only one argument.
 
-The `WEATHER_ALERTS_TOOL_OAI` leverages a function defined in `helpers/tool_helpers.py` that calls the aforementioned internal OpenAI function, generating a dictionary that becomes the argument passed into the OpenAI responses API.
+The `WEATHER_ALERTS_TOOL_OAI` uses a function defined in `helpers/tool_helpers.py` that calls the aforementioned internal OpenAI function, generating a dictionary that becomes the argument passed into the OpenAI responses API.
 
 `activities/get_weather_alerts.py`
 ```python
@@ -136,7 +136,7 @@ async def get_weather_alerts(weather_alerts_request: GetWeatherAlertsRequest) ->
 The `oai_responses_tool_from_model` function accepts a tool name and description, as well as a list of argument name/description pairs and returns json that is in the format expected for tool definitions in the OpenAI responses API.
 
 > [!WARNING]
-> The API used to generate the tools json is an interal function from the [Open AI API](https://github.com/openai/openai-python) and may therefore change in the future. There currently is no public API to generate the tool definition from a Pydantic model or a function signature.
+> The API used to generate the tools json is an internal function from the [OpenAI API](https://github.com/openai/openai-python) and may therefore change in the future. There currently is no public API to generate the tool definition from a Pydantic model or a function signature.
 
 `helpers/tool_helpers.py`
 ```python
@@ -155,10 +155,10 @@ def oai_responses_tool_from_model(name: str, description: str, model: type[BaseM
     }
 ```
 
-## Create the Agent
+## Create the agent
 
-The agent is implemented as a Temporal workflow that orchestrates 
-- the intial LLM call with the initial user input and guidance to the LLM that they should respond in haiku when the user input doesn't lead to a tool call,
+The agent is implemented as a Temporal Workflow that orchestrates 
+- the initial LLM call with the initial user input and guidance to the LLM that they should respond in haiku when the user input doesn't lead to a tool call,
 - the invocation of the function, if the LLM has chosen one
 - and if a function has been called, the result is appended to the context that is then sent back to the LLM for interpretation (the LLM is instructed to format the tool response).
 
@@ -168,9 +168,8 @@ from temporalio import workflow
 from datetime import timedelta
 import json
 
-from activities import openai_responses
-
 with workflow.unsafe.imports_passed_through():
+    from activities import openai_responses
     from activities import get_weather_alerts
 
 
@@ -233,11 +232,11 @@ class ToolCallingWorkflow:
         result = result.output_text
 
         return result
- ```
+```
 
 ## Create the Worker
 
-The worker is the process that dispatches work to the various parts of the agent implementation - the orchestrator and the activities for the LLM and tool invocations.
+The Worker is the process that dispatches work to the various parts of the agent implementation - the orchestrator and the Activities for the LLM and tool invocations.
 
 *File: worker.py*
 
@@ -278,7 +277,7 @@ if __name__ == "__main__":
 
 ## Initiate an interaction with the agent
 
-In order to interact with this simple AI agent, we create a Temporal client and execute a workflow.
+To interact with this simple AI agent, we create a Temporal client and execute a Workflow.
 
 `start_workflow.py`
 ```python

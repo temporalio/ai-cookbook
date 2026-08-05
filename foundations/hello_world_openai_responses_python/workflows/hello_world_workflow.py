@@ -1,7 +1,8 @@
 from temporalio import workflow
 from datetime import timedelta
 
-from activities import openai_responses
+with workflow.unsafe.imports_passed_through():
+    from activities import openai_responses
 
 
 @workflow.defn

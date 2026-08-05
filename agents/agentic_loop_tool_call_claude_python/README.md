@@ -1,9 +1,9 @@
 <!--
-description: A basic agentic loop using Claude (Anthropic) with tool calling.
+description: Build a durable agentic loop in Python with Claude tool calling and Temporal.
 tags: [agents, python, claude]
 priority: 775
 -->
-# Basic Agentic Loop with Claude and Tool Calling
+# Basic agentic loop with Claude and tool calling
 
 This example implements an agentic loop using Claude (Anthropic) that has a set of tools available. If the agent determines that no tools are needed to satisfy a user request, it will return the response directly. If Claude determines a tool should be used, it will return with the name of the chosen tool and any needed parameters. The agent then invokes the appropriate tool.
 
@@ -20,7 +20,7 @@ This recipe highlights the following key design decisions:
 
 Also see this foundational [recipe for basic tool calling](https://docs.temporal.io/ai-cookbook/tool-calling-python).
 
-## Application Components
+## Application components
 
 This example includes the following components:
 - The [Workflow](#create-the-agent-agentic-loop) that contains the agentic loop and tool calling logic; this is the core of the agent implementation.
@@ -30,7 +30,7 @@ This example includes the following components:
 - The [Worker](#create-the-worker) that manages the Workflow and the Activities.
 - An application that [initiates an interaction](#initiate-an-interaction-with-the-agent) with the agent.
 
-## Create the Agent (Agentic Loop)
+## Create the agent (agentic loop)
 
 ### Create the main agentic loop
 
@@ -70,7 +70,7 @@ class AgentWorkflow:
             result = await workflow.execute_activity(
                 claude_responses.create,
                 claude_responses.ClaudeResponsesRequest(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-sonnet-4-5-20250929",
                     system=tool_helpers.HELPFUL_AGENT_SYSTEM_INSTRUCTIONS,
                     messages=messages,
                     tools=get_tools(),
@@ -158,13 +158,17 @@ The tool execution handler is invoked by the main agentic loop when Claude has c
 
 We create a wrapper for the `create` method of the `AsyncAnthropic` client object. This is a generic Activity that invokes Claude's Messages API.
 
-We set `max_retries=0` when creating the `AsyncAnthropic` client. This moves the responsibility for retries from the Anthropic client to Temporal. This means that the Activity should interpret any errors coming from Claude's API call and return the appropriate error type so that the Workflow knows if it should retry the Activity or not.
+We set `max_retries=0` when creating the `AsyncAnthropic` client. This moves the responsibility for retries from the Anthropic client to Temporal. The Activity then has to interpret the errors coming from Claude's API so the Workflow knows whether to retry.
 
-In this implementation, we allow for the model, system instructions, messages, lis6t of tools, and max_tokens (required) to be passed in.
+Errors that can never succeed on a retry, such as a 404 for a retired model identifier or a 401 for a bad API key, are re-raised as a non-retryable `ApplicationError`. Without this they would be retried under the default retry policy until the Workflow timed out, which hides the real problem. Transient errors such as rate limits and 5xx responses propagate unchanged so that Temporal retries them.
+
+In this implementation, we allow for the model, system instructions, messages, list of tools, and max_tokens (required) to be passed in.
 
 *File: activities/claude_responses.py*
 ```python
 from temporalio import activity
+from temporalio.exceptions import ApplicationError
+import anthropic
 from anthropic import AsyncAnthropic
 from anthropic.types import Message
 from dataclasses import dataclass
@@ -182,8 +186,6 @@ class ClaudeResponsesRequest:
 @activity.defn
 async def create(request: ClaudeResponsesRequest) -> Message:
     # We disable retry logic in Anthropic API client library so that Temporal can handle retries.
-    # In a real setting, you would need to handle any errors coming back from the Anthropic API,
-    # so that Temporal can appropriately retry in the manner that Anthropic API would.
     client = AsyncAnthropic(max_retries=0)
 
     try:
@@ -195,6 +197,22 @@ async def create(request: ClaudeResponsesRequest) -> Message:
             max_tokens=request.max_tokens,
         )
         return resp
+    except (
+        anthropic.BadRequestError,
+        anthropic.AuthenticationError,
+        anthropic.PermissionDeniedError,
+        anthropic.NotFoundError,
+        anthropic.UnprocessableEntityError,
+    ) as exc:
+        # These errors will never succeed on a retry: a retired model identifier, for
+        # example, returns 404. Retrying them under the default policy would loop
+        # forever instead of surfacing the problem. Everything else, such as rate
+        # limits and 5xx responses, propagates so Temporal can retry it.
+        raise ApplicationError(
+            str(exc),
+            type=exc.__class__.__name__,
+            non_retryable=True,
+        ) from exc
     finally:
         await client.close()
 ```
@@ -206,7 +224,7 @@ Implement a single tool invocation Activity, as a dynamic Activity (note the `@a
 *File: activities/tool_invoker.py*
 ```python
 from temporalio import activity
-from typing import Sequence
+from collections.abc import Sequence
 from temporalio.common import RawValue
 import inspect
 from pydantic import BaseModel
@@ -308,7 +326,7 @@ If no tools are needed, respond in haikus.
 
 ## Create tool definitions
 
-Tools are defined in the `tools` directory and should be thought of as independent from the agent implementation; as described above, dynamic Activities are leveraged for this loose coupling.
+Tools are defined in the `tools` directory and should be thought of as independent from the agent implementation; as described above, dynamic Activities are used for this loose coupling.
 
 The `__init__.py` file holds tools for providing location (`get_location_info`), IP address (`get_ip_address`), and weather alerts (`get_weather_alerts`).
 - The `get_tools` method returns the set of tool definitions that will be passed to Claude.
@@ -392,7 +410,7 @@ async def get_location_info(req: GetLocationRequest) -> str:
 
 ## Create the Worker
 
-The worker is the process that dispatches work to the various parts of the agent implementation - the orchestrator and the Activities for Claude and tool invocations.
+The Worker is the process that dispatches work to the various parts of the agent implementation - the orchestrator and the Activities for Claude and tool invocations.
 
 *File: worker.py*
 
@@ -436,7 +454,7 @@ if __name__ == "__main__":
 
 ## Initiate an interaction with the agent
 
-In order to interact with this simple AI agent, we create a Temporal client and execute a Workflow.
+To interact with this simple AI agent, we create a Temporal client and execute a Workflow.
 
 *File: start_workflow.py*
 ```python
@@ -502,3 +520,11 @@ uv run python -m start_workflow "where am I?"
 uv run python -m start_workflow "what is my ip address?"
 uv run python -m start_workflow "tell me about recursion"
 ```
+
+## Troubleshooting
+
+**`not_found_error` naming the model**: Anthropic retires older model identifiers, and this recipe pins one in `workflows/agent.py`. Check the [list of current models](https://docs.claude.com/en/docs/about-claude/models/overview) and update the identifier. The Activity classifies this error as non-retryable, so the Workflow fails with the API message rather than retrying.
+
+**`authentication_error`**: `ANTHROPIC_API_KEY` is unset or invalid in the terminal running the Worker. The Activity, not `start_workflow`, makes the API call, so the key has to be set where the Worker runs.
+
+**Workflow runs but no tool is invoked**: Claude decides whether a tool is needed. Prompts like "tell me about recursion" are answered directly. Check the Event History in the [Temporal UI](http://localhost:8233) to see which Activities were scheduled.

@@ -1,10 +1,12 @@
-from .shared import QueryPlan, ResearchPlan, today_str
+from .shared import QueryPlan, ResearchPlan, with_today
 from .config import EFFICIENT_PROCESSING_MODEL
-from activities.invoke_model import invoke_model, InvokeModelRequest
 from temporalio import workflow
 from datetime import timedelta
 
-QUERY_GENERATION_INSTRUCTIONS = f"""
+with workflow.unsafe.imports_passed_through():
+    from activities.invoke_model import invoke_model, InvokeModelRequest
+
+QUERY_GENERATION_INSTRUCTIONS = """
 You are a search query specialist who crafts effective web searches.
 
 CORE RESPONSIBILITIES:
@@ -23,8 +25,6 @@ OUTPUT REQUIREMENTS:
   - rationale: Why this query addresses research needs  
   - expected_info_type: One of "factual_data", "expert_analysis", "case_studies", "recent_news"
   - priority: 1-5 (5 highest priority)
-
-TODAY'S DATE: {today_str()}
 """
 
 
@@ -45,7 +45,7 @@ Success Criteria: {", ".join(research_plan.success_criteria)}
         invoke_model,
         InvokeModelRequest(
             model=EFFICIENT_PROCESSING_MODEL,
-            instructions=QUERY_GENERATION_INSTRUCTIONS,
+            instructions=with_today(QUERY_GENERATION_INSTRUCTIONS),
             input=plan_context,
             response_format=QueryPlan,
         ),

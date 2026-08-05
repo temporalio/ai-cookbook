@@ -1,16 +1,16 @@
 <!-- 
-description: Simple example demonstrating how to call an LLM from Temporal using the OpenAI Python API library.
-tags:[foundations, openai, python]
+description: Call an LLM from a durable Temporal Workflow in Python using the OpenAI API library.
+tags: [foundations, python, openai]
 priority: 999
 -->
 
-# Hello World
+# Hello world
 
 This is a simple example showing how to call an LLM from Temporal using the [OpenAI Python API library](https://github.com/openai/openai-python).
 
 Being an external API call, the LLM invocation happens in a Temporal Activity.
 
-This recipe highlights two key design decisions:
+This recipe highlights three key design decisions:
 
 - A generic Activity for invoking an LLM API. This Activity can be re-used with different arguments throughout your codebase.
 - Configuring the Temporal client with a `dataconverter` to allow serialization of Pydantic types.
@@ -66,13 +66,18 @@ As per usual, the Activity retry configuration is set here in the Workflow. In t
 so the default retry policy is used (exponential backoff with 1s initial interval, 2.0 backoff coefficient, max interval
 100× initial, unlimited attempts, no non-retryable errors).
 
+The Activity module is imported inside `workflow.unsafe.imports_passed_through()`. Importing it pulls in the OpenAI
+client and, through it, `httpx`, which touches modules that the Workflow sandbox restricts at import time. Activity code
+runs outside the sandbox, so passing the module through is safe.
+
 *File: workflows/hello_world_workflow.py*
 
 ```python
 from temporalio import workflow
 from datetime import timedelta
 
-from activities import openai_responses
+with workflow.unsafe.imports_passed_through():
+    from activities import openai_responses
 
 
 @workflow.defn
@@ -135,7 +140,7 @@ if __name__ == "__main__":
 
 ## Create the Workflow Starter
 
-The starter script submits the workflow to Temporal for execution, then waits for the result and prints it out.
+The starter script submits the Workflow to Temporal for execution, then waits for the result and prints it out.
 It uses the `pydantic_data_converter` to match the Worker configuration.
 
 *File: start_workflow.py*

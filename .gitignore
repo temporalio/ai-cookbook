@@ -95,6 +95,9 @@ venv.bak/
 .python-version
 __pypackages__/
 
+# Vercel docs preview build output
+.docs-build/
+
 # Editors and OS files
 .DS_Store
 .idea/
@@ -145,3 +148,6 @@ Thumbs.db
 
 # Coverage
 coverage/
+
+# Vercel
+.vercel

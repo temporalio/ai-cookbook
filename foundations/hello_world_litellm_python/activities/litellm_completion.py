@@ -1,10 +1,9 @@
 from typing import Any, Dict
 
 import litellm
+from activities.models import LiteLLMRequest
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
-
-from activities.models import LiteLLMRequest
 
 
 @activity.defn(name="activities.litellm_completion.create")

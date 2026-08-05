@@ -1,8 +1,8 @@
 from datetime import timedelta
 
+from activities.models import LiteLLMRequest
 from temporalio import workflow
 
-from activities.models import LiteLLMRequest
 
 @workflow.defn
 class HelloWorld:
@@ -25,6 +25,8 @@ class HelloWorld:
 
         message = response["choices"][0]["message"]["content"]
         if isinstance(message, list):
-            message = "".join(part.get("text", "") for part in message if isinstance(part, dict))
+            message = "".join(
+                part.get("text", "") for part in message if isinstance(part, dict)
+            )
 
         return message

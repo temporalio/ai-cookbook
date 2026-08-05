@@ -1,5 +1,5 @@
 from temporalio import activity
-from typing import Sequence
+from collections.abc import Sequence
 from temporalio.common import RawValue
 import inspect
 from pydantic import BaseModel
