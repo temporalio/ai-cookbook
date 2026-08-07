@@ -1,7 +1,7 @@
 <!--
 description: Build a durable AI agent with the AI SDK by Vercel and Temporal that chooses tools to answer user questions.
 tags: [agents, typescript, openai]
-priority: 5
+priority: 750
 -->
 
 # Durable agent with tools using the AI SDK by Vercel
@@ -83,6 +83,8 @@ The Workflow registers both Activities as tools with a Zod schema so the model c
 *File: src/workflows.ts*
 
 ```ts
+import '@temporalio/ai-sdk/lib/load-polyfills';
+import type * as activities from './activities';
 import { generateText, stepCountIs, tool } from 'ai';
 import { temporalProvider } from '@temporalio/ai-sdk';
 import { proxyActivities } from '@temporalio/workflow';
@@ -134,16 +136,23 @@ import * as activities from './activities';
 import { AiSdkPlugin } from '@temporalio/ai-sdk';
 import { openai } from '@ai-sdk/openai';
 
-const connection = await NativeConnection.connect({ address: 'localhost:7233' });
-const worker = await Worker.create({
-  plugins: [new AiSdkPlugin({ modelProvider: openai })],
-  connection,
-  namespace: 'default',
-  taskQueue: 'ai-sdk',
-  workflowsPath: require.resolve('./workflows'),
-  activities,
+async function run() {
+  const connection = await NativeConnection.connect({ address: 'localhost:7233' });
+  const worker = await Worker.create({
+    plugins: [new AiSdkPlugin({ modelProvider: openai })],
+    connection,
+    namespace: 'default',
+    taskQueue: 'ai-sdk',
+    workflowsPath: require.resolve('./workflows'),
+    activities,
+  });
+  await worker.run();
+}
+
+run().catch((err) => {
+  console.error(err);
+  process.exit(1);
 });
-await worker.run();
 ```
 
 ## Create the Workflow Starter
@@ -184,34 +193,38 @@ run().catch((err) => {
 ## Running
 
 Start the Temporal Dev Server:
-```
+```bash
 temporal server start-dev
 ```
 
 Install all dependencies:
-```
+```bash
 npm install
 ```
 
 Set your API Key based on your preferred model provider:
-```
+```bash
 export OPENAI_API_KEY=<KEY>
 ```
 
 Run the worker:
-```
+```bash
 npm run start.watch
 ```
 
 Start execution with the default question, or supply your own:
-```
+```bash
 npm run workflow
 npm run workflow "What is the weather in Chicago?"
 npm run workflow "Calculate the area of a circle with radius 5"
 ```
 
-## Example prompts
+## Example interactions
 
-- `"What is the weather in Seattle right now?"` → `toolsAgent` calls `getWeather`, which geocodes the city and queries the National Weather Service, and weaves the result into the final reply.
-- `"Calculate the area of a circle with radius 5"` → `toolsAgent` invokes `calculateAreaOfCircle` and includes the numeric result.
-- `"What is the weather in Chicago and calculate the area of a circle with radius 3"` → `toolsAgent` calls both tools in the same run.
+Try asking the agent questions like:
+
+- "What is the weather in Seattle right now?"
+- "Calculate the area of a circle with radius 5"
+- "What is the weather in Chicago and calculate the area of a circle with radius 3"
+
+The agent decides which tools to use. Open the [Temporal UI](http://localhost:8233) to see the `invokeModel`, `getWeather`, and `calculateAreaOfCircle` Activities recorded in the Event History.
