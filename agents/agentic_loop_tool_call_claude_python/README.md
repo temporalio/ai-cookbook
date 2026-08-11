@@ -332,7 +332,7 @@ The `__init__.py` file holds tools for providing location (`get_location_info`),
 - The `get_tools` method returns the set of tool definitions that will be passed to Claude.
 - The `get_handler` method captures the mapping from tool name to tool function.
 
-*File: tools/__init__.py*
+*File: tools/\_\_init\_\_.py*
 ```python
 from typing import Any, Awaitable, Callable
 
@@ -505,20 +505,20 @@ uv sync
 Start the agent Worker:
 
 ```bash
-uv run python -m worker
+uv run worker.py
 ```
 
 Make request to the agent:
 
 ```bash
-uv run python -m start_workflow "are there any weather alerts for where I am?"
+uv run start_workflow.py "are there any weather alerts for where I am?"
 ```
 
 Try a number of different user prompts:
 ```bash
-uv run python -m start_workflow "where am I?"
-uv run python -m start_workflow "what is my ip address?"
-uv run python -m start_workflow "tell me about recursion"
+uv run start_workflow.py "where am I?"
+uv run start_workflow.py "what is my ip address?"
+uv run start_workflow.py "tell me about recursion"
 ```
 
 ## Troubleshooting

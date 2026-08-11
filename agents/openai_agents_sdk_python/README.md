@@ -192,13 +192,13 @@ export OPENAI_API_KEY=sk...
 Run the worker:
 
 ```bash
-uv run python -m worker
+uv run worker.py
 ```
 
 Start execution:
 
 ```bash
-uv run python -m start_workflow
+uv run start_workflow.py
 ```
 
 ## Example interactions

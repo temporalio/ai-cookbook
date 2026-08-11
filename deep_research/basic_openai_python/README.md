@@ -528,17 +528,17 @@ temporal server start-dev
 Run the worker:
 
 ```bash
-uv run python -m worker
+uv run worker.py
 ```
 
 Start execution:
 
 ```bash
-uv run python -m start_workflow
+uv run start_workflow.py
 ```
 
 To start execution with a specific query:
 
 ```bash
-uv run python -m start_workflow "What is the latest news on the stock market?"
+uv run start_workflow.py "What is the latest news on the stock market?"
 ```
