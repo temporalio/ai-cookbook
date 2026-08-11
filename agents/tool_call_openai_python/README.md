@@ -333,7 +333,7 @@ uv sync
 First set the `OPENAI_API_KEY` environment variable and then:
 
 ```bash
-uv run python -m worker
+uv run worker.py
 ```
 
 ### Initiate an interaction with the agent
@@ -341,11 +341,11 @@ uv run python -m worker
 This user input should not result in any tool call
 
 ```bash
-uv run python -m start_workflow "Tell me about recursion in programming."
+uv run start_workflow.py "Tell me about recursion in programming."
 ```
 
 This user input should invoke the tool and respond with current weather alerts for California.
 
 ```bash
-uv run python -m start_workflow "Are there any weather alerts in California?"
+uv run start_workflow.py "Are there any weather alerts in California?"
 ```

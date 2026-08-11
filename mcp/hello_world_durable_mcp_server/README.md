@@ -343,7 +343,7 @@ This recipe uses Temporal's environment configuration system to connect to Tempo
 
 3. Start the worker in one terminal:
    ```bash
-   uv run python worker.py
+   uv run worker.py
    ```
 
 4. Configure Claude Desktop by adding the configuration from `claude_desktop_config.json` to your Claude Desktop config file (typically located at `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS).

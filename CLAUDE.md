@@ -15,8 +15,8 @@ All Python recipes use [`uv`](https://docs.astral.sh/uv/) for dependency managem
 ```bash
 uv sync                  # install/sync dependencies
 uv run pytest tests/     # run the full test suite
-uv run python -m worker  # start the Temporal worker (separate terminal)
-uv run python -m start_workflow  # trigger a workflow execution
+uv run worker.py         # start the Temporal worker (separate terminal)
+uv run start_workflow.py # trigger a workflow execution
 ```
 
 To run a single test:
