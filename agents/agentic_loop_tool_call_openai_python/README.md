@@ -256,7 +256,7 @@ async def dynamic_tool_activity(args: Sequence[RawValue]) -> dict:
 The `oai_responses_tool_from_model` function accepts a tool name and description, as well as a list of argument name/description pairs and returns json that is in the format expected for tool definitions in the OpenAI responses API.
 
 > [!WARNING]
-> The API used to generate the tools json is an internal function from the [Open AI API](https://github.com/openai/openai-python) and may therefore change in the future. There currently is no public API to generate the tool definition from a Pydantic model or a function signature.
+> The API used to generate the tools json is an internal function from the [OpenAI API](https://github.com/openai/openai-python) and may therefore change in the future. There currently is no public API to generate the tool definition from a Pydantic model or a function signature.
 
 *File: helpers/tool_helpers.py*
 ```python
@@ -306,7 +306,7 @@ updating the `get_tools` and `get_handler` methods).
 the LLM.
 - The `get_handler` method captures the mapping from tool name to tool function
 
-*File: tools/__init__.py*
+*File: tools/\_\_init\_\_.py*
 ```python
 # Uncomment and comment out the tools you want to use
 
@@ -440,7 +440,7 @@ if __name__ == "__main__":
 
 To interact with this simple AI agent, we create a Temporal client and execute a Workflow.
 
-*File:start_workflow.py*
+*File: start_workflow.py*
 ```python
 import asyncio
 import sys
@@ -490,18 +490,18 @@ uv sync
 Start the agent worker:
 
 ```bash
-uv run python -m worker
+uv run worker.py
 ```
 
 Make request to the agent:
 
 ```bash
-uv run python -m start_workflow "are there any weather alerts for where I am?"
+uv run start_workflow.py "are there any weather alerts for where I am?"
 ```
 
 Try a number of different user prompts:
 ```bash
-uv run python -m start_workflow "where am I?"
-uv run python -m start_workflow "what is my ip address?"
-uv run python -m start_workflow "can I please have a random number?"
+uv run start_workflow.py "where am I?"
+uv run start_workflow.py "what is my ip address?"
+uv run start_workflow.py "can I please have a random number?"
 ```

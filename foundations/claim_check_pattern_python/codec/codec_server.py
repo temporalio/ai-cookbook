@@ -7,7 +7,7 @@ from aiohttp import hdrs, web
 from google.protobuf import json_format
 from temporalio.api.common.v1 import Payload, Payloads
 
-from .claim_check import ClaimCheckCodec
+from claim_check import ClaimCheckCodec
 
 def build_codec_server() -> web.Application:
     # Create codec with environment variable configuration (same as plugin)

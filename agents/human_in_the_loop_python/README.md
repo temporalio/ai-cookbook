@@ -49,14 +49,14 @@ temporal server start-dev
 
 In one terminal:
 ```bash
-uv run python -m worker
+uv run worker.py
 ```
 
 ### Start a Workflow
 
 In another terminal:
 ```bash
-uv run python -m start_workflow "Delete all test data from the production database"
+uv run start_workflow.py "Delete all test data from the production database"
 ```
 
 The Workflow will start, analyze the request, and pause for approval. Watch the Worker output for instructions.
@@ -67,12 +67,12 @@ The Worker output will show the Workflow Id and request identifier. In another t
 
 **To approve:**
 ```bash
-uv run python -m send_approval <workflow-id> <request-id> approve "Looks good"
+uv run send_approval.py <workflow-id> <request-id> approve "Looks good"
 ```
 
 **To reject:**
 ```bash
-uv run python -m send_approval <workflow-id> <request-id> reject "Too risky"
+uv run send_approval.py <workflow-id> <request-id> reject "Too risky"
 ```
 
 ### Testing timeout

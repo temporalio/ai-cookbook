@@ -222,6 +222,48 @@ class ClaimCheckCodec(PayloadCodec):
 - Where configured: `ClaimCheckCodec(max_inline_bytes=20 * 1024)` in `codec/claim_check.py`
 - Change by passing a different `max_inline_bytes` when constructing `ClaimCheckCodec`
 
+### Choosing the right threshold
+
+The `max_inline_bytes` threshold controls which payloads are offloaded to S3 and which stay inline in Event History. Here is how to choose the right value for your use case.
+
+#### Temporal Service size limits
+
+Temporal enforces size limits at several levels ([self-hosted defaults](https://docs.temporal.io/self-hosted-guide/defaults), [Temporal Cloud limits](https://docs.temporal.io/cloud/limits)):
+
+| Limit | Warning | Error / Termination |
+|-------|---------|---------------------|
+| Single payload (blob) size | 256 KB | 2 MB |
+| Event History total size | 10 MB | 50 MB (Workflow terminated) |
+| Event History event count | 10,240 events | 51,200 events (Workflow terminated) |
+| gRPC message size | — | 4 MB per message |
+| Event History transaction size | — | 4 MB per transaction |
+
+The single payload limit applies to each serialized Activity input, Activity output, or Workflow argument individually. The gRPC limit applies to the full request, so scheduling several Activities with moderate-sized inputs in the same Workflow Task can exceed 4 MB even when each payload is under 2 MB.
+
+These are the defaults for both self-hosted and Temporal Cloud. The blob size thresholds are configurable on self-hosted deployments. Temporal Cloud limits are not configurable.
+
+#### Sizing recommendations
+
+| Threshold | Good for | Trade-off |
+|-----------|----------|-----------|
+| **2 KB** | Chatty Workflows with many small Activities | More S3 round-trips, higher latency per call |
+| **20 KB** (default) | Most AI/RAG Workflows | Balances debuggability with Event History size |
+| **128 KB** | Low-Activity Workflows with moderate payloads | Fewer S3 calls, but Event History grows faster |
+| **256 KB+** | Workflows with few, large payloads | Stays under the blob warning threshold but pushes toward gRPC and Event History limits faster |
+
+#### How to decide
+
+1. **Estimate your payload sizes.** LLM conversation histories grow with each turn. A 10-turn conversation with tool calls can reach 50–100 KB. RAG chunks with embeddings can be several megabytes.
+2. **Count your Activities.** Each Activity input and output is a separate payload in Event History. A Workflow with 20 Activity calls at 100 KB each adds 4 MB to Event History from payloads alone.
+3. **Start with the default (20 KB).** This offloads anything that would meaningfully impact Event History size while keeping small, debuggable payloads visible in the Web UI.
+4. **Stay well under 256 KB.** Payloads above 256 KB trigger a warning from the Temporal Service. If your payloads regularly exceed this size, claim check is strongly recommended.
+5. **Lower the threshold** if your Workflows are long-running (many Activity calls over time) or if you run many concurrent Workflows on the same Temporal Service.
+6. **Raise the threshold** if S3 latency is a concern and your Workflows have few Activities with moderate payloads.
+
+#### Monitoring Event History size
+
+Use the Web UI or `temporal workflow describe` to check a Workflow's Event History size and event count. If you see the 10 MB / 10,240 event warning in Temporal Service logs, lower your `max_inline_bytes` threshold or review which payloads should be claim-checked.
+
 ## Claim Check plugin
 
 The `ClaimCheckPlugin` integrates the codec with the Temporal client configuration.
@@ -467,12 +509,12 @@ temporal server start-dev
 
 3. Run the worker:
 ```bash
-uv run python -m worker
+uv run worker.py
 ```
 
 4. Start execution:
 ```bash
-uv run python -m start_workflow
+uv run start_workflow.py
 ```
 
 ### Option 2: AWS S3 (Production)
@@ -502,7 +544,7 @@ from aiohttp import hdrs, web
 from google.protobuf import json_format
 from temporalio.api.common.v1 import Payload, Payloads
 
-from .claim_check import ClaimCheckCodec
+from claim_check import ClaimCheckCodec
 
 def build_codec_server() -> web.Application:
     # Create codec with environment variable configuration (same as plugin)
@@ -630,7 +672,7 @@ if __name__ == "__main__":
 ### Running the codec server
 
 ```bash
-uv run python -m codec.codec_server
+uv run codec/codec_server.py
 ```
 
 Then [configure the Web UI to use the codec server](https://docs.temporal.io/production-deployment/data-encryption#set-your-codec-server-endpoints-with-web-ui-and-cli).
