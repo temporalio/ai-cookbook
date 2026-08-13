@@ -10,7 +10,7 @@ In this example, we show you how to build a durable agent using the [AI SDK by V
 
 This recipe highlights key implementation patterns:
 
-- **AI SDK client integration**: The Workflow uses `generateText` from `ai` and `temporalProvider` from `@temporalio/ai-sdk`. This automatically wraps the LLM invocation as an Activity, so it's retried and tracked like any other durable step. `temporalProvider` is configured for `gpt-4o-mini` here, but you can point it at any model the AI SDK supports.
+- **AI SDK client integration**: The Workflow uses `generateText` from `ai` and `temporalProvider` from `@temporalio/ai-sdk/workflow`. This automatically wraps the LLM invocation as an Activity, so it's retried and tracked like any other durable step. `temporalProvider` is configured for `gpt-4o-mini` here, but you can point it at any model the AI SDK supports.
 - **Tools-as-Activities**: `proxyActivities` wires the `getWeather` and `calculateAreaOfCircle` Activities into the Workflow so `toolsAgent` can offer tool schemas to the model, wait for results durably, and retry a tool call if it fails.
 
 Unlike some other Temporal AI integrations — for example, the OpenAI Agents SDK's `activity_as_tool` helper, which generates a tool schema from a Python function's type hints — the Vercel AI SDK's `tool()` has no equivalent auto-generation from a TypeScript function signature. Each tool's `inputSchema` is written by hand as a Zod schema.
@@ -78,15 +78,14 @@ export async function calculateAreaOfCircle(input: { radius: number }): Promise<
 
 ## Create the Workflow
 
-The Workflow registers both Activities as tools with a Zod schema so the model can call them when appropriate.
+The Workflow registers both Activities as tools with a Zod schema so the model can call them when appropriate. Workflow code imports `temporalProvider` from `@temporalio/ai-sdk/workflow` rather than the package root, because the root also exports the Worker-side Activities and plugin, whose imports the Workflow bundler disallows.
 
 *File: src/workflows.ts*
 
 ```ts
-import '@temporalio/ai-sdk/lib/load-polyfills';
 import type * as activities from './activities';
 import { generateText, stepCountIs, tool } from 'ai';
-import { temporalProvider } from '@temporalio/ai-sdk';
+import { temporalProvider } from '@temporalio/ai-sdk/workflow';
 import { proxyActivities } from '@temporalio/workflow';
 import z from 'zod';
 
@@ -191,6 +190,8 @@ run().catch((err) => {
 ```
 
 ## Running
+
+This recipe needs Node 22.12 or later. The AI SDK is ESM-only as of v7, and this project is CommonJS, so it relies on Node's support for `require()` of ESM modules.
 
 Start the Temporal Dev Server:
 ```bash
