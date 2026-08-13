@@ -249,20 +249,20 @@ These are the defaults for both self-hosted and Temporal Cloud. The blob size th
 | **2 KB** | Chatty Workflows with many small Activities | More S3 round-trips, higher latency per call |
 | **20 KB** (default) | Most AI/RAG Workflows | Balances debuggability with Event History size |
 | **128 KB** | Low-Activity Workflows with moderate payloads | Fewer S3 calls, but Event History grows faster |
-| **256 KB+** | Workflows with few, large payloads | Stays under the blob warning threshold but pushes toward gRPC and Event History limits faster |
+| **256 KB+** | Workflows with few, large payloads | Right at the blob warning threshold — payloads near this size risk triggering warnings, and Event History grows fast |
 
 #### How to decide
 
 1. **Estimate your payload sizes.** LLM conversation histories grow with each turn. A 10-turn conversation with tool calls can reach 50–100 KB. RAG chunks with embeddings can be several megabytes.
 2. **Count your Activities.** Each Activity input and output is a separate payload in Event History. A Workflow with 20 Activity calls at 100 KB each adds 4 MB to Event History from payloads alone.
 3. **Start with the default (20 KB).** This offloads anything that would meaningfully impact Event History size while keeping small, debuggable payloads visible in the Web UI.
-4. **Stay well under 256 KB.** Payloads above 256 KB trigger a warning from the Temporal Service. If your payloads regularly exceed this size, claim check is strongly recommended.
+4. **Stay well under 256 KB.** Payloads above 256 KB trigger a warning from the Temporal Service. If your payloads regularly exceed this size, Claim Check is strongly recommended.
 5. **Lower the threshold** if your Workflows are long-running (many Activity calls over time) or if you run many concurrent Workflows on the same Temporal Service.
 6. **Raise the threshold** if S3 latency is a concern and your Workflows have few Activities with moderate payloads.
 
 #### Monitoring Event History size
 
-Use the Web UI or `temporal workflow describe` to check a Workflow's Event History size and event count. If you see the 10 MB / 10,240 event warning in Temporal Service logs, lower your `max_inline_bytes` threshold or review which payloads should be claim-checked.
+Use the Web UI or `temporal workflow describe` to check a Workflow's Event History size and event count. If you see the 10 MB / 10,240 event warning in Temporal Service logs, lower your `max_inline_bytes` threshold or review which payloads should use Claim Check instead of staying inline.
 
 ## Claim Check plugin
 
