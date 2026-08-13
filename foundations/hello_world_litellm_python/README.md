@@ -230,11 +230,11 @@ Set the appropriate environment variables before launching the worker (for examp
 Run the worker:
 
 ```bash
-uv run python -m worker
+uv run worker.py
 ```
 
 Start the workflow:
 
 ```bash
-uv run python -m start_workflow
+uv run start_workflow.py
 ```

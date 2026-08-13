@@ -509,12 +509,12 @@ temporal server start-dev
 
 3. Run the worker:
 ```bash
-uv run python -m worker
+uv run worker.py
 ```
 
 4. Start execution:
 ```bash
-uv run python -m start_workflow
+uv run start_workflow.py
 ```
 
 ### Option 2: AWS S3 (Production)
@@ -544,7 +544,7 @@ from aiohttp import hdrs, web
 from google.protobuf import json_format
 from temporalio.api.common.v1 import Payload, Payloads
 
-from .claim_check import ClaimCheckCodec
+from claim_check import ClaimCheckCodec
 
 def build_codec_server() -> web.Application:
     # Create codec with environment variable configuration (same as plugin)
@@ -672,7 +672,7 @@ if __name__ == "__main__":
 ### Running the codec server
 
 ```bash
-uv run python -m codec.codec_server
+uv run codec/codec_server.py
 ```
 
 Then [configure the Web UI to use the codec server](https://docs.temporal.io/production-deployment/data-encryption#set-your-codec-server-endpoints-with-web-ui-and-cli).

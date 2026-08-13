@@ -207,13 +207,13 @@ uv sync
 Run the Worker, with AWS credentials and region configured as described in the prerequisites:
 
 ```bash
-uv run python -m worker
+uv run worker.py
 ```
 
 In another terminal, start the Workflow:
 
 ```bash
-uv run python -m start_workflow
+uv run start_workflow.py
 ```
 
 ## Example interactions
