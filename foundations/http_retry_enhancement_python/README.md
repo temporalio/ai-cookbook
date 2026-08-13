@@ -1,10 +1,10 @@
 <!-- 
-description: Extract retry information from HTTP response headers and make it available to Temporal's retry mechanisms.
-tags:[foundations, openai, python]
+description: Extract retry information from HTTP response headers and pass it to Temporal's retry mechanisms in Python.
+tags: [foundations, python, openai]
 priority: 920
 -->
 
-# Retry Policy from HTTP Responses
+# Retry policy from HTTP responses
 
 This recipe extends the [Basic Example](../hello_world_openai_responses_python/README.md) to show how to extract retry information from HTTP response headers and make it available to Temporal's retry mechanisms.
 
@@ -225,11 +225,11 @@ temporal server start-dev
 Run the worker:
 
 ```bash
-uv run python -m worker
+uv run worker.py
 ```
 
 Start execution:
 
 ```bash
-uv run python -m start_workflow
+uv run start_workflow.py
 ```

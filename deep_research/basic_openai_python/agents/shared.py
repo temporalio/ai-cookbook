@@ -55,3 +55,9 @@ def today_str() -> str:
     except Exception:
         now = datetime.now()
     return f"{now:%a} {now:%b} {now.day}, {now:%Y}"
+
+
+def with_today(instructions: str) -> str:
+    # Must be called from workflow code rather than at module import time, so the
+    # date comes from the workflow clock and stays consistent across replays.
+    return f"{instructions}\nTODAY'S DATE: {today_str()}\n"

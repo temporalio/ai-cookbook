@@ -1,11 +1,10 @@
 <!-- 
-description: Build a simple deep research system embodying the standard
-deep research architecture.
-tags: [agents, toolcalling, python]
+description: Build a multi-agent deep research system in Python with Temporal and the OpenAI Responses API.
+tags: [agents, python, openai]
 priority: 399
 -->
 
-# Deep Research
+# Deep research
 
 Deep research systems combine multiple agents with information retrieval from
 the web or other sources to produce evidence-based reports on specific topics.
@@ -105,10 +104,10 @@ class ResearchReport(BaseModel):
     follow_up_questions: List[str]
 ```
 
-## Create the Agents
+## Create the agents
 
 The deep research system uses four specialized agents, each implemented as
-Temporal activities. In this implementation, each agent is implemented as a
+Temporal Activities. In this implementation, each agent is implemented as a
 single call to the OpenAI Responses API.
 
 This is possible because we are using structured outputs, which guarantee the
@@ -117,13 +116,24 @@ response will be in the correct format, eliminating the need for retries.
 The web search agent also requires only a single API call because OpenAI
 integrates the web search tool into the Responses API.
 
-These agents run in the Workflow and use the `invoke_model` activity to make
+These agents run in the Workflow and use the `invoke_model` Activity to make
 OpenAI API calls. It is critical to set the `start_to_close_timeout` for these
-activities to a value that is long enough to complete the task. If it is too
-short, the activity will fail with a timeout error, causing a retry loop that
+Activities to a value that is long enough to complete the task. If it is too
+short, the Activity will fail with a timeout error, causing a retry loop that
 never completes. Response times for reasoning models such as `GPT-5` can vary
 significantly depending on the nature of the request. Web search times also vary
 depending on the size and content of the documents located by the search.
+
+Each agent imports the `invoke_model` Activity inside
+`workflow.unsafe.imports_passed_through()`. That Activity module pulls in the
+OpenAI client and, through it, `httpx`, which touches modules that the Workflow
+sandbox restricts at import time. Only the Activity import is passed through, so
+the agent code itself stays sandboxed and keeps its determinism checks.
+
+Each agent also appends the current date to its instructions with `with_today()`.
+The date is read from the Workflow clock through `workflow.now()`, which requires
+a running Workflow. Building the instruction string at module import time would
+instead freeze the date when the Worker starts.
 
 ### Research Planning Agent
 
@@ -134,11 +144,13 @@ priorities, identifies expected source types, and defines success criteria.
 *File: agents/research_planning.py*
 
 ```python
-from .models import ResearchPlan
+from .shared import ResearchPlan, with_today
 from .config import COMPLEX_REASONING_MODEL
-from activities.invoke_model import invoke_model, InvokeModelRequest
 from temporalio import workflow
 from datetime import timedelta
+
+with workflow.unsafe.imports_passed_through():
+    from activities.invoke_model import invoke_model, InvokeModelRequest
 
 RESEARCH_PLANNING_INSTRUCTIONS = """
 You are a research planning specialist who creates focused research strategies.
@@ -166,7 +178,7 @@ async def plan_research(query: str) -> ResearchPlan:
         invoke_model,
         InvokeModelRequest(
             model=COMPLEX_REASONING_MODEL,
-            instructions=RESEARCH_PLANNING_INSTRUCTIONS,
+            instructions=with_today(RESEARCH_PLANNING_INSTRUCTIONS),
             input=f"Research query: {query}",
             response_format=ResearchPlan,
         ),
@@ -185,11 +197,13 @@ case studies, recent news) with varied search styles and temporal modifiers.
 *File: agents/research_query_generation.py*
 
 ```python
-from .models import QueryPlan, ResearchPlan
+from .shared import QueryPlan, ResearchPlan, with_today
 from .config import EFFICIENT_PROCESSING_MODEL
-from activities.invoke_model import invoke_model, InvokeModelRequest
 from temporalio import workflow
 from datetime import timedelta
+
+with workflow.unsafe.imports_passed_through():
+    from activities.invoke_model import invoke_model, InvokeModelRequest
 
 QUERY_GENERATION_INSTRUCTIONS = """
 You are a search query specialist who crafts effective web searches.
@@ -230,7 +244,7 @@ Success Criteria: {", ".join(research_plan.success_criteria)}
         invoke_model,
         InvokeModelRequest(
             model=EFFICIENT_PROCESSING_MODEL,
-            instructions=QUERY_GENERATION_INSTRUCTIONS,
+            instructions=with_today(QUERY_GENERATION_INSTRUCTIONS),
             input=plan_context,
             response_format=QueryPlan,
         ),
@@ -250,11 +264,13 @@ and provides proper citations with reliability assessments.
 *File: agents/research_web_search.py*
 
 ```python
-from .models import SearchResult, SearchQuery
+from .shared import SearchResult, SearchQuery, with_today
 from .config import EFFICIENT_PROCESSING_MODEL
-from activities.invoke_model import invoke_model, InvokeModelRequest
 from temporalio import workflow
 from datetime import timedelta
+
+with workflow.unsafe.imports_passed_through():
+    from activities.invoke_model import invoke_model, InvokeModelRequest
 
 WEB_SEARCH_INSTRUCTIONS = """
 You are a web research specialist who finds and evaluates information from web sources.
@@ -293,7 +309,7 @@ Please search for information using the provided query and analyze the results a
         invoke_model,
         InvokeModelRequest(
             model=EFFICIENT_PROCESSING_MODEL,
-            instructions=WEB_SEARCH_INSTRUCTIONS,
+            instructions=with_today(WEB_SEARCH_INSTRUCTIONS),
             input=search_input,
             response_format=SearchResult,
             tools=[{"type": "web_search"}],
@@ -317,9 +333,11 @@ follow-up research questions.
 from typing import List
 from temporalio import workflow
 from datetime import timedelta
-from .models import ResearchReport, ResearchPlan, SearchResult
+from .shared import ResearchReport, ResearchPlan, SearchResult, with_today
 from .config import COMPLEX_REASONING_MODEL
-from activities.invoke_model import invoke_model, InvokeModelRequest
+
+with workflow.unsafe.imports_passed_through():
+    from activities.invoke_model import invoke_model, InvokeModelRequest
 
 REPORT_SYNTHESIS_INSTRUCTIONS = """
 You are a research synthesis expert who creates comprehensive research reports.
@@ -386,7 +404,7 @@ Please synthesize all this information into a comprehensive research report foll
         invoke_model,
         InvokeModelRequest(
             model=COMPLEX_REASONING_MODEL,
-            instructions=REPORT_SYNTHESIS_INSTRUCTIONS,
+            instructions=with_today(REPORT_SYNTHESIS_INSTRUCTIONS),
             input=synthesis_input,
             response_format=ResearchReport,
         ),
@@ -510,17 +528,17 @@ temporal server start-dev
 Run the worker:
 
 ```bash
-uv run python -m worker
+uv run worker.py
 ```
 
 Start execution:
 
 ```bash
-uv run python -m start_workflow
+uv run start_workflow.py
 ```
 
 To start execution with a specific query:
 
 ```bash
-uv run python -m start_workflow "What is the latest news on the stock market?"
+uv run start_workflow.py "What is the latest news on the stock market?"
 ```

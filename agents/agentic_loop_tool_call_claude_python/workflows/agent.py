@@ -23,7 +23,7 @@ class AgentWorkflow:
             result = await workflow.execute_activity(
                 claude_responses.create,
                 claude_responses.ClaudeResponsesRequest(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-sonnet-4-5-20250929",
                     system=tool_helpers.HELPFUL_AGENT_SYSTEM_INSTRUCTIONS,
                     messages=messages,
                     tools=get_tools(),

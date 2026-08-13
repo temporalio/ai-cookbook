@@ -2,9 +2,8 @@ from temporalio import workflow
 from datetime import timedelta
 import json
 
-from activities import openai_responses
-
 with workflow.unsafe.imports_passed_through():
+    from activities import openai_responses
     from activities import get_weather_alerts
 
 

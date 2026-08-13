@@ -1,10 +1,10 @@
 <!-- 
-description: Use Temporal and OpenAI Responses API to reliably request output conforming to a specific data structure. 
-tags:[foundations, openai, python]
+description: Use Temporal and the OpenAI Responses API to reliably request output conforming to a specific data structure.
+tags: [foundations, python, openai]
 priority: 980
 -->
 
-# Structured Outputs with Temporal and OpenAI
+# Structured outputs with Temporal and OpenAI
 
 The OpenAI Responses API provides the [Structured Outputs API](https://platform.openai.com/docs/guides/structured-outputs) allowing you to request responses conforming to a specific data structure.
 
@@ -14,7 +14,7 @@ Structured outputs are also commonly used for tool calling.
 OpenAI usually returns the correct type. However, this is not always the case due to the non-deterministic nature of LLMs.
 When OpenAI returns an incorrect type, Temporal automatically retries the LLM call Activity.
 
-## Invoke Model Activity
+## Invoke model Activity
 
 We create a model-calling Activity that uses the `responses.parse` method of the OpenAI client.
 
@@ -277,11 +277,11 @@ temporal server start-dev
 Run the worker:
 
 ```bash
-uv run python -m worker
+uv run worker.py
 ```
 
 Start execution:
 
 ```bash
-uv run python -m start_workflow
+uv run start_workflow.py
 ```

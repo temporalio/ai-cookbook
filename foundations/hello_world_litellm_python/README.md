@@ -1,20 +1,20 @@
 <!-- 
-description: Integrate LiteLLM into a Temporal Workflow in Python.
-tags:[python, litellm, provider-neutral]
+description: Integrate LiteLLM into a durable Temporal Workflow in Python to call and switch between LLM providers.
+tags: [foundations, python, litellm]
 priority: 920
 -->
 
-# Hello World with LiteLLM
+# Hello world with LiteLLM
 
 [LiteLLM](https://github.com/BerriAI/litellm) is a library for calling LLMs from Python. It makes it easy to access, and switch between, many providers, including OpenAI, Anthropic, Google, and more.
 
-This recipe mirrors the [Basic Python recipe](../hello_world_openai_responses_python/README.md), but swaps the OpenAI SDK for LiteLLM. The workflow still delegates LLM calls to an Activity, letting Temporal coordinate retries and durability, while LiteLLM forwards those calls to your configured provider.
+This recipe mirrors the [Basic Python recipe](../hello_world_openai_responses_python/README.md), but swaps the OpenAI SDK for LiteLLM. The Workflow still delegates LLM calls to an Activity, letting Temporal coordinate retries and durability, while LiteLLM forwards those calls to your configured provider.
 
 Key points:
 
 - A reusable Activity that wraps `litellm.acompletion` and keeps retries in Temporal.
 - The most common LiteLLM parameters are on `LiteLLMRequest` ensuring type checking and IDE completion. Others may be passed via the `extra_options` dictionary, which functions as `kwargs` for `litellm.acompletion`.
-- The Activity returns the full LiteLLM response for processing by the workflow.
+- The Activity returns the full LiteLLM response for processing by the Workflow.
 
 ## Create the Activity
 
@@ -230,11 +230,11 @@ Set the appropriate environment variables before launching the worker (for examp
 Run the worker:
 
 ```bash
-uv run python -m worker
+uv run worker.py
 ```
 
 Start the workflow:
 
 ```bash
-uv run python -m start_workflow
+uv run start_workflow.py
 ```
