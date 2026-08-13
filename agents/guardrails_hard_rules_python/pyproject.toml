@@ -9,6 +9,7 @@ license = "MIT"
 dependencies = [
     "temporalio>=1.15.0,<2",
     "anthropic>=0.40.0",
+    "pydantic>=2.0.0",
 ]
 
 [dependency-groups]

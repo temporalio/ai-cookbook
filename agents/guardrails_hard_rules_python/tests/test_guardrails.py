@@ -30,6 +30,18 @@ class TestHardBlock:
         assert result is not None
         assert result.classification == "block"
 
+    def test_phone_with_parens_triggers_block(self):
+        signals = ContentSignals(text="Call me at (555) 867-5309", author_id="u1")
+        result = _hard_block(signals)
+        assert result is not None
+        assert result.classification == "block"
+
+    def test_phone_with_spaces_triggers_block(self):
+        signals = ContentSignals(text="Call me at 555 867 5309", author_id="u1")
+        result = _hard_block(signals)
+        assert result is not None
+        assert result.classification == "block"
+
     def test_banned_keyword_triggers_block(self):
         signals = ContentSignals(text="Click here for free money!", author_id="u1")
         result = _hard_block(signals)
@@ -85,6 +97,7 @@ class TestClassifyActivity:
         mock_create = AsyncMock(return_value=_mock_anthropic_response("safe", "Looks friendly."))
         with patch("activities.classify.anthropic.AsyncAnthropic") as mock_cls:
             mock_cls.return_value.messages.create = mock_create
+            mock_cls.return_value.close = AsyncMock()
             result = await classify(request)
 
         assert result.classification == "block"
@@ -100,6 +113,7 @@ class TestClassifyActivity:
         mock_create = AsyncMock(return_value=_mock_anthropic_response("review", "Borderline tone."))
         with patch("activities.classify.anthropic.AsyncAnthropic") as mock_cls:
             mock_cls.return_value.messages.create = mock_create
+            mock_cls.return_value.close = AsyncMock()
             result = await classify(request)
 
         assert result.classification == "review"

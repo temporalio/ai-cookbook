@@ -41,10 +41,24 @@ async def classify(request: ClassifyRequest) -> Verdict:
             tools=[_SUBMIT_VERDICT_TOOL],
             tool_choice={"type": "tool", "name": "submit_verdict"},
         )
-    except anthropic.AuthenticationError as exc:
-        raise ApplicationError(str(exc), type="AuthenticationError", non_retryable=True) from exc
-    except anthropic.BadRequestError as exc:
-        raise ApplicationError(str(exc), type="BadRequestError", non_retryable=True) from exc
+    except (
+        anthropic.BadRequestError,
+        anthropic.AuthenticationError,
+        anthropic.PermissionDeniedError,
+        anthropic.NotFoundError,
+        anthropic.UnprocessableEntityError,
+    ) as exc:
+        # These errors will never succeed on a retry: a retired model identifier, for
+        # example, returns 404. Retrying them under the default policy would loop
+        # forever instead of surfacing the problem. Everything else, such as rate
+        # limits and 5xx responses, propagates so Temporal can retry it.
+        raise ApplicationError(
+            str(exc),
+            type=exc.__class__.__name__,
+            non_retryable=True,
+        ) from exc
+    finally:
+        await client.close()
 
     tool_block = next(b for b in response.content if b.type == "tool_use")
     llm_verdict = Verdict.model_validate(tool_block.input)

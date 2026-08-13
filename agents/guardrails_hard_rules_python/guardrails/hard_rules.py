@@ -18,7 +18,7 @@ def _hard_block(signals: ContentSignals) -> Verdict | None:
                 overridden_by_hard_rule=True,
             )
 
-    if re.search(r"\b\d{3}[-.()]?\d{3}[-.]?\d{4}\b", signals.text):
+    if re.search(r"\(?\b\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b", signals.text):
         return Verdict(
             classification="block",
             confidence=1.0,

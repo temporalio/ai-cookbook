@@ -1,14 +1,14 @@
 <!--
-description: Demonstrates a post-LLM guardrail layer that uses deterministic hard rules to override an LLM's verdict, ensuring policy-critical decisions can never be bypassed by hallucination or prompt injection.
+description: Build a durable content-moderation guardrail in Python with Temporal and Claude that layers deterministic hard rules over an LLM's verdict for auditable overrides.
 tags: [agents, python, anthropic]
 priority: 500
 -->
 
-# Guardrails: Hard Rules
+# Post-LLM guardrail with hard-rule overrides
 
 This recipe shows how to combine an LLM classifier with a deterministic guardrail layer. The LLM provides nuanced judgment for ambiguous cases; hard rules act as a safety net for unambiguous policy violations, overriding the LLM's verdict regardless of what it concluded.
 
-The pattern answers a real problem: LLMs can be manipulated via prompt injection or simply hallucinate. For any decision with real consequences — content moderation, access control, transaction approval — you shouldn't rely on the LLM alone. Hard rules catch clear-cut cases deterministically; the LLM handles everything in the grey zone. Critically, when a hard rule fires, the LLM's original reasoning is preserved inside the override so every decision remains auditable.
+The pattern answers a real problem: LLMs can be manipulated via prompt injection or hallucinate outright. For any decision with real consequences — content moderation, access control, transaction approval — you shouldn't rely on the LLM alone. Hard rules catch clear-cut cases deterministically; the LLM handles everything in the grey zone. Critically, when a hard rule fires, the LLM's original reasoning is preserved inside the override so every decision remains auditable.
 
 The recipe uses a content moderation scenario: user-submitted text is classified as `safe`, `review`, or `block`. Hard rules override to `block` when contact information or banned keywords are detected, regardless of what the LLM concluded.
 

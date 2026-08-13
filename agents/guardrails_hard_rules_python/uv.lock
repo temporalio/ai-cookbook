@@ -77,6 +77,7 @@ version = "0.1"
 source = { virtual = "." }
 dependencies = [
     { name = "anthropic" },
+    { name = "pydantic" },
     { name = "temporalio" },
 ]
 
@@ -90,6 +91,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "anthropic", specifier = ">=0.40.0" },
+    { name = "pydantic", specifier = ">=2.0.0" },
     { name = "temporalio", specifier = ">=1.15.0,<2" },
 ]
 
