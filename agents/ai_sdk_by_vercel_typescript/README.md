@@ -78,7 +78,7 @@ export async function calculateAreaOfCircle(input: { radius: number }): Promise<
 
 ## Create the Workflow
 
-The Workflow registers both Activities as tools with a Zod schema so the model can call them when appropriate. Workflow code imports `temporalProvider` from `@temporalio/ai-sdk/workflow` rather than the package root, because the root also exports the Worker-side Activities and plugin, whose imports the Workflow bundler disallows.
+The Workflow registers both Activities as tools with a Zod schema so the model can call them when appropriate.
 
 *File: src/workflows.ts*
 
@@ -191,7 +191,6 @@ run().catch((err) => {
 
 ## Running
 
-This recipe needs Node 22.12 or later. The AI SDK is ESM-only as of v7, and this project is CommonJS, so it relies on Node's support for `require()` of ESM modules.
 
 Start the Temporal Dev Server:
 ```bash
