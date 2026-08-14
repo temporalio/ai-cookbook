@@ -50,3 +50,82 @@ Reasoning: Positive personal experience with no policy concerns.
 ```
 
 In Example 1, the LLM's classification and reasoning are preserved inside brackets — the override is fully auditable.
+
+## Architecture
+
+- **Models** (`models/`):
+  - `signals.py`: `ContentSignals` — the text and metadata being classified
+  - `verdict.py`: `LLMVerdict` (the LLM's raw classification, also used as the tool's input schema) and `Verdict` (adds `overridden_by_hard_rule`)
+- **Guardrails** (`guardrails/hard_rules.py`): pure functions that check content against banned keywords, phone numbers, and email addresses, and escalate the verdict to `block` when one matches
+- **Activity** (`activities/classify.py`): calls Claude via a forced tool call to get a structured `LLMVerdict`, then applies the hard rules
+- **Workflow** (`workflows/classify_workflow.py`): orchestrates the single `classify` Activity call with a 3-attempt retry policy
+- **Scripts**:
+  - `worker.py`: runs the Temporal Worker
+  - `start_workflow.py`: runs the two examples shown in [Expected output](#expected-output)
+
+## Key patterns
+
+### Forcing a structured verdict from the LLM
+
+The Activity forces Claude to call a single tool, so the response is always a well-formed `LLMVerdict` instead of free-form text to parse:
+
+```python
+_SUBMIT_VERDICT_TOOL = {
+    "name": "submit_verdict",
+    "description": "Submit your content moderation classification.",
+    "input_schema": LLMVerdict.model_json_schema(),
+}
+
+response = await client.messages.create(
+    ...
+    tools=[_SUBMIT_VERDICT_TOOL],
+    tool_choice={"type": "tool", "name": "submit_verdict"},
+)
+```
+
+### Overriding while preserving the original reasoning
+
+`apply_hard_rules` never discards the LLM's own verdict — a rule can only escalate a verdict to `block`, and when it does, the LLM's reasoning is embedded in the result so the override stays auditable:
+
+```python
+def apply_hard_rules(signals: ContentSignals, llm_verdict: Verdict) -> Verdict:
+    if llm_verdict.classification == "block":
+        return llm_verdict  # already blocked — nothing to override
+
+    hard = _hard_block(signals)
+    if hard is None:
+        return llm_verdict  # no rule fired — LLM verdict stands
+
+    return Verdict(
+        classification=hard.classification,
+        confidence=hard.confidence,
+        overridden_by_hard_rule=True,
+        reasoning=(
+            f"{hard.reasoning}\n\n"
+            f"[LLM classified as '{llm_verdict.classification}' — "
+            f"reasoning: {llm_verdict.reasoning}]"
+        ),
+    )
+```
+
+### Non-retryable Anthropic errors
+
+Permanent client errors (bad request, authentication, permission-denied, not-found, unprocessable-entity) are classified as non-retryable so the Workflow doesn't keep retrying a request that can never succeed:
+
+```python
+except (
+    anthropic.BadRequestError,
+    anthropic.AuthenticationError,
+    anthropic.PermissionDeniedError,
+    anthropic.NotFoundError,
+    anthropic.UnprocessableEntityError,
+) as exc:
+    raise ApplicationError(str(exc), type=exc.__class__.__name__, non_retryable=True) from exc
+```
+
+## Extensions
+
+This pattern can be extended to:
+- Add more hard rules (regex, allow/deny lists, PII detectors) without touching the LLM prompt
+- Log every override to a compliance or audit sink for review
+- Route `review` verdicts to a human approval step — see [Human-in-the-loop AI agent](../human_in_the_loop_python)
