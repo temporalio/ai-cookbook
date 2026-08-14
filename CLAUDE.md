@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository. Other coding agents should read `AGENTS.md`, which points here.
 
 ## What This Repo Is
 
@@ -47,6 +47,12 @@ category/recipe-name/
 
 **Retries belong to Temporal, not the LLM client.** All LLM clients are configured with `max_retries=0`. Activity retry policies in the workflow definition control retry behavior instead. Client-side retries interfere with Temporal's durable error handling.
 
+**Classify the provider's full set of permanent errors as non-retryable.** Catch every client error that can never succeed on retry (bad request, authentication, permission-denied, not-found, unprocessable-entity — a retired model id, for example, returns 404) and raise `ApplicationError(..., non_retryable=True)`. Catching only one or two of these lets the rest retry forever instead of surfacing the problem. Everything else (rate limits, 5xx) should propagate so Temporal's retry policy handles it.
+
+**Close SDK clients constructed inside an activity.** An LLM/HTTP client created per-invocation (for example `AsyncAnthropic(max_retries=0)`) should be closed in a `finally` block. A long-running worker that never closes them leaks connections and file descriptors.
+
+**Declare directly-imported packages explicitly**, even when a transitive dependency already provides them. If a recipe imports `pydantic.BaseModel` directly, list `pydantic` in `pyproject.toml` rather than relying on it arriving via `temporalio` or another SDK — an unrelated dependency bump could otherwise silently drop it.
+
 **Pydantic models are used for serialization.** Recipes use `pydantic_data_converter` (from `temporalio.contrib.pydantic`) to serialize Pydantic v2 models as workflow/activity inputs and outputs. Request/response dataclasses or Pydantic models define the data contract between orchestrator and activities.
 
 **Activities are kept generic where possible.** Rather than hardcoding model names or system prompts into activities, recipes pass them as parameters so workflows control behavior without re-registering activities.
@@ -71,7 +77,7 @@ Required fields: `description` (plain text), `tags` (array including category, l
 
 ## README Style Guide
 
-Top-level recipe READMEs are published to [docs.temporal.io](https://docs.temporal.io) as MDX pages. The `# H1` becomes the page `title`, the front matter `description` becomes the meta `description`, and the body becomes the page body. Follow the [Temporal documentation style guide](https://github.com/temporalio/documentation/blob/main/STYLE.md) so new recipes match published docs.
+Top-level recipe READMEs are published to [docs.temporal.io](https://docs.temporal.io) as MDX pages, synced wholesale from this repo on every docs build rather than hand-authored per page. The `# H1` becomes the page `title`, the front matter `description` becomes the meta `description`, and the body becomes the page body. Follow the [Temporal documentation style guide](https://github.com/temporalio/documentation/blob/main/STYLE.md) and the prose/terminology rules in [documentation's AGENTS.md](https://github.com/temporalio/documentation/blob/main/AGENTS.md) so new recipes match published docs. AGENTS.md's Frontmatter, MDX/components, and Snipsync sections describe hand-authored docs pages and don't apply here — this repo's own front matter contract (below) is authoritative for recipes.
 
 **Front matter**
 
@@ -88,7 +94,7 @@ Top-level recipe READMEs are published to [docs.temporal.io](https://docs.tempor
 
 - Capitalize Temporal core terms as proper nouns in prose: Workflow, Activity, Worker, Signal, Event History. In code and code comments, follow the language's conventions (lowercase `workflow`, `activity`, etc.).
 - Use "Temporal Service" (not "Cluster") for a running backend, and spell out "identifier" outside core terms (use "Workflow Id", "request identifier").
-- Cut filler ("in order to", "simply", "easily", "just") and vague intensifiers ("powerful", "robust", "seamless", "leverage" → "use"). Prefer brevity.
+- Cut filler ("it's worth noting that", "in order to", "simply", "easily", "just") and vague intensifiers ("powerful", "robust", "seamless", "cutting-edge", "leverage" → "use", "unlock", "elevate", "streamline"). Prefer brevity.
 - Do not add emojis; use em dashes sparingly.
 
 ## Local Development Prerequisites
