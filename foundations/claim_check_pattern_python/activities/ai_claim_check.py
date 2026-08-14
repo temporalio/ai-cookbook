@@ -2,7 +2,7 @@ from typing import List
 
 from temporalio import activity
 
-from shared.models import IngestRequest, IngestResult, RagRequest, RagAnswer
+from shared.models import IngestRequest, IngestResult, RagAnswer, RagRequest
 
 
 def _split_text(text: str, chunk_size: int, overlap: int) -> List[str]:

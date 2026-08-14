@@ -1,6 +1,8 @@
-from temporalio import activity
-from openai import AsyncOpenAI
 from dataclasses import dataclass
+
+from openai import AsyncOpenAI
+from temporalio import activity
+
 
 @dataclass
 class OpenAIResponsesRequest:

@@ -1,4 +1,5 @@
 import re
+
 from models.signals import ContentSignals
 from models.verdict import Verdict
 

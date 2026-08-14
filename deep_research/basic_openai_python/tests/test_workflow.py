@@ -1,19 +1,20 @@
 """Test DeepResearchWorkflow using Temporal's test framework with a mocked invoke_model activity."""
 
+from datetime import timedelta
+
 import pytest
+from temporalio import activity
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
-from temporalio import activity
-from datetime import timedelta
 
 from activities.invoke_model import InvokeModelRequest, InvokeModelResponse
 from agents.shared import (
-    ResearchPlan,
-    ResearchAspect,
     QueryPlan,
+    ResearchAspect,
+    ResearchPlan,
+    ResearchReport,
     SearchQuery,
     SearchResult,
-    ResearchReport,
 )
 from workflows.deep_research_workflow import DeepResearchWorkflow
 

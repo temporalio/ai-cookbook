@@ -6,6 +6,7 @@ the way it would for a real user running `uv run start_workflow.py`."""
 from datetime import timedelta
 
 import pytest
+from fakes import ScriptedModel, ScriptedModelProvider, text_response
 from temporalio.client import Client
 from temporalio.contrib.openai_agents import ModelActivityParameters, OpenAIAgentsPlugin
 from temporalio.testing import WorkflowEnvironment
@@ -13,7 +14,6 @@ from temporalio.worker import Worker
 
 import start_workflow
 from activities.tools import calculate_circle_area, get_weather
-from fakes import ScriptedModel, ScriptedModelProvider, text_response
 from workflows.hello_world_workflow import HelloWorldAgent
 
 TASK_QUEUE = "hello-world-openai-agent-task-queue"

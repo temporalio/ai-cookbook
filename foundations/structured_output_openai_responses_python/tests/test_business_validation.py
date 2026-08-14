@@ -1,6 +1,7 @@
-from workflows.clean_data_workflow import Business
 import pytest
 from pydantic import ValidationError
+
+from workflows.clean_data_workflow import Business
 
 
 class TestBusiness:

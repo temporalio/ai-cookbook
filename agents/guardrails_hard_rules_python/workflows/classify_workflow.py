@@ -1,9 +1,10 @@
 from datetime import timedelta
+
 from temporalio import workflow
 from temporalio.common import RetryPolicy
 
 with workflow.unsafe.imports_passed_through():
-    from activities.classify import classify, ClassifyRequest
+    from activities.classify import ClassifyRequest, classify
     from models.signals import ContentSignals
     from models.verdict import Verdict
 

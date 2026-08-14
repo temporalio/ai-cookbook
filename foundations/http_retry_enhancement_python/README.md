@@ -56,12 +56,13 @@ Duplicating the logic makes sense because it is not accessible via the public li
 import email.utils
 import time
 from datetime import timedelta
-from temporalio.exceptions import ApplicationError
-from temporalio import workflow
 from typing import Optional, Tuple
 
+from temporalio import workflow
+from temporalio.exceptions import ApplicationError
+
 with workflow.unsafe.imports_passed_through():
-    from httpx import Response, Headers
+    from httpx import Headers, Response
 
 
 # Adapted from the OpenAI Python client (https://github.com/openai/openai-python/blob/main/src/openai/_base_client.py)
@@ -183,12 +184,14 @@ We use the `http_response_to_application_error` function defined above to transl
 
 <!--SNIPSTART:file activities/openai_responses.py-->
 ```python
-from temporalio import activity
-from openai import AsyncOpenAI
-from openai.types.responses import Response
 from dataclasses import dataclass
+
+from openai import APIStatusError, AsyncOpenAI
+from openai.types.responses import Response
+from temporalio import activity
+
 from util.translate_http_errors import http_response_to_application_error
-from openai import APIStatusError
+
 
 # Temporal best practice: Create a data structure to hold the request parameters.
 @dataclass

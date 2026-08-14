@@ -1,13 +1,13 @@
 # weather_activities.py
 
-from typing import Any
-from temporalio import activity
-import httpx
 import json
-from pydantic import BaseModel
-import openai
+from typing import Any
+
+import httpx
+from pydantic import BaseModel, Field
+from temporalio import activity
+
 from helpers import tool_helpers
-from pydantic import Field
 
 # Constants
 NWS_API_BASE = "https://api.weather.gov"

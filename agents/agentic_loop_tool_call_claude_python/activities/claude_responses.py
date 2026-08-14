@@ -1,10 +1,12 @@
-from temporalio import activity
-from temporalio.exceptions import ApplicationError
+from dataclasses import dataclass
+from typing import Any
+
 import anthropic
 from anthropic import AsyncAnthropic
 from anthropic.types import Message
-from dataclasses import dataclass
-from typing import Any
+from temporalio import activity
+from temporalio.exceptions import ApplicationError
+
 
 # Temporal best practice: Create a data structure to hold the request parameters.
 @dataclass

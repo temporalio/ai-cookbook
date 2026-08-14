@@ -1,11 +1,11 @@
 import asyncio
 
 from temporalio.client import Client
-from temporalio.worker import Worker
 from temporalio.contrib.pydantic import pydantic_data_converter
+from temporalio.worker import Worker
 
-from workflows.clean_data_workflow import CleanDataWorkflow
 from activities import invoke_model
+from workflows.clean_data_workflow import CleanDataWorkflow
 
 
 async def main():

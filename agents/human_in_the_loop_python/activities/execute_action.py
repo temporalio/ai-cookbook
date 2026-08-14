@@ -1,6 +1,8 @@
+
 from temporalio import activity
+
 from models.models import ProposedAction
-import asyncio
+
 
 @activity.defn
 async def execute_action(action: ProposedAction) -> str:

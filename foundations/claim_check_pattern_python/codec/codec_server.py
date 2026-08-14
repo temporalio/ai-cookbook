@@ -1,13 +1,13 @@
-from functools import partial
-from typing import Awaitable, Callable, Iterable, List
 import json
 import os
+from functools import partial
+from typing import Awaitable, Callable, Iterable, List
 
 from aiohttp import hdrs, web
+from claim_check import ClaimCheckCodec
 from google.protobuf import json_format
 from temporalio.api.common.v1 import Payload, Payloads
 
-from claim_check import ClaimCheckCodec
 
 def build_codec_server() -> web.Application:
     # Create codec with environment variable configuration (same as plugin)

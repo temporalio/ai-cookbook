@@ -3,10 +3,10 @@ import sys
 import uuid
 
 from temporalio.client import Client
-
-from workflows.human_in_the_loop_workflow import HumanInTheLoopWorkflow
 from temporalio.contrib.pydantic import pydantic_data_converter
+
 from models.models import WorkflowInput
+from workflows.human_in_the_loop_workflow import HumanInTheLoopWorkflow
 
 
 async def main():
@@ -37,7 +37,7 @@ async def main():
         task_queue="human-in-the-loop-task-queue",
     )
     
-    print(f"\nWorkflow completed!")
+    print("\nWorkflow completed!")
     print(f"Result: {result}")
 
 

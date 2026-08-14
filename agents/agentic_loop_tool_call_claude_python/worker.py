@@ -1,13 +1,12 @@
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 from temporalio.client import Client
+from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.worker import Worker
 
-from workflows.agent import AgentWorkflow
 from activities import claude_responses, tool_invoker
-from temporalio.contrib.pydantic import pydantic_data_converter
-
-from concurrent.futures import ThreadPoolExecutor
+from workflows.agent import AgentWorkflow
 
 
 async def main():

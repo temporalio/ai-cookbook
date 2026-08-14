@@ -64,14 +64,11 @@ however that the agent is not single shot.
 <!--SNIPSTART workflows/agent.py {"startPattern": "^from temporalio import workflow$", "endPattern": "return result\\.output_text"}-->
 ```python
 from temporalio import workflow
-from datetime import timedelta
-
-import json
 
 with workflow.unsafe.imports_passed_through():
-    from tools import get_tools
-    from helpers import tool_helpers
     from activities import openai_responses
+    from helpers import tool_helpers
+    from tools import get_tools
 
 @workflow.defn
 class AgentWorkflow:
@@ -170,11 +167,13 @@ In this implementation, we allow for the model, instructions and input to be pas
 *File: activities/openai_responses.py*
 <!--SNIPSTART:file activities/openai_responses.py-->
 ```python
-from temporalio import activity
-from openai import AsyncOpenAI
-from openai.types.responses import Response
 from dataclasses import dataclass
 from typing import Any
+
+from openai import AsyncOpenAI
+from openai.types.responses import Response
+from temporalio import activity
+
 
 # Temporal best practice: Create a data structure to hold the request parameters.
 @dataclass
@@ -219,11 +218,13 @@ and that function is then called with the supplied arguments.
 *File: activities/tool_invoker.py*
 <!--SNIPSTART:file activities/tool_invoker.py-->
 ```python
-from temporalio import activity
-from collections.abc import Sequence
-from temporalio.common import RawValue
 import inspect
+from collections.abc import Sequence
+
 from pydantic import BaseModel
+from temporalio import activity
+from temporalio.common import RawValue
+
 
 # We use dynamic activities to allow the agent to be defined independently of the tools it can call.
 @activity.defn(dynamic=True)
@@ -270,9 +271,11 @@ The `oai_responses_tool_from_model` function accepts a tool name and description
 <!--SNIPSTART helpers/tool_helpers.py {"startPattern": "^from openai\\.lib\\._pydantic import to_strict_json_schema", "endPattern": "^\\s*\\}\\s*$"}-->
 ```python
 from openai.lib._pydantic import to_strict_json_schema  # private API; may change
+
 # there currently is no public API to generate the tool definition from a Pydantic model
 # or a function signature.
 from pydantic import BaseModel
+
 
 def oai_responses_tool_from_model(name: str, description: str, model: type[BaseModel]):
     return {
@@ -326,8 +329,13 @@ the LLM.
 from typing import Any, Awaitable, Callable
 
 # Location and weather related tools
-from .get_location import get_location_info, get_ip_address
-from .get_weather import get_weather_alerts
+from .get_location import (
+    GET_IP_ADDRESS_TOOL_OAI,
+    GET_LOCATION_TOOL_OAI,
+    get_ip_address,
+    get_location_info,
+)
+from .get_weather import WEATHER_ALERTS_TOOL_OAI, get_weather_alerts
 
 ToolHandler = Callable[..., Awaitable[Any]]
 
@@ -341,9 +349,9 @@ def get_handler(tool_name: str) -> ToolHandler:
     raise ValueError(f"Unknown tool name: {tool_name}")
 
 def get_tools() -> list[dict[str, Any]]:
-    return [get_weather.WEATHER_ALERTS_TOOL_OAI, 
-            get_location.GET_LOCATION_TOOL_OAI,
-            get_location.GET_IP_ADDRESS_TOOL_OAI]
+    return [WEATHER_ALERTS_TOOL_OAI,
+            GET_LOCATION_TOOL_OAI,
+            GET_IP_ADDRESS_TOOL_OAI]
 
 # Random number tool
 # from .random_stuff import get_random_number, RANDOM_NUMBER_TOOL_OAI
@@ -370,9 +378,12 @@ The tool descriptions and functions are defined in `tools/get_location.py`,
 # get_location.py
 
 from typing import Any
+
 import httpx
 from pydantic import BaseModel, Field
+
 from helpers import tool_helpers
+
 
 # For the location finder we use Pydantic to create a structure that encapsulates the input parameter 
 # (an IP address). 
@@ -419,16 +430,15 @@ The Worker is the process that dispatches work to the various parts of the agent
 <!--SNIPSTART:file worker.py-->
 ```python
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 from temporalio.client import Client
-from temporalio.worker import Worker
-from temporalio.envconfig import ClientConfig
-
-from workflows.agent import AgentWorkflow
-from activities import openai_responses, tool_invoker
 from temporalio.contrib.pydantic import pydantic_data_converter
+from temporalio.envconfig import ClientConfig
+from temporalio.worker import Worker
 
-from concurrent.futures import ThreadPoolExecutor
+from activities import openai_responses, tool_invoker
+from workflows.agent import AgentWorkflow
 
 
 async def main():
@@ -471,9 +481,9 @@ import sys
 import uuid
 
 from temporalio.client import Client
+from temporalio.contrib.pydantic import pydantic_data_converter
 
 from workflows.agent import AgentWorkflow
-from temporalio.contrib.pydantic import pydantic_data_converter
 
 
 async def main():

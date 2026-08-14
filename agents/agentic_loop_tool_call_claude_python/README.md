@@ -47,13 +47,11 @@ Each time through the loop:
 <!--SNIPSTART workflows/agent.py {"startPattern": "^from temporalio import workflow$", "endPattern": "return \"No text response from Claude\""}-->
 ```python
 from temporalio import workflow
-from datetime import timedelta
-import json
 
 with workflow.unsafe.imports_passed_through():
-    from tools import get_tools
-    from helpers import tool_helpers
     from activities import claude_responses
+    from helpers import tool_helpers
+    from tools import get_tools
 
 @workflow.defn
 class AgentWorkflow:
@@ -170,13 +168,15 @@ In this implementation, we allow for the model, system instructions, messages, l
 *File: activities/claude_responses.py*
 <!--SNIPSTART:file activities/claude_responses.py-->
 ```python
-from temporalio import activity
-from temporalio.exceptions import ApplicationError
+from dataclasses import dataclass
+from typing import Any
+
 import anthropic
 from anthropic import AsyncAnthropic
 from anthropic.types import Message
-from dataclasses import dataclass
-from typing import Any
+from temporalio import activity
+from temporalio.exceptions import ApplicationError
+
 
 # Temporal best practice: Create a data structure to hold the request parameters.
 @dataclass
@@ -230,11 +230,13 @@ Implement a single tool invocation Activity, as a dynamic Activity (note the `@a
 *File: activities/tool_invoker.py*
 <!--SNIPSTART:file activities/tool_invoker.py-->
 ```python
-from temporalio import activity
-from collections.abc import Sequence
-from temporalio.common import RawValue
 import inspect
+from collections.abc import Sequence
+
 from pydantic import BaseModel
+from temporalio import activity
+from temporalio.common import RawValue
+
 
 # We use dynamic activities to allow the agent to be defined independently of the tools it can call.
 @activity.defn(dynamic=True)
@@ -342,11 +344,11 @@ The `__init__.py` file holds tools for providing location (`get_location_info`),
 ```python
 from typing import Any, Awaitable, Callable
 
+from . import get_location, get_weather
+
 # Location and weather related tools
-from .get_location import get_location_info, get_ip_address
+from .get_location import get_ip_address, get_location_info
 from .get_weather import get_weather_alerts
-from . import get_weather
-from . import get_location
 
 ToolHandler = Callable[..., Awaitable[Any]]
 
@@ -380,9 +382,12 @@ The tool descriptions and functions are defined in `tools/get_location.py`, `too
 # get_location.py
 
 from typing import Any
+
 import httpx
 from pydantic import BaseModel, Field
+
 from helpers import tool_helpers
+
 
 # For the location finder we use Pydantic to create a structure that encapsulates the input parameter 
 # (an IP address). 
@@ -428,15 +433,14 @@ The Worker is the process that dispatches work to the various parts of the agent
 <!--SNIPSTART:file worker.py-->
 ```python
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 from temporalio.client import Client
+from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.worker import Worker
 
-from workflows.agent import AgentWorkflow
 from activities import claude_responses, tool_invoker
-from temporalio.contrib.pydantic import pydantic_data_converter
-
-from concurrent.futures import ThreadPoolExecutor
+from workflows.agent import AgentWorkflow
 
 
 async def main():
@@ -478,9 +482,9 @@ import sys
 import uuid
 
 from temporalio.client import Client
+from temporalio.contrib.pydantic import pydantic_data_converter
 
 from workflows.agent import AgentWorkflow
-from temporalio.contrib.pydantic import pydantic_data_converter
 
 
 async def main():
@@ -503,7 +507,6 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
 ```
 <!--SNIPEND-->
 

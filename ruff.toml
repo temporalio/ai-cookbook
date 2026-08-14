@@ -1,0 +1,10 @@
+# CI runs `ruff check` against every recipe using this config (see
+# .github/workflows/validate-python-projects.yml). The rule selection is
+# deliberately narrow: pyflakes (undefined names, unused imports/variables)
+# plus import sorting. It exists to catch bugs like a missing import that
+# only fails at runtime — the kind unit tests miss when they mock past the
+# broken code path — not to enforce a broader style.
+target-version = "py310"
+
+[lint]
+select = ["E4", "E7", "E9", "F", "I"]

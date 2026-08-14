@@ -1,14 +1,15 @@
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 from temporalio import activity
+from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
-from temporalio.contrib.pydantic import pydantic_data_converter
 
+from activities.classify import ClassifyRequest, classify
+from guardrails.hard_rules import _hard_block, apply_hard_rules
 from models.signals import ContentSignals
 from models.verdict import Verdict
-from guardrails.hard_rules import _hard_block, apply_hard_rules
-from activities.classify import classify, ClassifyRequest
 from workflows.classify_workflow import ClassifyContentWorkflow
 
 TASK_QUEUE = "test-guardrails-task-queue"

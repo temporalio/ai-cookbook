@@ -1,12 +1,14 @@
-from pydantic import BaseModel, Field, field_validator, EmailStr
-from pydantic_core import PydanticCustomError
 import re
+from datetime import timedelta
+from typing import List, Optional
+
+from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic_core import PydanticCustomError
 from temporalio import workflow
+from temporalio.common import RetryPolicy
+
 from activities import invoke_model
 from activities.invoke_model import InvokeModelRequest
-from typing import List, Optional
-from datetime import timedelta
-from temporalio.common import RetryPolicy
 
 
 class Business(BaseModel):

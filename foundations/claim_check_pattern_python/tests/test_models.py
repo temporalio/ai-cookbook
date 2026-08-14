@@ -1,6 +1,6 @@
 """Tests for shared/models.py — dataclass construction and defaults."""
 
-from shared.models import IngestRequest, IngestResult, RagRequest, RagAnswer
+from shared.models import IngestRequest, IngestResult, RagAnswer, RagRequest
 
 
 class TestIngestRequest:

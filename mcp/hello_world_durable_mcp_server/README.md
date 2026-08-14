@@ -271,12 +271,15 @@ The Worker is the process that executes Activities and Workflows.
 <!--SNIPSTART:file worker.py-->
 ```python
 import asyncio
+
 from temporalio.client import Client
+from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.envconfig import ClientConfig
 from temporalio.worker import Worker
 
-from workflows.weather_workflows import GetAlerts, GetForecast
 from activities.weather_activities import make_nws_request
+from workflows.weather_workflows import GetAlerts, GetForecast
+
 
 async def main():
     # Connect to Temporal server 

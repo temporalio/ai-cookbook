@@ -80,9 +80,10 @@ class LiteLLMRequest:
 from typing import Any, Dict
 
 import litellm
-from activities.models import LiteLLMRequest
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
+
+from activities.models import LiteLLMRequest
 
 
 @activity.defn(name="activities.litellm_completion.create")
@@ -124,8 +125,9 @@ LiteLLM supports many providers. Configure credentials via environment variables
 ```python
 from datetime import timedelta
 
-from activities.models import LiteLLMRequest
 from temporalio import workflow
+
+from activities.models import LiteLLMRequest
 
 
 @workflow.defn
@@ -167,10 +169,11 @@ Temporal manages Activity retries, so LiteLLM's retry helper is disabled via `nu
 ```python
 import asyncio
 
-from activities import litellm_completion
 from temporalio.client import Client
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.worker import Worker
+
+from activities import litellm_completion
 from workflows.hello_world_workflow import HelloWorld
 
 
@@ -208,6 +211,7 @@ import asyncio
 
 from temporalio.client import Client
 from temporalio.contrib.pydantic import pydantic_data_converter
+
 from workflows.hello_world_workflow import HelloWorld
 
 

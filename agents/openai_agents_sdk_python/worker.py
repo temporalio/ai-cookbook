@@ -2,12 +2,11 @@ import asyncio
 from datetime import timedelta
 
 from temporalio.client import Client
+from temporalio.contrib.openai_agents import ModelActivityParameters, OpenAIAgentsPlugin
 from temporalio.worker import Worker
-from temporalio.contrib.openai_agents import OpenAIAgentsPlugin, ModelActivityParameters
 
-
+from activities.tools import calculate_circle_area, get_weather
 from workflows.hello_world_workflow import HelloWorldAgent
-from activities.tools import get_weather, calculate_circle_area
 
 
 async def worker_main():

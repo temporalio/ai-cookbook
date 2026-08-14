@@ -26,9 +26,11 @@ We create Activities that serve as tools for the agent. These Activities can per
 
 <!--SNIPSTART:file activities/tools.py-->
 ```python
-from dataclasses import dataclass
-from temporalio import activity
 import math
+from dataclasses import dataclass
+
+from temporalio import activity
+
 
 # Temporal best practice: Create a data structure to hold the request parameters.
 @dataclass
@@ -57,13 +59,14 @@ The Workflow creates an agent with specific instructions and tools. The agent ca
 
 <!--SNIPSTART:file workflows/hello_world_workflow.py-->
 ```python
-from temporalio import workflow
 from datetime import timedelta
 
 from agents import Agent, Runner
+from temporalio import workflow
 from temporalio.contrib import openai_agents
 
-from activities.tools import get_weather, calculate_circle_area
+from activities.tools import calculate_circle_area, get_weather
+
 
 @workflow.defn
 class HelloWorldAgent:
@@ -104,12 +107,11 @@ import asyncio
 from datetime import timedelta
 
 from temporalio.client import Client
+from temporalio.contrib.openai_agents import ModelActivityParameters, OpenAIAgentsPlugin
 from temporalio.worker import Worker
-from temporalio.contrib.openai_agents import OpenAIAgentsPlugin, ModelActivityParameters
 
-
+from activities.tools import calculate_circle_area, get_weather
 from workflows.hello_world_workflow import HelloWorldAgent
-from activities.tools import get_weather, calculate_circle_area
 
 
 async def worker_main():
@@ -153,7 +155,9 @@ import asyncio
 from temporalio.client import Client
 from temporalio.common import WorkflowIDConflictPolicy
 from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
+
 from workflows.hello_world_workflow import HelloWorldAgent
+
 
 async def main():
     client = await Client.connect(
