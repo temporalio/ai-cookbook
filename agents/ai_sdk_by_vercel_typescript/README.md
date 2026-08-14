@@ -191,7 +191,6 @@ run().catch((err) => {
 
 ## Running
 
-
 Start the Temporal Dev Server:
 ```bash
 temporal server start-dev
