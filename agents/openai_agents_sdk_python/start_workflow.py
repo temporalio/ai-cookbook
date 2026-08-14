@@ -24,7 +24,7 @@ async def main():
         user_input,
         id="my-workflow-id",
         task_queue="hello-world-openai-agent-task-queue",
-        id_conflict_policy=WorkflowIDConflictPolicy.TERMINATE_IF_RUNNING,
+        id_conflict_policy=WorkflowIDConflictPolicy.TERMINATE_EXISTING,
     )
     print(f"Result: {result}")
 
