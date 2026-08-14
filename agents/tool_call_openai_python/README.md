@@ -38,11 +38,13 @@ In this implementation, we allow for the model, instructions and input to be pas
 `activities/openai_responses.py`
 <!--SNIPSTART:file activities/openai_responses.py-->
 ```python
-from temporalio import activity
-from openai import AsyncOpenAI
-from openai.types.responses import Response
 from dataclasses import dataclass
 from typing import Any
+
+from openai import AsyncOpenAI
+from openai.types.responses import Response
+from temporalio import activity
+
 
 # Temporal best practice: Create a data structure to hold the request parameters.
 @dataclass
@@ -83,14 +85,14 @@ The `WEATHER_ALERTS_TOOL_OAI` uses a function defined in `helpers/tool_helpers.p
 ```python
 # weather_activities.py
 
-from typing import Any
-from temporalio import activity
-import httpx
 import json
-from pydantic import BaseModel
-import openai
+from typing import Any
+
+import httpx
+from pydantic import BaseModel, Field
+from temporalio import activity
+
 from helpers import tool_helpers
-from pydantic import Field
 
 # Constants
 NWS_API_BASE = "https://api.weather.gov"
@@ -146,9 +148,11 @@ The `oai_responses_tool_from_model` function accepts a tool name and description
 <!--SNIPSTART:file helpers/tool_helpers.py-->
 ```python
 from openai.lib._pydantic import to_strict_json_schema  # private API; may change
+
 # there currently is no public API to generate the tool definition from a Pydantic model
 # or a function signature.
 from pydantic import BaseModel
+
 
 def oai_responses_tool_from_model(name: str, description: str, model: type[BaseModel]):
     return {
@@ -171,13 +175,13 @@ The agent is implemented as a Temporal Workflow that orchestrates
 `workflows/get_weather_workflow.py`
 <!--SNIPSTART:file workflows/get_weather_workflow.py-->
 ```python
-from temporalio import workflow
-from datetime import timedelta
 import json
+from datetime import timedelta
+
+from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
-    from activities import openai_responses
-    from activities import get_weather_alerts
+    from activities import get_weather_alerts, openai_responses
 
 
 @workflow.defn
@@ -254,11 +258,11 @@ The Worker is the process that dispatches work to the various parts of the agent
 import asyncio
 
 from temporalio.client import Client
+from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.worker import Worker
 
+from activities import get_weather_alerts, openai_responses
 from workflows.get_weather_workflow import ToolCallingWorkflow
-from activities import openai_responses, get_weather_alerts
-from temporalio.contrib.pydantic import pydantic_data_converter
 
 
 async def main():
@@ -297,9 +301,9 @@ import asyncio
 import sys
 
 from temporalio.client import Client
+from temporalio.contrib.pydantic import pydantic_data_converter
 
 from workflows.get_weather_workflow import ToolCallingWorkflow
-from temporalio.contrib.pydantic import pydantic_data_converter
 
 
 async def main():

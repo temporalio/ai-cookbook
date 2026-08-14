@@ -30,10 +30,12 @@ In this implementation, we include only the `instructions` and `input` argument,
 
 <!--SNIPSTART:file activities/openai_responses.py-->
 ```python
-from temporalio import activity
+from dataclasses import dataclass
+
 from openai import AsyncOpenAI
 from openai.types.responses import Response
-from dataclasses import dataclass
+from temporalio import activity
+
 
 # Temporal best practice: Create a data structure to hold the request parameters.
 @dataclass
@@ -75,8 +77,9 @@ runs outside the sandbox, so passing the module through is safe.
 
 <!--SNIPSTART:file workflows/hello_world_workflow.py-->
 ```python
-from temporalio import workflow
 from datetime import timedelta
+
+from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
     from activities import openai_responses
@@ -113,11 +116,11 @@ We configure the Temporal client with `pydantic_data_converter` so Temporal can 
 import asyncio
 
 from temporalio.client import Client
+from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.worker import Worker
 
-from workflows.hello_world_workflow import HelloWorld
 from activities import openai_responses
-from temporalio.contrib.pydantic import pydantic_data_converter
+from workflows.hello_world_workflow import HelloWorld
 
 
 async def main():
@@ -156,9 +159,9 @@ It uses the `pydantic_data_converter` to match the Worker configuration.
 import asyncio
 
 from temporalio.client import Client
+from temporalio.contrib.pydantic import pydantic_data_converter
 
 from workflows.hello_world_workflow import HelloWorld
-from temporalio.contrib.pydantic import pydantic_data_converter
 
 
 async def main():

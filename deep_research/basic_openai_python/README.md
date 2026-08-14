@@ -157,13 +157,15 @@ priorities, identifies expected source types, and defines success criteria.
 
 <!--SNIPSTART:file agents/research_planning.py-->
 ```python
-from .shared import ResearchPlan, with_today
-from .config import COMPLEX_REASONING_MODEL
-from temporalio import workflow
 from datetime import timedelta
 
+from temporalio import workflow
+
+from .config import COMPLEX_REASONING_MODEL
+from .shared import ResearchPlan, with_today
+
 with workflow.unsafe.imports_passed_through():
-    from activities.invoke_model import invoke_model, InvokeModelRequest
+    from activities.invoke_model import InvokeModelRequest, invoke_model
 
 RESEARCH_PLANNING_INSTRUCTIONS = """
 You are a research planning specialist who creates focused research strategies.
@@ -212,13 +214,15 @@ case studies, recent news) with varied search styles and temporal modifiers.
 
 <!--SNIPSTART:file agents/research_query_generation.py-->
 ```python
-from .shared import QueryPlan, ResearchPlan, with_today
-from .config import EFFICIENT_PROCESSING_MODEL
-from temporalio import workflow
 from datetime import timedelta
 
+from temporalio import workflow
+
+from .config import EFFICIENT_PROCESSING_MODEL
+from .shared import QueryPlan, ResearchPlan, with_today
+
 with workflow.unsafe.imports_passed_through():
-    from activities.invoke_model import invoke_model, InvokeModelRequest
+    from activities.invoke_model import InvokeModelRequest, invoke_model
 
 QUERY_GENERATION_INSTRUCTIONS = """
 You are a search query specialist who crafts effective web searches.
@@ -281,13 +285,15 @@ and provides proper citations with reliability assessments.
 
 <!--SNIPSTART:file agents/research_web_search.py-->
 ```python
-from .shared import SearchResult, SearchQuery, with_today
-from .config import EFFICIENT_PROCESSING_MODEL
-from temporalio import workflow
 from datetime import timedelta
 
+from temporalio import workflow
+
+from .config import EFFICIENT_PROCESSING_MODEL
+from .shared import SearchQuery, SearchResult, with_today
+
 with workflow.unsafe.imports_passed_through():
-    from activities.invoke_model import invoke_model, InvokeModelRequest
+    from activities.invoke_model import InvokeModelRequest, invoke_model
 
 WEB_SEARCH_INSTRUCTIONS = """
 You are a web research specialist who finds and evaluates information from web sources.
@@ -349,14 +355,16 @@ follow-up research questions.
 
 <!--SNIPSTART:file agents/research_report_synthesis.py-->
 ```python
-from typing import List
-from temporalio import workflow
 from datetime import timedelta
-from .shared import ResearchReport, ResearchPlan, SearchResult, with_today
+from typing import List
+
+from temporalio import workflow
+
 from .config import COMPLEX_REASONING_MODEL
+from .shared import ResearchPlan, ResearchReport, SearchResult, with_today
 
 with workflow.unsafe.imports_passed_through():
-    from activities.invoke_model import invoke_model, InvokeModelRequest
+    from activities.invoke_model import InvokeModelRequest, invoke_model
 
 REPORT_SYNTHESIS_INSTRUCTIONS = """
 You are a research synthesis expert who creates comprehensive research reports.
@@ -449,15 +457,16 @@ pulls together the findings into a comprehensive report.
 
 <!--SNIPSTART:file workflows/deep_research_workflow.py-->
 ```python
-from temporalio import workflow
-from temporalio.exceptions import ApplicationError
 import asyncio
 from typing import List
 
+from temporalio import workflow
+from temporalio.exceptions import ApplicationError
+
 from agents.research_planning import plan_research
 from agents.research_query_generation import generate_queries
-from agents.research_web_search import search_web
 from agents.research_report_synthesis import generate_synthesis
+from agents.research_web_search import search_web
 from agents.shared import SearchResult
 
 
