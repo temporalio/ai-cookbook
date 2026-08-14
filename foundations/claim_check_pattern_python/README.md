@@ -15,6 +15,12 @@ This recipe includes:
 - A lightweight codec server for a better Web UI experience
 - An AI/RAG example workflow that demonstrates the pattern end-to-end
 
+## Temporal's built-in external storage feature
+
+Since Python SDK 1.25, Temporal offers a built-in [external storage](https://docs.temporal.io/develop/python/data-handling/external-storage) feature that implements the same claim check pattern without a custom `PayloadCodec`. It's configured directly on the `DataConverter` via an `ExternalStorage` option, and Temporal provides an `S3StorageDriver` out of the box. The feature is in Public Preview, so its API may change before General Availability.
+
+Reach for the built-in feature first if S3 (or a self-hosted equivalent) is a good fit and you don't need custom encode/decode logic. Use the codec-based approach in this recipe when you need a storage backend other than what the built-in drivers support, want to combine claim check with other codec logic (such as encryption) in a single codec, or want full control over the encode/decode implementation.
+
 ## How the Claim Check pattern works
 
 Each Temporal Workflow has an associated Event History that is stored in Temporal Server and used to provide durable execution. When using the Claim Check pattern, we store the payload content of the Event in a separate storage system, then store a reference to that storage in the Temporal Event History instead.
