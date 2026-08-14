@@ -106,6 +106,7 @@ Within the agent implementation there are three main elements to the solution.
 
 ### Local state within the Workflow implementation
 This state will be written to via the Signal handler and will be part of the condition that defines the wait point.
+<!--SNIPSTART workflows/human_in_the_loop_workflow.py {"startPattern": "^@workflow\\.defn$", "endPattern": "self\\.pending_request_id: Optional\\[str\\] = None"}-->
 ```python
 @workflow.defn
 class HumanInTheLoopWorkflow:
@@ -113,24 +114,30 @@ class HumanInTheLoopWorkflow:
         self.current_decision: Optional[ApprovalDecision] = None
         self.pending_request_id: Optional[str] = None
 ```
+<!--SNIPEND-->
 ### Signal handler
 The Workflow uses a Signal handler to receive approval decisions asynchronously:
+<!--SNIPSTART workflows/human_in_the_loop_workflow.py {"startPattern": "^\\s*@workflow\\.signal$", "endPattern": "expected: \\{self\\.pending_request_id\\}\"", "selectedLines": ["1-2", "5-6"]}-->
 ```python
 @workflow.signal
 async def approval_decision(self, decision: ApprovalDecision):
-    if decision.request_id == self.pending_request_id:
-        self.approval_decision = decision
     ...
+    if decision.request_id == self.pending_request_id:
+        self.current_decision = decision
+        ...
 ```
+<!--SNIPEND-->
 
 ### Waiting with timeout
 The Workflow waits for approval with a configurable timeout:
+<!--SNIPSTART workflows/human_in_the_loop_workflow.py {"startPattern": "await workflow\\.wait_condition\\(", "endPattern": "^\\s*\\)\\s*$"}-->
 ```python
 await workflow.wait_condition(
-    lambda: self.approval_decision is not None,
+    lambda: self.current_decision is not None,
     timeout=timedelta(seconds=timeout_seconds),
 )
 ```
+<!--SNIPEND-->
 
 ## Extensions
 

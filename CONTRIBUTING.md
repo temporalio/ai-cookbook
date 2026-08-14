@@ -52,6 +52,34 @@ priority: 500
 - `tags` — array; include at least the category (e.g. `agents`, `foundations`), language (`python`), and LLM provider (`openai`, `claude`, `litellm`) where applicable
 - `priority` — an integer; higher numbers appear earlier in listings
 
+### Code snippet markers
+
+If a README shows a code fragment pulled from the recipe's own source (for example, a "Key patterns" section highlighting a specific function), wrap it in `<!--SNIPSTART ...--><!--SNIPEND-->` markers instead of hand-pasting the fence. A CI check (`.github/workflows/check-readme-snippets.yml`) flags fences that drift from current source; markers keep that from happening and let you auto-regenerate the fence with one command.
+
+- **Whole file**, no source changes needed:
+  ```markdown
+  <!--SNIPSTART:file activities/classify.py-->
+  <!--SNIPEND-->
+  ```
+- **Fragment located by a regex boundary** (default — try this first, no source changes needed):
+  ```markdown
+  <!--SNIPSTART activities/classify.py {"startPattern": "^def classify\\(", "endPattern": "^\\s*\\)\\s*$"}-->
+  <!--SNIPEND-->
+  ```
+  `startPattern` must match exactly one line in the file; `endPattern` is the first matching line at or after it.
+- **Fragment located by an explicit id** (fallback for when no stable regex boundary exists), marked in source with `# @@@SNIPSTART <id>` / `# @@@SNIPEND` (or `//` in TypeScript):
+  ```markdown
+  <!--SNIPSTART workflows/human_in_the_loop_workflow.py:signal-handler-->
+  <!--SNIPEND-->
+  ```
+- **`selectedLines`** (relative to the matched region, 1-indexed) renders only some lines, with `...` auto-inserted at gaps — use this instead of hand-typing `...`, which can't be checked:
+  ```markdown
+  <!--SNIPSTART activities/classify.py {"startPattern": "...", "endPattern": "...", "selectedLines": ["1", "6-7"]}-->
+  <!--SNIPEND-->
+  ```
+
+Run `node .github/scripts/sync-readme-snippets.js --fix` before opening a PR that adds or touches one of these — it rewrites every marked fence to match current source. Run `--check` to verify without writing.
+
 ## Running Tests
 
 ### For Python Recipes
@@ -73,6 +101,7 @@ Before submitting a PR, confirm:
 - [ ] CI checks are green
 - [ ] LLM client retries are disabled (let Temporal retry instead)
 - [ ] New dependencies are added to `pyproject.toml`
+- [ ] Any README code fragment pulled from source uses `<!--SNIPSTART-->` markers, and `node .github/scripts/sync-readme-snippets.js --check` passes
 
 ## Questions?
 
