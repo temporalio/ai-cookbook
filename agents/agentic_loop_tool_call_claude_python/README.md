@@ -44,6 +44,7 @@ Each time through the loop:
 
 *File: workflows/agent.py*
 
+<!--SNIPSTART workflows/agent.py {"startPattern": "^from temporalio import workflow$", "endPattern": "return \"No text response from Claude\""}-->
 ```python
 from temporalio import workflow
 from datetime import timedelta
@@ -61,10 +62,10 @@ class AgentWorkflow:
         
         # Initialize messages list with user input
         messages = [{"role": "user", "content": input}]
+        print(f"\n[User] {input}")
 
         # The agentic loop
         while True:
-            print(80 * "=")
                 
             # Consult Claude
             result = await workflow.execute_activity(
@@ -91,6 +92,7 @@ class AgentWorkflow:
                     if block.type == "text":
                         assistant_content.append({"type": "text", "text": block.text})
                     elif block.type == "tool_use":
+                        print(f"[Agent] Calling tool: {block.name}")
                         assistant_content.append({
                             "type": "tool_use",
                             "id": block.id,
@@ -103,12 +105,8 @@ class AgentWorkflow:
                 # Execute all tool calls and collect results
                 tool_results = []
                 for block in tool_use_blocks:
-                    print(f"[Agent] Tool call: {block.name}({block.input})")
-                    
                     # Execute the tool
                     tool_result = await self._execute_tool(block.name, block.input)
-                    
-                    print(f"[Agent] Tool result: {tool_result}")
                     
                     # Add tool result in Claude's expected format
                     tool_results.append({
@@ -117,18 +115,21 @@ class AgentWorkflow:
                         "content": str(tool_result)
                     })
                 
-                # Add tool results as a user message
+                # Add tool results as a user message. Claude has only two message roles: user and assistant,
+                # and the user message role is used to send tool results back to Claude; in this case the content
+                # block includes the tool result.
                 messages.append({"role": "user", "content": tool_results})
             else:
                 # No tool calls - extract the text response and return
                 text_blocks = [block for block in result.content if block.type == "text"]
                 if text_blocks:
                     response_text = text_blocks[0].text
-                    print(f"[Agent] Final response: {response_text}")
+                    print(f"[Agent] Final response: {response_text}\n")
                     return response_text
                 else:
                     return "No text response from Claude"
 ```
+<!--SNIPEND-->
 
 ### Create the tool execution handler
 
@@ -136,23 +137,25 @@ The tool execution handler is invoked by the main agentic loop when Claude has c
 
 *File: workflows/agent.py*
 
+<!--SNIPSTART workflows/agent.py {"startPattern": "async def _execute_tool\\(self, tool_name: str, tool_input: dict\\) -> str:", "endPattern": "^\\s*return result$"}-->
 ```python
-    async def _execute_tool(self, tool_name: str, tool_input: dict) -> str:
-        """
-        Execute a tool dynamically.
-        
-        Args:
-            tool_name: Name of the tool to execute
-            tool_input: Dictionary of input parameters
-        """
-        # Execute dynamic Activity with the tool name and arguments
-        result = await workflow.execute_activity(
-            tool_name,
-            tool_input,
-            start_to_close_timeout=timedelta(seconds=30),
-        )
-        return result
+async def _execute_tool(self, tool_name: str, tool_input: dict) -> str:
+    """
+    Execute a tool dynamically.
+
+    Args:
+        tool_name: Name of the tool to execute
+        tool_input: Dictionary of input parameters
+    """
+    # Execute dynamic activity with the tool name and arguments
+    result = await workflow.execute_activity(
+        tool_name,
+        tool_input,
+        start_to_close_timeout=timedelta(seconds=30),
+    )
+    return result
 ```
+<!--SNIPEND-->
 
 ## Create the Activity for Claude invocations
 
@@ -165,6 +168,7 @@ Errors that can never succeed on a retry, such as a 404 for a retired model iden
 In this implementation, we allow for the model, system instructions, messages, list of tools, and max_tokens (required) to be passed in.
 
 *File: activities/claude_responses.py*
+<!--SNIPSTART:file activities/claude_responses.py-->
 ```python
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
@@ -215,13 +219,16 @@ async def create(request: ClaudeResponsesRequest) -> Message:
         ) from exc
     finally:
         await client.close()
+
 ```
+<!--SNIPEND-->
 
 ## Create the Activity for the tool invocation
 
 Implement a single tool invocation Activity, as a dynamic Activity (note the `@activity.defn(dynamic=True)` annotation) that acts as a broker to the right tool function. The name of the Activity is drawn from the `activity.info()` and the property bag of arguments from the Activity payload. The `handler` is the function that maps to the `tool_name` (see [Create Tool Definitions](#create-tool-definitions) for more details) and that function is then called with the supplied arguments.
 
 *File: activities/tool_invoker.py*
+<!--SNIPSTART:file activities/tool_invoker.py-->
 ```python
 from temporalio import activity
 from collections.abc import Sequence
@@ -234,7 +241,7 @@ from pydantic import BaseModel
 async def dynamic_tool_activity(args: Sequence[RawValue]) -> dict:
     from tools import get_handler
 
-    # the name of the tool to execute - this is passed in via the execute_activity call in the Workflow
+    # the name of the tool to execute - this is passed in via the execute_activity call in the workflow
     tool_name = activity.info().activity_type 
     tool_args = activity.payload_converter().from_payload(args[0].payload, dict)
     activity.logger.info(f"Running dynamic tool '{tool_name}' with args: {tool_args}")
@@ -260,18 +267,17 @@ async def dynamic_tool_activity(args: Sequence[RawValue]) -> dict:
     # Optionally log or augment the result
     activity.logger.info(f"Tool '{tool_name}' result: {result}")
     return result
+
 ```
+<!--SNIPEND-->
 
 ## Create the helper function
 
 The `claude_tool_from_model` function accepts a tool name and description, as well as a Pydantic model for the parameters, and returns JSON that is in the format expected for tool definitions in Claude's Messages API.
 
 *File: helpers/tool_helpers.py*
+<!--SNIPSTART helpers/tool_helpers.py:claude-tool-from-model-->
 ```python
-from pydantic import BaseModel
-from typing import Any
-import json
-
 def claude_tool_from_model(name: str, description: str, model: type[BaseModel] | None) -> dict[str, Any]:
     """
     Convert a Pydantic model to Claude's tool format.
@@ -302,19 +308,17 @@ def claude_tool_from_model(name: str, description: str, model: type[BaseModel] |
     # Get the JSON schema from the Pydantic model
     schema = model.model_json_schema()
     
-    # Claude expects an input_schema field
+    # Claude expects an input_schema field instead of parameters
     return {
         "name": name,
         "description": description,
-        "input_schema": {
-            "type": "object",
-            "properties": schema.get("properties", {}),
-            "required": schema.get("required", [])
-        }
+        "input_schema": schema
     }
 ```
+<!--SNIPEND-->
 
 This file also holds the system instruction for the agent.
+<!--SNIPSTART helpers/tool_helpers.py {"startPattern": "^HELPFUL_AGENT_SYSTEM_INSTRUCTIONS = \"\"\"$", "endPattern": "^\"\"\"$"}-->
 ```python
 HELPFUL_AGENT_SYSTEM_INSTRUCTIONS = """
 You are a helpful agent that can use tools to help the user.
@@ -323,6 +327,7 @@ You may or may not need to use the tools to satisfy the user ask.
 If no tools are needed, respond in haikus.
 """
 ```
+<!--SNIPEND-->
 
 ## Create tool definitions
 
@@ -333,6 +338,7 @@ The `__init__.py` file holds tools for providing location (`get_location_info`),
 - The `get_handler` method captures the mapping from tool name to tool function.
 
 *File: tools/\_\_init\_\_.py*
+<!--SNIPSTART:file tools/__init__.py-->
 ```python
 from typing import Any, Awaitable, Callable
 
@@ -359,7 +365,9 @@ def get_tools() -> list[dict[str, Any]]:
         get_location.GET_LOCATION_TOOL_CLAUDE,
         get_location.GET_IP_ADDRESS_TOOL_CLAUDE
     ]
+
 ```
+<!--SNIPEND-->
 
 The tool descriptions and functions are defined in `tools/get_location.py`, `tools/get_weather.py` and `tools/random_stuff.py` files. Each of these files contains:
 - data structures for function arguments
@@ -367,6 +375,7 @@ The tool descriptions and functions are defined in `tools/get_location.py`, `too
 - the function definitions.
 
 `tools/get_location.py`
+<!--SNIPSTART:file tools/get_location.py-->
 ```python
 # get_location.py
 
@@ -406,7 +415,9 @@ async def get_location_info(req: GetLocationRequest) -> str:
         response.raise_for_status()
         result = response.json()
         return f"{result['city']}, {result['regionName']}, {result['country']}"
+
 ```
+<!--SNIPEND-->
 
 ## Create the Worker
 
@@ -414,6 +425,7 @@ The Worker is the process that dispatches work to the various parts of the agent
 
 *File: worker.py*
 
+<!--SNIPSTART:file worker.py-->
 ```python
 import asyncio
 
@@ -450,13 +462,16 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 ```
+<!--SNIPEND-->
 
 ## Initiate an interaction with the agent
 
 To interact with this simple AI agent, we create a Temporal client and execute a Workflow.
 
 *File: start_workflow.py*
+<!--SNIPSTART:file start_workflow.py-->
 ```python
 import asyncio
 import sys
@@ -476,7 +491,7 @@ async def main():
 
     query = sys.argv[1] if len(sys.argv) > 1 else "Tell me about recursion"
 
-    # Submit the agent Workflow for execution
+    # Submit the agent workflow for execution
     result = await client.execute_workflow(
         AgentWorkflow.run,
         query,
@@ -488,7 +503,9 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 ```
+<!--SNIPEND-->
 
 ## Running the app
 

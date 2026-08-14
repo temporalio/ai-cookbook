@@ -2,6 +2,7 @@ from pydantic import BaseModel
 from typing import Any
 import json
 
+# @@@SNIPSTART claude-tool-from-model
 def claude_tool_from_model(name: str, description: str, model: type[BaseModel] | None) -> dict[str, Any]:
     """
     Convert a Pydantic model to Claude's tool format.
@@ -38,6 +39,7 @@ def claude_tool_from_model(name: str, description: str, model: type[BaseModel] |
         "description": description,
         "input_schema": schema
     }
+# @@@SNIPEND
 
 HELPFUL_AGENT_SYSTEM_INSTRUCTIONS = """
 You are a helpful agent that can use tools to help the user.

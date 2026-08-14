@@ -21,7 +21,8 @@ Temporal Activities provide the tools that `toolsAgent` can call. `getWeather` d
 
 *File: src/activities.ts*
 
-```ts
+<!--SNIPSTART:file src/activities.ts-->
+```typescript
 const USER_AGENT = '(temporal-ai-cookbook, cookbook@temporal.io)';
 
 async function geocode(location: string): Promise<{ name: string; latitude: number; longitude: number }> {
@@ -75,6 +76,7 @@ export async function calculateAreaOfCircle(input: { radius: number }): Promise<
   return { area: Math.PI * input.radius * input.radius };
 }
 ```
+<!--SNIPEND-->
 
 ## Create the Workflow
 
@@ -82,7 +84,8 @@ The Workflow registers both Activities as tools with a Zod schema so the model c
 
 *File: src/workflows.ts*
 
-```ts
+<!--SNIPSTART:file src/workflows.ts-->
+```typescript
 import type * as activities from './activities';
 import { generateText, stepCountIs, tool } from 'ai';
 import { temporalProvider } from '@temporalio/ai-sdk/workflow';
@@ -122,6 +125,7 @@ export async function toolsAgent(question: string): Promise<string> {
   return result.text;
 }
 ```
+<!--SNIPEND-->
 
 ## Create the Worker
 
@@ -129,7 +133,8 @@ Create the process for executing Activities and Workflows. The Worker uses `AiSd
 
 *File: src/worker.ts*
 
-```ts
+<!--SNIPSTART:file src/worker.ts-->
+```typescript
 import { NativeConnection, Worker } from '@temporalio/worker';
 import * as activities from './activities';
 import { AiSdkPlugin } from '@temporalio/ai-sdk';
@@ -152,7 +157,9 @@ run().catch((err) => {
   console.error(err);
   process.exit(1);
 });
+
 ```
+<!--SNIPEND-->
 
 ## Create the Workflow Starter
 
@@ -160,7 +167,8 @@ The starter (`src/client.ts`) takes the question to ask as a command-line argume
 
 *File: src/client.ts*
 
-```ts
+<!--SNIPSTART:file src/client.ts-->
+```typescript
 import { Connection, Client } from '@temporalio/client';
 import { loadClientConnectConfig } from '@temporalio/envconfig';
 import { toolsAgent } from './workflows';
@@ -188,6 +196,7 @@ run().catch((err) => {
   process.exit(1);
 });
 ```
+<!--SNIPEND-->
 
 ## Running
 
