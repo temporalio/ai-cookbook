@@ -24,6 +24,7 @@ We create Activities that serve as tools for the agent. These Activities can per
 
 *File: activities/tools.py*
 
+<!--SNIPSTART:file activities/tools.py-->
 ```python
 from dataclasses import dataclass
 from temporalio import activity
@@ -46,6 +47,7 @@ async def calculate_circle_area(radius: float) -> float:
     """Calculate the area of a circle given its radius."""
     return math.pi * radius ** 2
 ```
+<!--SNIPEND-->
 
 ## Create the Workflow
 
@@ -53,6 +55,7 @@ The Workflow creates an agent with specific instructions and tools. The agent ca
 
 *File: workflows/hello_world_workflow.py*
 
+<!--SNIPSTART:file workflows/hello_world_workflow.py-->
 ```python
 from temporalio import workflow
 from datetime import timedelta
@@ -72,19 +75,21 @@ class HelloWorldAgent:
             # Tools for the agent to use that are defined as activities
             tools=[
                 openai_agents.workflow.activity_as_tool(
-                    get_weather,
+                    get_weather, 
                     start_to_close_timeout=timedelta(seconds=10)
                 ),
                 openai_agents.workflow.activity_as_tool(
-                    calculate_circle_area,
+                    calculate_circle_area, 
                     start_to_close_timeout=timedelta(seconds=10)
                 )
             ]
+
         )
 
         result = await Runner.run(agent, prompt)
         return result.final_output
 ```
+<!--SNIPEND-->
 
 ## Create the Worker
 
@@ -93,6 +98,7 @@ We configure the Temporal client with the `OpenAIAgentsPlugin` to enable OpenAI 
 
 *File: worker.py*
 
+<!--SNIPSTART:file worker.py-->
 ```python
 import asyncio
 from datetime import timedelta
@@ -101,8 +107,10 @@ from temporalio.client import Client
 from temporalio.worker import Worker
 from temporalio.contrib.openai_agents import OpenAIAgentsPlugin, ModelActivityParameters
 
+
 from workflows.hello_world_workflow import HelloWorldAgent
 from activities.tools import get_weather, calculate_circle_area
+
 
 async def worker_main():
     # Use the plugin to configure Temporal for use with OpenAI Agents SDK
@@ -125,9 +133,11 @@ async def worker_main():
     )
     await worker.run()
 
+
 if __name__ == "__main__":
     asyncio.run(worker_main())
 ```
+<!--SNIPEND-->
 
 ## Create the Workflow Starter
 
@@ -136,6 +146,7 @@ It uses the `OpenAIAgentsPlugin` to match the Worker configuration.
 
 *File: start_workflow.py*
 
+<!--SNIPSTART:file start_workflow.py-->
 ```python
 import asyncio
 
@@ -163,7 +174,7 @@ async def main():
         user_input,
         id="my-workflow-id",
         task_queue="hello-world-openai-agent-task-queue",
-        id_conflict_policy=WorkflowIDConflictPolicy.TERMINATE_IF_RUNNING,
+        id_conflict_policy=WorkflowIDConflictPolicy.TERMINATE_EXISTING,
     )
     print(f"Result: {result}")
 
@@ -174,6 +185,7 @@ async def main():
 if __name__ == "__main__":
     asyncio.run(main())
 ```
+<!--SNIPEND-->
 
 ## Running
 

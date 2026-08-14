@@ -69,32 +69,44 @@ In Example 1, the LLM's classification and reasoning are preserved inside bracke
 
 The Activity forces Claude to call a single tool, so the response is always a well-formed `LLMVerdict` instead of free-form text to parse:
 
+<!--SNIPSTART activities/classify.py {"startPattern": "^_SUBMIT_VERDICT_TOOL = \\{$", "endPattern": "^\\}$"}-->
 ```python
 _SUBMIT_VERDICT_TOOL = {
     "name": "submit_verdict",
     "description": "Submit your content moderation classification.",
     "input_schema": LLMVerdict.model_json_schema(),
 }
+```
+<!--SNIPEND-->
 
+<!--SNIPSTART activities/classify.py {"startPattern": "response = await client\\.messages\\.create\\($", "endPattern": "^\\s*\\)\\s*$", "selectedLines": ["1", "8-10"]}-->
+```python
 response = await client.messages.create(
     ...
     tools=[_SUBMIT_VERDICT_TOOL],
     tool_choice={"type": "tool", "name": "submit_verdict"},
 )
 ```
+<!--SNIPEND-->
 
 ### Overriding while preserving the original reasoning
 
 `apply_hard_rules` never discards the LLM's own verdict — a rule can only escalate a verdict to `block`, and when it does, the LLM's reasoning is embedded in the result so the override stays auditable:
 
+<!--SNIPSTART guardrails/hard_rules.py {"startPattern": "^def apply_hard_rules\\(signals: ContentSignals, llm_verdict: Verdict\\) -> Verdict:$", "endPattern": "^\\s*\\)\\s*$"}-->
 ```python
 def apply_hard_rules(signals: ContentSignals, llm_verdict: Verdict) -> Verdict:
+    """Post-filter: override the LLM verdict if a hard rule matches.
+
+    When a rule fires, the LLM's original reasoning is embedded in the
+    returned verdict so the override is auditable.
+    """
     if llm_verdict.classification == "block":
-        return llm_verdict  # already blocked — nothing to override
+        return llm_verdict
 
     hard = _hard_block(signals)
     if hard is None:
-        return llm_verdict  # no rule fired — LLM verdict stands
+        return llm_verdict
 
     return Verdict(
         classification=hard.classification,
@@ -107,11 +119,13 @@ def apply_hard_rules(signals: ContentSignals, llm_verdict: Verdict) -> Verdict:
         ),
     )
 ```
+<!--SNIPEND-->
 
 ### Non-retryable Anthropic errors
 
 Permanent client errors (bad request, authentication, permission-denied, not-found, unprocessable-entity) are classified as non-retryable so the Workflow doesn't keep retrying a request that can never succeed:
 
+<!--SNIPSTART activities/classify.py {"startPattern": "^\\s*except \\($", "endPattern": "\\) from exc$"}-->
 ```python
 except (
     anthropic.BadRequestError,
@@ -120,8 +134,17 @@ except (
     anthropic.NotFoundError,
     anthropic.UnprocessableEntityError,
 ) as exc:
-    raise ApplicationError(str(exc), type=exc.__class__.__name__, non_retryable=True) from exc
+    # These errors will never succeed on a retry: a retired model identifier, for
+    # example, returns 404. Retrying them under the default policy would loop
+    # forever instead of surfacing the problem. Everything else, such as rate
+    # limits and 5xx responses, propagates so Temporal can retry it.
+    raise ApplicationError(
+        str(exc),
+        type=exc.__class__.__name__,
+        non_retryable=True,
+    ) from exc
 ```
+<!--SNIPEND-->
 
 ## Extensions
 

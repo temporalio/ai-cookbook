@@ -32,6 +32,7 @@ The `ClaimCheckCodec` implements `PayloadCodec` and adds an inline threshold to 
 
 *File: codec/claim_check.py*
 
+<!--SNIPSTART:file codec/claim_check.py-->
 ```python
 import uuid
 import logging
@@ -215,6 +216,7 @@ class ClaimCheckCodec(PayloadCodec):
                 return None
             raise e
 ```
+<!--SNIPEND-->
 
 ### Inline payload threshold
 
@@ -270,6 +272,7 @@ The `ClaimCheckPlugin` integrates the codec with the Temporal client configurati
 
 *File: codec/plugin.py*
 
+<!--SNIPSTART:file codec/plugin.py-->
 ```python
 import os
 from temporalio.plugin import SimplePlugin
@@ -294,6 +297,7 @@ class ClaimCheckPlugin(SimplePlugin):
             ),
         )
 ```
+<!--SNIPEND-->
 
 ## Example: AI/RAG Workflow using Claim Check
 
@@ -303,6 +307,7 @@ This example ingests a large text, performs lightweight lexical retrieval, and a
 
 *File: shared/models.py*
 
+<!--SNIPSTART:file shared/models.py-->
 ```python
 from dataclasses import dataclass
 from typing import List, Dict, Any
@@ -336,11 +341,13 @@ class RagAnswer:
     answer: str
     sources: List[Dict[str, Any]]
 ```
+<!--SNIPEND-->
 
 ### Activities
 
 *File: activities/ai_claim_check.py*
 
+<!--SNIPSTART:file activities/ai_claim_check.py-->
 ```python
 from typing import List
 
@@ -415,12 +422,16 @@ async def rag_answer(req: RagRequest, ingest_result: IngestResult) -> RagAnswer:
     answer = chat.choices[0].message.content.strip()
 
     return RagAnswer(answer=answer, sources=sources)
+
+
 ```
+<!--SNIPEND-->
 
 ### Workflow
 
 *File: workflows/ai_rag_workflow.py*
 
+<!--SNIPSTART:file workflows/ai_rag_workflow.py-->
 ```python
 from temporalio import workflow
 from datetime import timedelta
@@ -454,7 +465,10 @@ class AiRagWorkflow:
             summary="RAG answer using embedded chunks",
         )
         return answer
+
+
 ```
+<!--SNIPEND-->
 
 ## Running
 
@@ -534,6 +548,7 @@ When claim check is enabled, the Web UI would otherwise show opaque keys. This c
 
 *File: codec/codec_server.py*
 
+<!--SNIPSTART:file codec/codec_server.py-->
 ```python
 from functools import partial
 from typing import Awaitable, Callable, Iterable, List
@@ -668,6 +683,7 @@ def build_codec_server() -> web.Application:
 if __name__ == "__main__":
     web.run_app(build_codec_server(), host="127.0.0.1", port=8081)
 ```
+<!--SNIPEND-->
 
 ### Running the codec server
 

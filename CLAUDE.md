@@ -75,6 +75,8 @@ Required fields: `description` (plain text), `tags` (array including category, l
 
 **Tests must pass** before a PR is merged. CI detects changed recipe directories and runs `uv sync && pytest tests/ --timeout=30` for each.
 
+**README code snippets pulled from source must stay in sync** — wrap them in `<!--SNIPSTART ...--><!--SNIPEND-->` markers (see CONTRIBUTING.md's "Code snippet markers" section) rather than hand-pasting a fence. `.github/workflows/check-readme-snippets.yml` runs `node .github/scripts/sync-readme-snippets.js --check`; run `--fix` locally to regenerate marked fences from current source before opening a PR.
+
 ## README Style Guide
 
 Top-level recipe READMEs are published to [docs.temporal.io](https://docs.temporal.io) as MDX pages, synced wholesale from this repo on every docs build rather than hand-authored per page. The `# H1` becomes the page `title`, the front matter `description` becomes the meta `description`, and the body becomes the page body. Follow the [Temporal documentation style guide](https://github.com/temporalio/documentation/blob/main/STYLE.md) and the prose/terminology rules in [documentation's AGENTS.md](https://github.com/temporalio/documentation/blob/main/AGENTS.md) so new recipes match published docs. AGENTS.md's Frontmatter, MDX/components, and Snipsync sections describe hand-authored docs pages and don't apply here — this repo's own front matter contract (below) is authoritative for recipes.

@@ -28,8 +28,8 @@ In this implementation, we include only the `instructions` and `input` argument,
 
 *File: activities/openai_responses.py*
 
+<!--SNIPSTART:file activities/openai_responses.py-->
 ```python
-
 from temporalio import activity
 from openai import AsyncOpenAI
 from openai.types.responses import Response
@@ -56,6 +56,7 @@ async def create(request: OpenAIResponsesRequest) -> Response:
 
     return resp
 ```
+<!--SNIPEND-->
 
 ## Create the Workflow
 
@@ -72,6 +73,7 @@ runs outside the sandbox, so passing the module through is safe.
 
 *File: workflows/hello_world_workflow.py*
 
+<!--SNIPSTART:file workflows/hello_world_workflow.py-->
 ```python
 from temporalio import workflow
 from datetime import timedelta
@@ -95,7 +97,9 @@ class HelloWorld:
             start_to_close_timeout=timedelta(seconds=30),
         )
         return result.output_text
+ 
 ```
+<!--SNIPEND-->
 
 ## Create the Worker
 
@@ -104,6 +108,7 @@ We configure the Temporal client with `pydantic_data_converter` so Temporal can 
 
 *File: worker.py*
 
+<!--SNIPSTART:file worker.py-->
 ```python
 import asyncio
 
@@ -137,6 +142,7 @@ async def main():
 if __name__ == "__main__":
     asyncio.run(main())
 ```
+<!--SNIPEND-->
 
 ## Create the Workflow Starter
 
@@ -145,6 +151,7 @@ It uses the `pydantic_data_converter` to match the Worker configuration.
 
 *File: start_workflow.py*
 
+<!--SNIPSTART:file start_workflow.py-->
 ```python
 import asyncio
 
@@ -164,7 +171,7 @@ async def main():
     result = await client.execute_workflow(
         HelloWorld.run,
         "Tell me about recursion in programming.",
-        id="my-workflow-id",
+        id="my-workflow-id-2",
         task_queue="hello-world-python-task-queue",
     )
     print(f"Result: {result}")
@@ -172,8 +179,8 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
 ```
+<!--SNIPEND-->
 
 ## Running
 
