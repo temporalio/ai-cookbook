@@ -19,7 +19,7 @@ This recipe includes:
 
 Since Python SDK 1.25, Temporal offers a built-in [external storage](https://docs.temporal.io/develop/python/data-handling/external-storage) feature that implements the same claim check pattern without a custom `PayloadCodec`. It's configured directly on the `DataConverter` via an `ExternalStorage` option, and Temporal provides an `S3StorageDriver` out of the box. The feature is in Public Preview, so its API may change before General Availability.
 
-Reach for the built-in feature first if S3 (or a self-hosted equivalent) is a good fit and you don't need custom encode/decode logic. Use the codec-based approach in this recipe when you need a storage backend other than what the built-in drivers support, want to combine claim check with other codec logic (such as encryption) in a single codec, or want full control over the encode/decode implementation.
+Use the built-in feature first if S3 (or a self-hosted equivalent) is a good fit and you don't need custom encode/decode logic. Follow the codec-based approach in this recipe when you need a storage backend other than what the built-in drivers support, want to combine claim check with other codec logic (such as encryption) in a single codec, or want full control over the encode/decode implementation.
 
 ## How the Claim Check pattern works
 
