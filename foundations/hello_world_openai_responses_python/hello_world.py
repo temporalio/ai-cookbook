@@ -2,6 +2,7 @@ import asyncio
 
 from openai import AsyncOpenAI
 
+
 async def main():
     client = AsyncOpenAI()
 

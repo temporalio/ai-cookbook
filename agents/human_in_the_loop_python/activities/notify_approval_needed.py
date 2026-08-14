@@ -1,5 +1,7 @@
 from temporalio import activity
+
 from models.models import ApprovalRequest
+
 
 @activity.defn
 async def notify_approval_needed(request: ApprovalRequest) -> None:
@@ -24,7 +26,7 @@ async def notify_approval_needed(request: ApprovalRequest) -> None:
     # In a real implementation, you would call notification services here
     risk_indicator = "⚠️  RISKY ACTION" if request.proposed_action.risky_action else "✓ Safe Action"
     print(f"\n{'='*60}")
-    print(f"APPROVAL REQUIRED")
+    print("APPROVAL REQUIRED")
     print(f"{'='*60}")
     print(f"Workflow ID: {workflow_id}")
     print(f"Request ID: {request.request_id}")
@@ -32,7 +34,7 @@ async def notify_approval_needed(request: ApprovalRequest) -> None:
     print(f"Action: {request.proposed_action.action_type}")
     print(f"Description: {request.proposed_action.description}")
     print(f"Reasoning: {request.proposed_action.reasoning}")
-    print(f"\nTo approve or reject, use the send_approval script:")
+    print("\nTo approve or reject, use the send_approval script:")
     print(f"  uv run python -m send_approval {workflow_id} {request.request_id} approve 'Looks good'")
     print(f"  uv run python -m send_approval {workflow_id} {request.request_id} reject 'Too risky'")
     print(f"{'='*60}\n")

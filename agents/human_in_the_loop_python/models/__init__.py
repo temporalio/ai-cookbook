@@ -1,9 +1,9 @@
 # Models for human-in-the-loop workflow
 from .models import (
-    WorkflowInput,
-    ProposedAction,
-    ApprovalRequest,
     ApprovalDecision,
+    ApprovalRequest,
+    ProposedAction,
+    WorkflowInput,
 )
 
 __all__ = [

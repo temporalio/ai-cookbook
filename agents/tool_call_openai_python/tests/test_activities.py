@@ -1,15 +1,15 @@
 """Tests for activities/get_weather_alerts.py."""
 
 import json
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from activities.get_weather_alerts import (
-    get_weather_alerts,
-    GetWeatherAlertsRequest,
     WEATHER_ALERTS_TOOL_OAI,
+    GetWeatherAlertsRequest,
     _alerts_url,
+    get_weather_alerts,
 )
 
 

@@ -1,11 +1,11 @@
 import anthropic
+from pydantic import BaseModel
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
-from pydantic import BaseModel
 
+from guardrails.hard_rules import apply_hard_rules
 from models.signals import ContentSignals
 from models.verdict import LLMVerdict, Verdict
-from guardrails.hard_rules import apply_hard_rules
 
 _SYSTEM = """You are a content moderation assistant. Classify the submitted text as:
 - safe: acceptable content with no policy concerns

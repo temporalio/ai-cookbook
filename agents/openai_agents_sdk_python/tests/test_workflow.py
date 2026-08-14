@@ -4,12 +4,17 @@ import json
 from datetime import timedelta
 
 import pytest
+from fakes import (
+    ScriptedModel,
+    ScriptedModelProvider,
+    text_response,
+    tool_call_response,
+)
 from temporalio.contrib.openai_agents import ModelActivityParameters, OpenAIAgentsPlugin
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
 from activities.tools import calculate_circle_area, get_weather
-from fakes import ScriptedModel, ScriptedModelProvider, text_response, tool_call_response
 from workflows.hello_world_workflow import HelloWorldAgent
 
 TASK_QUEUE = "test-hello-world-agent"

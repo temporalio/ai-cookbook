@@ -1,7 +1,8 @@
 from datetime import timedelta
 
-from activities.models import LiteLLMRequest
 from temporalio import workflow
+
+from activities.models import LiteLLMRequest
 
 
 @workflow.defn

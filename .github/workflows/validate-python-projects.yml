@@ -85,6 +85,10 @@ jobs:
         working-directory: ${{ matrix.project }}
         run: uv sync
 
+      - name: Lint (ruff)
+        working-directory: ${{ matrix.project }}
+        run: uvx ruff@0.16.3 check --config ${{ github.workspace }}/ruff.toml .
+
       - name: Run tests
         working-directory: ${{ matrix.project }}
         run: |

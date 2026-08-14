@@ -1,6 +1,7 @@
-from pydantic import BaseModel
 from typing import Any
-import json
+
+from pydantic import BaseModel
+
 
 def claude_tool_from_model(name: str, description: str, model: type[BaseModel] | None) -> dict[str, Any]:
     """

@@ -1,10 +1,12 @@
-from .shared import ResearchPlan, with_today
-from .config import COMPLEX_REASONING_MODEL
-from temporalio import workflow
 from datetime import timedelta
 
+from temporalio import workflow
+
+from .config import COMPLEX_REASONING_MODEL
+from .shared import ResearchPlan, with_today
+
 with workflow.unsafe.imports_passed_through():
-    from activities.invoke_model import invoke_model, InvokeModelRequest
+    from activities.invoke_model import InvokeModelRequest, invoke_model
 
 RESEARCH_PLANNING_INSTRUCTIONS = """
 You are a research planning specialist who creates focused research strategies.

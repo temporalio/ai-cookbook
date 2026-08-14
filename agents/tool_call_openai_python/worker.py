@@ -1,11 +1,11 @@
 import asyncio
 
 from temporalio.client import Client
+from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.worker import Worker
 
+from activities import get_weather_alerts, openai_responses
 from workflows.get_weather_workflow import ToolCallingWorkflow
-from activities import openai_responses, get_weather_alerts
-from temporalio.contrib.pydantic import pydantic_data_converter
 
 
 async def main():

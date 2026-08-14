@@ -3,7 +3,9 @@ import asyncio
 from temporalio.client import Client
 from temporalio.common import WorkflowIDConflictPolicy
 from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
+
 from workflows.hello_world_workflow import HelloWorldAgent
+
 
 async def main():
     client = await Client.connect(

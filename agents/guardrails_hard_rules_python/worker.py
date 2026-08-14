@@ -1,10 +1,11 @@
 import asyncio
-from temporalio.client import Client
-from temporalio.worker import Worker
-from temporalio.contrib.pydantic import pydantic_data_converter
 
-from workflows.classify_workflow import ClassifyContentWorkflow
+from temporalio.client import Client
+from temporalio.contrib.pydantic import pydantic_data_converter
+from temporalio.worker import Worker
+
 from activities.classify import classify
+from workflows.classify_workflow import ClassifyContentWorkflow
 
 
 async def main():
