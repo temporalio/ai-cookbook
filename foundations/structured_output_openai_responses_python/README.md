@@ -23,6 +23,9 @@ Key challenges are related to serialization:
 1. In `InvokeModelRequest` the `response_format` field is a class reference. We provide custom Pydantic serialization and deserialization logic.
 2. In `InvokeModelResponse` the `response_model` must be deserialized to the correct type. We serialize the type in one field and the model, represented as a dictionary, in another.
 
+*File: activities/invoke_model.py*
+
+<!--SNIPSTART:file activities/invoke_model.py-->
 ```python
 from temporalio import activity
 from openai import AsyncOpenAI
@@ -93,7 +96,7 @@ class InvokeModelResponse(BaseModel, Generic[T]):
 async def invoke_model(request: InvokeModelRequest[T]) -> InvokeModelResponse[T]:
     client = AsyncOpenAI(max_retries=0)
 
-    kwargs = {
+    kwargs: dict[str, Any] = {
         "model": request.model,
         "instructions": request.instructions,
         "input": request.input,
@@ -121,6 +124,7 @@ async def invoke_model(request: InvokeModelRequest[T]) -> InvokeModelResponse[T]
             response_model=resp.output_text, response_format=None
         )
 ```
+<!--SNIPEND-->
 
 ## Workflow
 
@@ -132,6 +136,9 @@ The validators should check for obvious structural errors that LLMs will only ge
 If the LLM produces invalid responses consistently, Activity retries will fail consistently.
 To mitigate the cost of such futile retries, we limit the number of retry attempts when using structured outputs.
 
+*File: workflows/clean_data_workflow.py*
+
+<!--SNIPSTART:file workflows/clean_data_workflow.py-->
 ```python
 from pydantic import BaseModel, Field, field_validator, EmailStr
 from pydantic_core import PydanticCustomError
@@ -142,6 +149,7 @@ from activities.invoke_model import InvokeModelRequest
 from typing import List, Optional
 from datetime import timedelta
 from temporalio.common import RetryPolicy
+
 
 class Business(BaseModel):
     name: Optional[str] = Field(
@@ -228,10 +236,10 @@ class CleanDataWorkflow:
             invoke_model.invoke_model,
             InvokeModelRequest(
                 model="gpt-4o",
-                instructions=f"""Extract and clean business data with these specific rules:
+                instructions="""Extract and clean business data with these specific rules:
 
 1. BUSINESS NAME: Extract the main business name, normalize capitalization (Title Case for proper nouns)
-2. EMAIL:
+2. EMAIL: 
    - Extract only ONE primary email address
    - If multiple emails, choose the one marked as "primary" or the first valid one
    - Validate format (must have @ and valid domain with .)
@@ -263,8 +271,8 @@ Return null for any field that cannot be reliably extracted or validated.""",
             summary="Clean data",
         )
         return results.response
-
 ```
+<!--SNIPEND-->
 
 ## Running
 

@@ -36,6 +36,7 @@ This moves the responsibility for retries from the OpenAI client to Temporal.
 In this implementation, we allow for the model, instructions and input to be passed in, and also the list of tools.
 
 `activities/openai_responses.py`
+<!--SNIPSTART:file activities/openai_responses.py-->
 ```python
 from temporalio import activity
 from openai import AsyncOpenAI
@@ -66,6 +67,7 @@ async def create(request: OpenAIResponsesRequest) -> Response:
 
     return resp
 ```
+<!--SNIPEND-->
 
 ## Create the Activity for the tool invocation
 
@@ -77,6 +79,7 @@ a data structure, even here where this is only one argument.
 The `WEATHER_ALERTS_TOOL_OAI` uses a function defined in `helpers/tool_helpers.py` that calls the aforementioned internal OpenAI function, generating a dictionary that becomes the argument passed into the OpenAI responses API.
 
 `activities/get_weather_alerts.py`
+<!--SNIPSTART:file activities/get_weather_alerts.py-->
 ```python
 # weather_activities.py
 
@@ -131,6 +134,7 @@ async def get_weather_alerts(weather_alerts_request: GetWeatherAlertsRequest) ->
     data = await _make_nws_request(_alerts_url(weather_alerts_request.state))
     return json.dumps(data)
 ```
+<!--SNIPEND-->
 ### Create the helper function
 
 The `oai_responses_tool_from_model` function accepts a tool name and description, as well as a list of argument name/description pairs and returns json that is in the format expected for tool definitions in the OpenAI responses API.
@@ -139,6 +143,7 @@ The `oai_responses_tool_from_model` function accepts a tool name and description
 > The API used to generate the tools json is an internal function from the [OpenAI API](https://github.com/openai/openai-python) and may therefore change in the future. There currently is no public API to generate the tool definition from a Pydantic model or a function signature.
 
 `helpers/tool_helpers.py`
+<!--SNIPSTART:file helpers/tool_helpers.py-->
 ```python
 from openai.lib._pydantic import to_strict_json_schema  # private API; may change
 # there currently is no public API to generate the tool definition from a Pydantic model
@@ -154,6 +159,7 @@ def oai_responses_tool_from_model(name: str, description: str, model: type[BaseM
         "strict": True,
     }
 ```
+<!--SNIPEND-->
 
 ## Create the agent
 
@@ -163,6 +169,7 @@ The agent is implemented as a Temporal Workflow that orchestrates
 - and if a function has been called, the result is appended to the context that is then sent back to the LLM for interpretation (the LLM is instructed to format the tool response).
 
 `workflows/get_weather_workflow.py`
+<!--SNIPSTART:file workflows/get_weather_workflow.py-->
 ```python
 from temporalio import workflow
 from datetime import timedelta
@@ -232,7 +239,9 @@ class ToolCallingWorkflow:
         result = result.output_text
 
         return result
+ 
 ```
+<!--SNIPEND-->
 
 ## Create the Worker
 
@@ -240,6 +249,7 @@ The Worker is the process that dispatches work to the various parts of the agent
 
 *File: worker.py*
 
+<!--SNIPSTART:file worker.py-->
 ```python
 import asyncio
 
@@ -274,12 +284,14 @@ async def main():
 if __name__ == "__main__":
     asyncio.run(main())
 ```
+<!--SNIPEND-->
 
 ## Initiate an interaction with the agent
 
 To interact with this simple AI agent, we create a Temporal client and execute a Workflow.
 
 `start_workflow.py`
+<!--SNIPSTART:file start_workflow.py-->
 ```python
 import asyncio
 import sys
@@ -311,6 +323,7 @@ async def main():
 if __name__ == "__main__":
     asyncio.run(main())
 ```
+<!--SNIPEND-->
 
 ## Running
 

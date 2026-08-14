@@ -55,6 +55,7 @@ class GetAlerts:
         return "\n---\n".join(alerts)
 
 
+# @@@SNIPSTART get-forecast-workflow
 @workflow.defn
 class GetForecast:
     @workflow.run
@@ -101,3 +102,4 @@ class GetForecast:
             forecasts.append(forecast)
 
         return "\n---\n".join(forecasts)
+# @@@SNIPEND
