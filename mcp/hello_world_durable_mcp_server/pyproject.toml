@@ -8,12 +8,22 @@ dependencies = [
     "httpx>=0.28.1",
     "temporalio>=1.11.1",
     # Elicitation support requires FastMCP 2.10.0+
-    "fastmcp>=2.10.0",
+    "fastmcp>=3.2.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-asyncio",
+    "pytest-timeout>=2.4.0",
 ]
 
 [build-system]
 requires = [ "hatchling",]
 build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
 
 [tool.hatch.build.targets.wheel]
 packages = [

@@ -1,10 +1,10 @@
 <!-- 
-description: Use Temporal and OpenAI Responses API to reliably request output conforming to a specific data structure. 
-tags:[foundations, openai, python]
+description: Use Temporal and the OpenAI Responses API to reliably request output conforming to a specific data structure.
+tags: [foundations, python, openai]
 priority: 980
 -->
 
-# Structured Outputs with Temporal and OpenAI
+# Structured outputs with Temporal and OpenAI
 
 The OpenAI Responses API provides the [Structured Outputs API](https://platform.openai.com/docs/guides/structured-outputs) allowing you to request responses conforming to a specific data structure.
 
@@ -14,7 +14,7 @@ Structured outputs are also commonly used for tool calling.
 OpenAI usually returns the correct type. However, this is not always the case due to the non-deterministic nature of LLMs.
 When OpenAI returns an incorrect type, Temporal automatically retries the LLM call Activity.
 
-## Invoke Model Activity
+## Invoke model Activity
 
 We create a model-calling Activity that uses the `responses.parse` method of the OpenAI client.
 
@@ -23,16 +23,19 @@ Key challenges are related to serialization:
 1. In `InvokeModelRequest` the `response_format` field is a class reference. We provide custom Pydantic serialization and deserialization logic.
 2. In `InvokeModelResponse` the `response_model` must be deserialized to the correct type. We serialize the type in one field and the model, represented as a dictionary, in another.
 
-```python
-from temporalio import activity
-from openai import AsyncOpenAI
-from typing import Optional, List, cast, Any, TypeVar, Generic
-from typing_extensions import Annotated
-from pydantic import BaseModel
-from pydantic.functional_validators import BeforeValidator
-from pydantic.functional_serializers import PlainSerializer
+*File: activities/invoke_model.py*
 
+<!--SNIPSTART:file activities/invoke_model.py-->
+```python
 import importlib
+from typing import Any, Generic, List, Optional, TypeVar, cast
+
+from openai import AsyncOpenAI
+from pydantic import BaseModel
+from pydantic.functional_serializers import PlainSerializer
+from pydantic.functional_validators import BeforeValidator
+from temporalio import activity
+from typing_extensions import Annotated
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -93,7 +96,7 @@ class InvokeModelResponse(BaseModel, Generic[T]):
 async def invoke_model(request: InvokeModelRequest[T]) -> InvokeModelResponse[T]:
     client = AsyncOpenAI(max_retries=0)
 
-    kwargs = {
+    kwargs: dict[str, Any] = {
         "model": request.model,
         "instructions": request.instructions,
         "input": request.input,
@@ -121,6 +124,7 @@ async def invoke_model(request: InvokeModelRequest[T]) -> InvokeModelResponse[T]
             response_model=resp.output_text, response_format=None
         )
 ```
+<!--SNIPEND-->
 
 ## Workflow
 
@@ -132,16 +136,22 @@ The validators should check for obvious structural errors that LLMs will only ge
 If the LLM produces invalid responses consistently, Activity retries will fail consistently.
 To mitigate the cost of such futile retries, we limit the number of retry attempts when using structured outputs.
 
+*File: workflows/clean_data_workflow.py*
+
+<!--SNIPSTART:file workflows/clean_data_workflow.py-->
 ```python
-from pydantic import BaseModel, Field, field_validator, EmailStr
-from pydantic_core import PydanticCustomError
 import re
+from datetime import timedelta
+from typing import List, Optional
+
+from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic_core import PydanticCustomError
 from temporalio import workflow
+from temporalio.common import RetryPolicy
+
 from activities import invoke_model
 from activities.invoke_model import InvokeModelRequest
-from typing import List, Optional
-from datetime import timedelta
-from temporalio.common import RetryPolicy
+
 
 class Business(BaseModel):
     name: Optional[str] = Field(
@@ -228,10 +238,10 @@ class CleanDataWorkflow:
             invoke_model.invoke_model,
             InvokeModelRequest(
                 model="gpt-4o",
-                instructions=f"""Extract and clean business data with these specific rules:
+                instructions="""Extract and clean business data with these specific rules:
 
 1. BUSINESS NAME: Extract the main business name, normalize capitalization (Title Case for proper nouns)
-2. EMAIL:
+2. EMAIL: 
    - Extract only ONE primary email address
    - If multiple emails, choose the one marked as "primary" or the first valid one
    - Validate format (must have @ and valid domain with .)
@@ -263,8 +273,8 @@ Return null for any field that cannot be reliably extracted or validated.""",
             summary="Clean data",
         )
         return results.response
-
 ```
+<!--SNIPEND-->
 
 ## Running
 
@@ -277,11 +287,11 @@ temporal server start-dev
 Run the worker:
 
 ```bash
-uv run python -m worker
+uv run worker.py
 ```
 
 Start execution:
 
 ```bash
-uv run python -m start_workflow
+uv run start_workflow.py
 ```

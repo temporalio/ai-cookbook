@@ -1,8 +1,10 @@
-from temporalio import activity
-from typing import Sequence
-from temporalio.common import RawValue
 import inspect
+from collections.abc import Sequence
+
 from pydantic import BaseModel
+from temporalio import activity
+from temporalio.common import RawValue
+
 
 # We use dynamic activities to allow the agent to be defined independently of the tools it can call.
 @activity.defn(dynamic=True)

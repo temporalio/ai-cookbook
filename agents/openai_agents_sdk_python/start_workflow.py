@@ -1,10 +1,11 @@
 import asyncio
 
 from temporalio.client import Client
-
-from temporalio.common import WorkflowIDReusePolicy
+from temporalio.common import WorkflowIDConflictPolicy
 from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
+
 from workflows.hello_world_workflow import HelloWorldAgent
+
 
 async def main():
     client = await Client.connect(
@@ -12,6 +13,9 @@ async def main():
         # Use the plugin to configure Temporal for use with OpenAI Agents SDK
         plugins=[OpenAIAgentsPlugin()],
     )
+
+    # Start workflow
+    print( 80 * "-" )
 
     # Get user input
     user_input = input("Enter a question: ")
@@ -22,9 +26,13 @@ async def main():
         user_input,
         id="my-workflow-id",
         task_queue="hello-world-openai-agent-task-queue",
-        id_reuse_policy=WorkflowIDReusePolicy.TERMINATE_IF_RUNNING,
+        id_conflict_policy=WorkflowIDConflictPolicy.TERMINATE_EXISTING,
     )
     print(f"Result: {result}")
+
+    # End of workflow
+    print( 80 * "-" )
+    print("Workflow completed")
 
 if __name__ == "__main__":
     asyncio.run(main())

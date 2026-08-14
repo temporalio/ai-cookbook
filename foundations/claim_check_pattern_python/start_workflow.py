@@ -1,6 +1,6 @@
 import asyncio
-import time
 import os
+import time
 from pathlib import Path
 
 import requests
@@ -8,7 +8,6 @@ from temporalio.client import Client
 
 from codec.plugin import ClaimCheckPlugin
 from workflows.ai_rag_workflow import AiRagWorkflow
-
 
 ASSETS_DIR = Path(os.path.join(os.path.dirname(__file__), "assets"))
 ASSETS_DIR.mkdir(parents=True, exist_ok=True)

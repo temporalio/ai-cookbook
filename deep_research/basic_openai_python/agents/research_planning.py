@@ -1,10 +1,14 @@
-from .shared import ResearchPlan, today_str
-from .config import COMPLEX_REASONING_MODEL
-from activities.invoke_model import invoke_model, InvokeModelRequest
-from temporalio import workflow
 from datetime import timedelta
 
-RESEARCH_PLANNING_INSTRUCTIONS = f"""
+from temporalio import workflow
+
+from .config import COMPLEX_REASONING_MODEL
+from .shared import ResearchPlan, with_today
+
+with workflow.unsafe.imports_passed_through():
+    from activities.invoke_model import InvokeModelRequest, invoke_model
+
+RESEARCH_PLANNING_INSTRUCTIONS = """
 You are a research planning specialist who creates focused research strategies.
 
 CORE RESPONSIBILITIES:
@@ -22,8 +26,6 @@ OUTPUT REQUIREMENTS:
 - expected_sources: Types of sources likely to contain relevant information
 - search_strategy: High-level approach for information gathering
 - success_criteria: Specific indicators of research completeness
-
-TODAY'S DATE: {today_str()}
 """
 
 
@@ -32,7 +34,7 @@ async def plan_research(query: str) -> ResearchPlan:
         invoke_model,
         InvokeModelRequest(
             model=COMPLEX_REASONING_MODEL,
-            instructions=RESEARCH_PLANNING_INSTRUCTIONS,
+            instructions=with_today(RESEARCH_PLANNING_INSTRUCTIONS),
             input=f"Research query: {query}",
             response_format=ResearchPlan,
         ),

@@ -1,10 +1,10 @@
 <!-- 
-description: Use the Claim Check pattern to handle large payloads to workflows and activities.
-tags:[foundations, claim-check, python, s3]
+description: Use the Claim Check pattern with Temporal to keep large payloads out of Event History by offloading them to S3.
+tags: [foundations, python, s3, claim-check]
 priority: 400
 -->
 
-# Claim Check Pattern with Temporal
+# Claim check pattern with Temporal
 
 This recipe demonstrates how to use the Claim Check pattern to offload data from Temporal Server's Event History to external storage. This can be useful in conversational AI applications that include the full conversation history with each LLM call, creating large Event History that can exceed server size limits.
 
@@ -15,9 +15,9 @@ This recipe includes:
 - A lightweight codec server for a better Web UI experience
 - An AI/RAG example workflow that demonstrates the pattern end-to-end
 
-## How the Claim Check Pattern Works
+## How the Claim Check pattern works
 
-Each Temporal Workflow has an associated Event History that is stored in Temporal Server and used to provide durable execution. When using the Claim Check pattern, we store the payload content of the Event in separate storage system, then store a reference to that storage in the Temporal Event History instead.
+Each Temporal Workflow has an associated Event History that is stored in Temporal Server and used to provide durable execution. When using the Claim Check pattern, we store the payload content of the Event in a separate storage system, then store a reference to that storage in the Temporal Event History instead.
 
 The Claim Check Recipe implements a `PayloadCodec` that:
 
@@ -26,19 +26,20 @@ The Claim Check Recipe implements a `PayloadCodec` that:
 
 Workflows operate with small, lightweight keys while maintaining transparent access to full data through automatic encoding/decoding.
 
-## Claim Check Codec Implementation
+## Claim Check codec implementation
 
 The `ClaimCheckCodec` implements `PayloadCodec` and adds an inline threshold to keep small payloads inline. This avoids the latency costs of uploading/downloading the payload externally when it's not required.
 
 *File: codec/claim_check.py*
 
+<!--SNIPSTART:file codec/claim_check.py-->
 ```python
-import uuid
 import logging
+import uuid
 from typing import Iterable, List
+
 import aioboto3
 from botocore.exceptions import ClientError
-
 from temporalio.api.common.v1 import Payload
 from temporalio.converter import PayloadCodec
 
@@ -215,6 +216,7 @@ class ClaimCheckCodec(PayloadCodec):
                 return None
             raise e
 ```
+<!--SNIPEND-->
 
 ### Inline payload threshold
 
@@ -222,16 +224,60 @@ class ClaimCheckCodec(PayloadCodec):
 - Where configured: `ClaimCheckCodec(max_inline_bytes=20 * 1024)` in `codec/claim_check.py`
 - Change by passing a different `max_inline_bytes` when constructing `ClaimCheckCodec`
 
-## Claim Check Plugin
+### Choosing the right threshold
+
+The `max_inline_bytes` threshold controls which payloads are offloaded to S3 and which stay inline in Event History. Here is how to choose the right value for your use case.
+
+#### Temporal Service size limits
+
+Temporal enforces size limits at several levels ([self-hosted defaults](https://docs.temporal.io/self-hosted-guide/defaults), [Temporal Cloud limits](https://docs.temporal.io/cloud/limits)):
+
+| Limit | Warning | Error / Termination |
+|-------|---------|---------------------|
+| Single payload (blob) size | 256 KB | 2 MB |
+| Event History total size | 10 MB | 50 MB (Workflow terminated) |
+| Event History event count | 10,240 events | 51,200 events (Workflow terminated) |
+| gRPC message size | — | 4 MB per message |
+| Event History transaction size | — | 4 MB per transaction |
+
+The single payload limit applies to each serialized Activity input, Activity output, or Workflow argument individually. The gRPC limit applies to the full request, so scheduling several Activities with moderate-sized inputs in the same Workflow Task can exceed 4 MB even when each payload is under 2 MB.
+
+These are the defaults for both self-hosted and Temporal Cloud. The blob size thresholds are configurable on self-hosted deployments. Temporal Cloud limits are not configurable.
+
+#### Sizing recommendations
+
+| Threshold | Good for | Trade-off |
+|-----------|----------|-----------|
+| **2 KB** | Chatty Workflows with many small Activities | More S3 round-trips, higher latency per call |
+| **20 KB** (default) | Most AI/RAG Workflows | Balances debuggability with Event History size |
+| **128 KB** | Low-Activity Workflows with moderate payloads | Fewer S3 calls, but Event History grows faster |
+| **256 KB+** | Workflows with few, large payloads | Right at the blob warning threshold — payloads near this size risk triggering warnings, and Event History grows fast |
+
+#### How to decide
+
+1. **Estimate your payload sizes.** LLM conversation histories grow with each turn. A 10-turn conversation with tool calls can reach 50–100 KB. RAG chunks with embeddings can be several megabytes.
+2. **Count your Activities.** Each Activity input and output is a separate payload in Event History. A Workflow with 20 Activity calls at 100 KB each adds 4 MB to Event History from payloads alone.
+3. **Start with the default (20 KB).** This offloads anything that would meaningfully impact Event History size while keeping small, debuggable payloads visible in the Web UI.
+4. **Stay well under 256 KB.** Payloads above 256 KB trigger a warning from the Temporal Service. If your payloads regularly exceed this size, Claim Check is strongly recommended.
+5. **Lower the threshold** if your Workflows are long-running (many Activity calls over time) or if you run many concurrent Workflows on the same Temporal Service.
+6. **Raise the threshold** if S3 latency is a concern and your Workflows have few Activities with moderate payloads.
+
+#### Monitoring Event History size
+
+Use the Web UI or `temporal workflow describe` to check a Workflow's Event History size and event count. If you see the 10 MB / 10,240 event warning in Temporal Service logs, lower your `max_inline_bytes` threshold or review which payloads should use Claim Check instead of staying inline.
+
+## Claim Check plugin
 
 The `ClaimCheckPlugin` integrates the codec with the Temporal client configuration.
 
 *File: codec/plugin.py*
 
+<!--SNIPSTART:file codec/plugin.py-->
 ```python
 import os
-from temporalio.plugin import SimplePlugin
+
 from temporalio.converter import DataConverter
+from temporalio.plugin import SimplePlugin
 
 from .claim_check import ClaimCheckCodec
 
@@ -252,18 +298,20 @@ class ClaimCheckPlugin(SimplePlugin):
             ),
         )
 ```
+<!--SNIPEND-->
 
-## Example: AI / RAG Workflow using Claim Check
+## Example: AI/RAG Workflow using Claim Check
 
 This example ingests a large text, performs lightweight lexical retrieval, and answers a question with an LLM. Large intermediates (chunks, scores) are kept out of Temporal payloads via the Claim Check codec. Only the small final answer is returned inline.
 
-### Shared Models
+### Shared models
 
 *File: shared/models.py*
 
+<!--SNIPSTART:file shared/models.py-->
 ```python
 from dataclasses import dataclass
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
 
 @dataclass
@@ -294,17 +342,19 @@ class RagAnswer:
     answer: str
     sources: List[Dict[str, Any]]
 ```
+<!--SNIPEND-->
 
 ### Activities
 
 *File: activities/ai_claim_check.py*
 
+<!--SNIPSTART:file activities/ai_claim_check.py-->
 ```python
 from typing import List
 
 from temporalio import activity
 
-from shared.models import IngestRequest, IngestResult, RagRequest, RagAnswer
+from shared.models import IngestRequest, IngestResult, RagAnswer, RagRequest
 
 
 def _split_text(text: str, chunk_size: int, overlap: int) -> List[str]:
@@ -373,18 +423,23 @@ async def rag_answer(req: RagRequest, ingest_result: IngestResult) -> RagAnswer:
     answer = chat.choices[0].message.content.strip()
 
     return RagAnswer(answer=answer, sources=sources)
+
+
 ```
+<!--SNIPEND-->
 
 ### Workflow
 
 *File: workflows/ai_rag_workflow.py*
 
+<!--SNIPSTART:file workflows/ai_rag_workflow.py-->
 ```python
-from temporalio import workflow
 from datetime import timedelta
 
-from shared.models import IngestRequest, IngestResult, RagRequest, RagAnswer
+from temporalio import workflow
+
 from activities.ai_claim_check import ingest_document, rag_answer
+from shared.models import IngestRequest, IngestResult, RagAnswer, RagRequest
 
 
 @workflow.defn
@@ -412,7 +467,10 @@ class AiRagWorkflow:
             summary="RAG answer using embedded chunks",
         )
         return answer
+
+
 ```
+<!--SNIPEND-->
 
 ## Running
 
@@ -420,7 +478,7 @@ class AiRagWorkflow:
 
 - MinIO server (for local testing) or AWS S3 access (for production)
 - Temporal dev server
-- Python 3.9+
+- Python 3.10+
 
 ### Configuration
 
@@ -467,12 +525,12 @@ temporal server start-dev
 
 3. Run the worker:
 ```bash
-uv run python -m worker
+uv run worker.py
 ```
 
 4. Start execution:
 ```bash
-uv run python -m start_workflow
+uv run start_workflow.py
 ```
 
 ### Option 2: AWS S3 (Production)
@@ -486,23 +544,24 @@ uv run python -m start_workflow
 
 To demonstrate payload size failures without claim check, you can disable it in your local wiring (e.g., omit the plugin/codec) and re-run. With claim check disabled, large payloads may exceed Temporal's default payload size limits and fail.
 
-## Codec Server for Web UI
+## Codec server for Web UI
 
 When claim check is enabled, the Web UI would otherwise show opaque keys. This codec server shows helpful text with a link to view the raw data on demand.
 
 *File: codec/codec_server.py*
 
+<!--SNIPSTART:file codec/codec_server.py-->
 ```python
-from functools import partial
-from typing import Awaitable, Callable, Iterable, List
 import json
 import os
+from functools import partial
+from typing import Awaitable, Callable, Iterable, List
 
 from aiohttp import hdrs, web
+from claim_check import ClaimCheckCodec
 from google.protobuf import json_format
 from temporalio.api.common.v1 import Payload, Payloads
 
-from .claim_check import ClaimCheckCodec
 
 def build_codec_server() -> web.Application:
     # Create codec with environment variable configuration (same as plugin)
@@ -626,11 +685,12 @@ def build_codec_server() -> web.Application:
 if __name__ == "__main__":
     web.run_app(build_codec_server(), host="127.0.0.1", port=8081)
 ```
+<!--SNIPEND-->
 
-### Running the Codec Server
+### Running the codec server
 
 ```bash
-uv run python -m codec.codec_server
+uv run codec/codec_server.py
 ```
 
 Then [configure the Web UI to use the codec server](https://docs.temporal.io/production-deployment/data-encryption#set-your-codec-server-endpoints-with-web-ui-and-cli).

@@ -1,11 +1,11 @@
-from temporalio import workflow
 from datetime import timedelta
-import json
+
+from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
-    from tools import get_tools
-    from helpers import tool_helpers
     from activities import claude_responses
+    from helpers import tool_helpers
+    from tools import get_tools
 
 @workflow.defn
 class AgentWorkflow:
@@ -23,7 +23,7 @@ class AgentWorkflow:
             result = await workflow.execute_activity(
                 claude_responses.create,
                 claude_responses.ClaudeResponsesRequest(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-sonnet-4-5-20250929",
                     system=tool_helpers.HELPFUL_AGENT_SYSTEM_INSTRUCTIONS,
                     messages=messages,
                     tools=get_tools(),

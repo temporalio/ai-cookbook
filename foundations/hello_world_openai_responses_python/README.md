@@ -1,16 +1,16 @@
 <!-- 
-description: Simple example demonstrating how to call an LLM from Temporal using the OpenAI Python API library.
-tags:[foundations, openai, python]
+description: Call an LLM from a durable Temporal Workflow in Python using the OpenAI API library.
+tags: [foundations, python, openai]
 priority: 999
 -->
 
-# Hello World
+# Hello world
 
 This is a simple example showing how to call an LLM from Temporal using the [OpenAI Python API library](https://github.com/openai/openai-python).
 
 Being an external API call, the LLM invocation happens in a Temporal Activity.
 
-This recipe highlights two key design decisions:
+This recipe highlights three key design decisions:
 
 - A generic Activity for invoking an LLM API. This Activity can be re-used with different arguments throughout your codebase.
 - Configuring the Temporal client with a `dataconverter` to allow serialization of Pydantic types.
@@ -28,12 +28,14 @@ In this implementation, we include only the `instructions` and `input` argument,
 
 *File: activities/openai_responses.py*
 
+<!--SNIPSTART:file activities/openai_responses.py-->
 ```python
+from dataclasses import dataclass
 
-from temporalio import activity
 from openai import AsyncOpenAI
 from openai.types.responses import Response
-from dataclasses import dataclass
+from temporalio import activity
+
 
 # Temporal best practice: Create a data structure to hold the request parameters.
 @dataclass
@@ -56,6 +58,7 @@ async def create(request: OpenAIResponsesRequest) -> Response:
 
     return resp
 ```
+<!--SNIPEND-->
 
 ## Create the Workflow
 
@@ -66,13 +69,20 @@ As per usual, the Activity retry configuration is set here in the Workflow. In t
 so the default retry policy is used (exponential backoff with 1s initial interval, 2.0 backoff coefficient, max interval
 100× initial, unlimited attempts, no non-retryable errors).
 
+The Activity module is imported inside `workflow.unsafe.imports_passed_through()`. Importing it pulls in the OpenAI
+client and, through it, `httpx`, which touches modules that the Workflow sandbox restricts at import time. Activity code
+runs outside the sandbox, so passing the module through is safe.
+
 *File: workflows/hello_world_workflow.py*
 
+<!--SNIPSTART:file workflows/hello_world_workflow.py-->
 ```python
-from temporalio import workflow
 from datetime import timedelta
 
-from activities import openai_responses
+from temporalio import workflow
+
+with workflow.unsafe.imports_passed_through():
+    from activities import openai_responses
 
 
 @workflow.defn
@@ -90,7 +100,9 @@ class HelloWorld:
             start_to_close_timeout=timedelta(seconds=30),
         )
         return result.output_text
+ 
 ```
+<!--SNIPEND-->
 
 ## Create the Worker
 
@@ -99,15 +111,16 @@ We configure the Temporal client with `pydantic_data_converter` so Temporal can 
 
 *File: worker.py*
 
+<!--SNIPSTART:file worker.py-->
 ```python
 import asyncio
 
 from temporalio.client import Client
+from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.worker import Worker
 
-from workflows.hello_world_workflow import HelloWorld
 from activities import openai_responses
-from temporalio.contrib.pydantic import pydantic_data_converter
+from workflows.hello_world_workflow import HelloWorld
 
 
 async def main():
@@ -132,21 +145,23 @@ async def main():
 if __name__ == "__main__":
     asyncio.run(main())
 ```
+<!--SNIPEND-->
 
 ## Create the Workflow Starter
 
-The starter script submits the workflow to Temporal for execution, then waits for the result and prints it out.
+The starter script submits the Workflow to Temporal for execution, then waits for the result and prints it out.
 It uses the `pydantic_data_converter` to match the Worker configuration.
 
 *File: start_workflow.py*
 
+<!--SNIPSTART:file start_workflow.py-->
 ```python
 import asyncio
 
 from temporalio.client import Client
+from temporalio.contrib.pydantic import pydantic_data_converter
 
 from workflows.hello_world_workflow import HelloWorld
-from temporalio.contrib.pydantic import pydantic_data_converter
 
 
 async def main():
@@ -159,7 +174,7 @@ async def main():
     result = await client.execute_workflow(
         HelloWorld.run,
         "Tell me about recursion in programming.",
-        id="my-workflow-id",
+        id="my-workflow-id-2",
         task_queue="hello-world-python-task-queue",
     )
     print(f"Result: {result}")
@@ -167,8 +182,8 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
 ```
+<!--SNIPEND-->
 
 ## Running
 
@@ -181,11 +196,11 @@ temporal server start-dev
 Run the worker:
 
 ```bash
-uv run python -m worker
+uv run worker.py
 ```
 
 Start execution:
 
 ```bash
-uv run python -m start_workflow
+uv run start_workflow.py
 ```

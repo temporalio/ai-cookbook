@@ -1,17 +1,22 @@
 [project]
-name = "deep-research-basic-openai-python"
+name = "structured-output-openai-responses-python"
 version = "0.1"
-description = "Deep research example using OpenAI Responses API with Temporal workflows"
+description = "Use Temporal and the OpenAI Responses API to reliably request output conforming to a specific data structure."
 authors = [{ name = "Temporal Technologies Inc", email = "sdk@temporal.io" }]
 requires-python = ">=3.10"
 readme = "README.md"
 license = "MIT"
-dependencies = ["temporalio>=1.15.0,<2", "openai>=1.40.0", "pydantic[email]>=2.0.0"]
+dependencies = [
+    "temporalio>=1.15.0,<2",
+    "openai>=1.40.0",
+    "pydantic[email]>=2.0.0",
+]
 
 [dependency-groups]
 dev = [
-    "pytest>=8.4.2",
+    "pytest>=9.0.3",
+    "pytest-timeout>=2.4.0",
 ]
 
-[tool.ruff]
-target-version = "py39"
+[tool.pytest.ini_options]
+pythonpath = ["."]

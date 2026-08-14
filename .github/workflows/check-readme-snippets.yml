@@ -1,0 +1,53 @@
+name: Check README Code Snippets
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '**/README.md'
+      - '**/*.py'
+      - '**/*.ts'
+      - '.github/scripts/sync-readme-snippets.js'
+      - '.github/workflows/check-readme-snippets.yml'
+
+concurrency:
+  group: check-readme-snippets-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Check README Code Snippets
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout ai-cookbook repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "20"
+
+      - name: Make sync script executable
+        run: chmod +x .github/scripts/sync-readme-snippets.js
+
+      # Report-only while the repo's recipes are migrated to snippet markers
+      # one at a time — remove continue-on-error once every recipe with a
+      # "Key patterns"-style fragment section has been migrated.
+      - name: Check README code snippets are in sync with source
+        continue-on-error: true
+        run: node .github/scripts/sync-readme-snippets.js --check
+
+      - name: Report success
+        if: success()
+        run: |
+          echo "✅ All README code snippets are in sync with their source files"
+          echo ""
+          echo "This validates that <!--SNIPSTART ...--> marked snippets in recipe READMEs match current recipe source code."

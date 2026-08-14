@@ -2,13 +2,13 @@ import asyncio
 import logging
 
 from temporalio.client import Client
+from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.worker import Worker
 
-from workflows.human_in_the_loop_workflow import HumanInTheLoopWorkflow
-from activities.openai_responses import create
 from activities.execute_action import execute_action
 from activities.notify_approval_needed import notify_approval_needed
-from temporalio.contrib.pydantic import pydantic_data_converter
+from activities.openai_responses import create
+from workflows.human_in_the_loop_workflow import HumanInTheLoopWorkflow
 
 
 async def main():

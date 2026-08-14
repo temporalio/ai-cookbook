@@ -1,10 +1,10 @@
 from typing import Any, Awaitable, Callable
 
+from . import get_location, get_weather
+
 # Location and weather related tools
-from .get_location import get_location_info, get_ip_address
+from .get_location import get_ip_address, get_location_info
 from .get_weather import get_weather_alerts
-from . import get_weather
-from . import get_location
 
 ToolHandler = Callable[..., Awaitable[Any]]
 

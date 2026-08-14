@@ -1,6 +1,8 @@
-from dataclasses import dataclass
-from temporalio import activity
 import math
+from dataclasses import dataclass
+
+from temporalio import activity
+
 
 # Temporal best practice: Create a data structure to hold the request parameters.
 @dataclass
@@ -12,8 +14,6 @@ class Weather:
 @activity.defn
 async def get_weather(city: str) -> Weather:
     """Get the weather for a given city."""
-    # introduce a bug
-    raise Exception("This is a test error")
     return Weather(city=city, temperature_range="14-20C", conditions="Sunny with wind.")
 
 @activity.defn

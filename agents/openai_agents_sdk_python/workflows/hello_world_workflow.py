@@ -1,10 +1,11 @@
-from temporalio import workflow
 from datetime import timedelta
 
 from agents import Agent, Runner
+from temporalio import workflow
 from temporalio.contrib import openai_agents
 
-from activities.tools import get_weather, calculate_circle_area
+from activities.tools import calculate_circle_area, get_weather
+
 
 @workflow.defn
 class HelloWorldAgent:

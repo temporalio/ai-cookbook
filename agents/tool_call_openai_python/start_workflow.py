@@ -2,9 +2,9 @@ import asyncio
 import sys
 
 from temporalio.client import Client
+from temporalio.contrib.pydantic import pydantic_data_converter
 
 from workflows.get_weather_workflow import ToolCallingWorkflow
-from temporalio.contrib.pydantic import pydantic_data_converter
 
 
 async def main():

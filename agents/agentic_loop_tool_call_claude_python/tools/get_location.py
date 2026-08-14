@@ -1,9 +1,12 @@
 # get_location.py
 
 from typing import Any
+
 import httpx
 from pydantic import BaseModel, Field
+
 from helpers import tool_helpers
+
 
 # For the location finder we use Pydantic to create a structure that encapsulates the input parameter 
 # (an IP address). 

@@ -4,11 +4,12 @@ Tests generic HTTP retry logic based on status codes and headers.
 The behavior matches the original OpenAI Python client but works with any HTTP API.
 """
 
-import pytest
 from datetime import timedelta
 from unittest.mock import Mock, patch
-from temporalio.exceptions import ApplicationError
+
 import httpx
+import pytest
+from temporalio.exceptions import ApplicationError
 
 from util.translate_http_errors import http_response_to_application_error
 
