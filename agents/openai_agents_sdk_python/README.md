@@ -40,8 +40,6 @@ class Weather:
 @activity.defn
 async def get_weather(city: str) -> Weather:
     """Get the weather for a given city."""
-    # introduce a bug
-    raise Exception("This is a test error")
     return Weather(city=city, temperature_range="14-20C", conditions="Sunny with wind.")
 
 @activity.defn
@@ -176,7 +174,7 @@ async def main():
         user_input,
         id="my-workflow-id",
         task_queue="hello-world-openai-agent-task-queue",
-        id_conflict_policy=WorkflowIDConflictPolicy.TERMINATE_IF_RUNNING,
+        id_conflict_policy=WorkflowIDConflictPolicy.TERMINATE_EXISTING,
     )
     print(f"Result: {result}")
 
