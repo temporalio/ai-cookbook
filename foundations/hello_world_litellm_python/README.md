@@ -1,7 +1,7 @@
 <!-- 
 description: Integrate LiteLLM into a durable Temporal Workflow in Python to call and switch between LLM providers.
 tags: [foundations, python, litellm]
-priority: 920
+priority: 990
 -->
 
 # Hello world with LiteLLM

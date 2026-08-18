@@ -1,7 +1,7 @@
 <!--
 description: Build a durable AI agent with the AI SDK by Vercel and Temporal that chooses tools to answer user questions.
 tags: [agents, typescript, openai]
-priority: 750
+priority: 980
 -->
 
 # Durable agent with tools using the AI SDK by Vercel
