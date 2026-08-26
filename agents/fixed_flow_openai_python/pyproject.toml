@@ -1,7 +1,7 @@
 [project]
 name = "cookbook-fixed-flow-openai-python"
 version = "0.1"
-description = "A fixed-flow AI agent pipeline using OpenAI and Temporal."
+description = "A bounded, policy-constrained underwriting agent using OpenAI and Temporal."
 authors = [{ name = "Temporal Technologies Inc", email = "sdk@temporal.io" }]
 requires-python = ">=3.10"
 readme = "README.md"

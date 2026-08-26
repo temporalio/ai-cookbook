@@ -1,191 +1,138 @@
 <!--
-description: Build a durable fixed-flow AI agent pipeline in Python with Temporal and the OpenAI Responses API.
-tags: [agents, python, openai]
+description: Build a bounded, policy-constrained mortgage underwriting agent with Temporal and OpenAI.
+tags: [agents, python, openai, human-in-the-loop]
 priority: 650
 -->
 
-# Fixed-flow AI agents
+# Policy-constrained fixed-flow agent
 
-This recipe runs three AI specialists in a predetermined sequence: an analyst extracts the important evidence, a critic finds gaps and risks, and a decision specialist writes the final recommendation. The Workflow decides which specialist runs next; the model cannot skip, repeat, or add stages.
+Having trouble ensuring an LLM review never skips required checks, never auto-approves
+a hard-policy violation, and eventually stops or escalates to a human? This recipe uses
+a small mortgage underwriting example where Temporal owns the route:
 
-A fixed flow is useful when the process is known in advance and needs to be repeatable, observable, and easy to test. Use a dynamic agentic loop instead when the model genuinely needs to choose its next tool or specialist at runtime.
+1. an analyst produces a typed assessment
+2. a critic either accepts it or requests a revision
+3. the Workflow permits at most two revisions
+4. a decision agent produces a typed recommendation
+5. deterministic policy checks can force human review
 
-Each model call is a Temporal Activity. If a Worker or model request fails, Temporal retries only the failed stage and preserves the completed stages in Event History.
+Each model call is an Activity, so Temporal retries only the failed call and preserves
+completed work. The review packet is exposed by Query; a reviewer resumes the Workflow
+with a Signal.
 
-## Prerequisites
+> The thresholds and application schema are intentionally simplified teaching data,
+> not production lending policy. The example sends no personal identifiers to OpenAI.
 
-- Python 3.10+
-- [uv](https://docs.astral.sh/uv/)
-- A running Temporal server: `temporal server start-dev`
-- `OPENAI_API_KEY` environment variable set
+This is a Cookbook-sized extraction of the fixed-flow mortgage example in
+[document-processing-examples](https://github.com/temporal-sa/document-processing-examples).
+It deliberately leaves out OCR, PDFs and retrieval, a web UI, datasets, and most of the
+domain schema so the reliability controls remain visible.
 
 ## Run it
+
+Prerequisites: Python 3.10+, [uv](https://docs.astral.sh/uv/), an
+`OPENAI_API_KEY`, and a local server started with `temporal server start-dev`.
 
 ```bash
 uv sync
 
-# Terminal 1 — start the worker
+# terminal 1
 uv run worker.py
 
-# Terminal 2 — start the fixed flow
+# terminal 2: inspect the review packet, then approve or reject it
 uv run start_workflow.py
 ```
 
-The example evaluates a proposal to extend a neighborhood library's weekend hours and prints the output from every stage:
+The starter uses an example credit score below the demo policy threshold, so the
+Workflow always pauses at the human gate.
 
-```text
-Analysis
---------
-...
+## Bounded orchestration
 
-Critique
---------
-...
+The model never selects the next stage. The Workflow records the fixed route and the
+revision counter in Event History:
 
-Recommendation
---------------
-...
-```
-
-## Architecture
-
-- **Models** (`models/flow.py`): typed inputs and outputs for the Workflow and each specialist stage
-- **Activity** (`activities/run_agent_stage.py`): runs one OpenAI Responses API call with client-side retries disabled
-- **Workflow** (`workflows/fixed_flow_workflow.py`): defines and executes the analysis, critique, and recommendation stages in order
-- **Worker** (`worker.py`): registers the Workflow and Activity
-- **Starter** (`start_workflow.py`): submits an example and prints the results
-- **Tests** (`tests/test_fixed_flow.py`): verify client cleanup, retryable empty responses, stage ordering, and context propagation without calling OpenAI
-
-## Key patterns
-
-### Keep routing in the Workflow
-
-The sequence is visible in Workflow code and Event History. Each stage receives the earlier output it needs, but no stage decides what runs next:
-
-<!--SNIPSTART workflows/fixed_flow_workflow.py:fixed-sequence-->
+<!--SNIPSTART workflows/fixed_flow_workflow.py:bounded-fixed-flow-->
 ```python
 analysis = await workflow.execute_activity(
-    run_agent_stage,
-    AgentStageRequest(
-        stage="analysis",
-        model=request.model,
-        instructions=(
-            "You are an analysis specialist. Extract the important claims, "
-            "evidence, and assumptions from the source material. Do not make "
-            "a final recommendation."
-        ),
-        input=f"Topic: {request.topic}\n\nSource material:\n{request.source_material}",
-    ),
-    start_to_close_timeout=timedelta(seconds=45),
-    retry_policy=ACTIVITY_RETRY_POLICY,
+    analyze_application,
+    AgentTask(application=application, metrics=metrics, model=request.model),
+    start_to_close_timeout=ACTIVITY_TIMEOUT,
+    retry_policy=RETRY_POLICY,
 )
 
-critique = await workflow.execute_activity(
-    run_agent_stage,
-    AgentStageRequest(
-        stage="critique",
-        model=request.model,
-        instructions=(
-            "You are a critical reviewer. Identify unsupported claims, missing "
-            "information, contradictions, and risks in the analysis. Do not "
-            "rewrite it or make the final recommendation."
+critique = CriticReview(accepted=False, issues=[], revision_instructions=[])
+for revision_count in range(MAX_REVISIONS + 1):
+    critique = await workflow.execute_activity(
+        critique_analysis,
+        AgentTask(
+            application=application,
+            metrics=metrics,
+            previous_analysis=analysis,
+            model=request.model,
         ),
-        input=(
-            f"Topic: {request.topic}\n\n"
-            f"Source material:\n{request.source_material}\n\n"
-            f"Analysis to review:\n{analysis.output}"
+        start_to_close_timeout=ACTIVITY_TIMEOUT,
+        retry_policy=RETRY_POLICY,
+    )
+    if critique.accepted or revision_count == MAX_REVISIONS:
+        break
+    analysis = await workflow.execute_activity(
+        analyze_application,
+        AgentTask(
+            application=application,
+            metrics=metrics,
+            previous_analysis=analysis,
+            critique=critique,
+            model=request.model,
         ),
-    ),
-    start_to_close_timeout=timedelta(seconds=45),
-    retry_policy=ACTIVITY_RETRY_POLICY,
-)
+        start_to_close_timeout=ACTIVITY_TIMEOUT,
+        retry_policy=RETRY_POLICY,
+    )
 
 recommendation = await workflow.execute_activity(
-    run_agent_stage,
-    AgentStageRequest(
-        stage="recommendation",
+    draft_decision,
+    AgentTask(
+        application=application,
+        metrics=metrics,
+        previous_analysis=analysis,
+        critique=critique,
         model=request.model,
-        instructions=(
-            "You are a decision specialist. Produce a concise recommendation "
-            "with rationale, uncertainties, and concrete next steps. Base it "
-            "only on the supplied source, analysis, and critique."
-        ),
-        input=(
-            f"Topic: {request.topic}\n\n"
-            f"Source material:\n{request.source_material}\n\n"
-            f"Analysis:\n{analysis.output}\n\n"
-            f"Critique:\n{critique.output}"
-        ),
     ),
-    start_to_close_timeout=timedelta(seconds=45),
-    retry_policy=ACTIVITY_RETRY_POLICY,
-)
-
-return FixedFlowResult(
-    analysis=analysis.output,
-    critique=critique.output,
-    recommendation=recommendation.output,
+    start_to_close_timeout=ACTIVITY_TIMEOUT,
+    retry_policy=RETRY_POLICY,
 )
 ```
 <!--SNIPEND-->
 
-This makes the orchestration replay-safe and gives every model call an independent timeout and retry boundary. To change the process, edit the Workflow explicitly instead of changing a routing prompt.
+The OpenAI Responses API parses each stage directly into a Pydantic model. OpenAI SDK
+retries are disabled; Temporal retries transient Activity failures up to three times,
+while permanent request and authentication failures are marked non-retryable.
 
-### Let Temporal own retries
+## Deterministic policy and human review
 
-The OpenAI client has retries disabled. Permanent client errors are marked non-retryable, while transient failures and empty responses are left retryable under the Workflow's three-attempt Activity policy:
+Two example rules run in normal Python: credit score must be at least 620 and
+debt-to-income must not exceed 50%. These checks are independent of the LLM. A violation,
+an unresolved critic objection, or an explicit model request all create the same review
+gate:
 
-<!--SNIPSTART activities/run_agent_stage.py {"startPattern": "^@activity\\.defn$", "endPattern": "^    return AgentStageResult\\(stage=request\\.stage, output=output\\)$"}-->
+<!--SNIPSTART workflows/fixed_flow_workflow.py:policy-human-gate-->
 ```python
-@activity.defn
-async def run_agent_stage(request: AgentStageRequest) -> AgentStageResult:
-    """Run one specialist role as a retryable Temporal Activity."""
-
-    client = AsyncOpenAI(max_retries=0)
-    try:
-        response = await client.responses.create(
-            model=request.model,
-            instructions=request.instructions,
-            input=request.input,
-            timeout=30,
-        )
-    except (
-        openai.BadRequestError,
-        openai.AuthenticationError,
-        openai.PermissionDeniedError,
-        openai.NotFoundError,
-        openai.UnprocessableEntityError,
-    ) as exc:
-        raise ApplicationError(
-            str(exc),
-            type=exc.__class__.__name__,
-            non_retryable=True,
-        ) from exc
-    finally:
-        await client.close()
-
-    output = response.output_text.strip()
-    if not output:
-        # An empty response may be transient, so let the Workflow's Activity retry
-        # policy decide whether to try the stage again.
-        raise ApplicationError(
-            f"The {request.stage} stage returned no text.",
-            type="EmptyModelResponse",
-        )
-
-    return AgentStageResult(stage=request.stage, output=output)
+self._review_packet = HumanReviewPacket(
+    application=application,
+    metrics=metrics,
+    analysis=analysis,
+    critique=critique,
+    recommendation=recommendation,
+    policy_violations=violations,
+    review_reasons=reasons,
+)
+await workflow.wait_condition(lambda: self._human_review is not None)
+human_review = self._human_review
+final_decision = human_review.decision
 ```
 <!--SNIPEND-->
 
-## When to use this pattern
-
-Choose a fixed flow when:
-
-- every case should pass through the same review stages
-- reviewers need to see which stage produced each output
-- a failed stage should retry without re-running successful earlier stages
-- tests must assert the exact route through the process
-
-Choose model-directed routing when the useful set or order of steps cannot be known until runtime.
-
-This recipe extracts the fixed-flow pattern from Temporal's larger [document-processing example](https://github.com/temporal-sa/document-processing-examples), which demonstrates OCR, specialist analysis, deterministic policy checks, and human review in a mortgage-underwriting scenario.
+This composition is the point of the recipe: structured model output alone does not
+guarantee process completeness, and durable human input alone does not stop an agent
+from wandering. The fixed route, bounded revision loop, deterministic override, Query,
+and Signal work together to make the decision traceable and guaranteed to terminate or
+wait at an explicit human boundary.
