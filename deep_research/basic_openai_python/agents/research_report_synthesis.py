@@ -1,11 +1,13 @@
-from typing import List
-from temporalio import workflow
 from datetime import timedelta
-from .shared import ResearchReport, ResearchPlan, SearchResult, with_today
+from typing import List
+
+from temporalio import workflow
+
 from .config import COMPLEX_REASONING_MODEL
+from .shared import ResearchPlan, ResearchReport, SearchResult, with_today
 
 with workflow.unsafe.imports_passed_through():
-    from activities.invoke_model import invoke_model, InvokeModelRequest
+    from activities.invoke_model import InvokeModelRequest, invoke_model
 
 REPORT_SYNTHESIS_INSTRUCTIONS = """
 You are a research synthesis expert who creates comprehensive research reports.

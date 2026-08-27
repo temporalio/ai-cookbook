@@ -28,13 +28,16 @@ A non-deterministic tool (live HTTP call) is defined as a Temporal Activity. The
 
 *File: activities/tools.py*
 
+<!--SNIPSTART:file activities/tools.py-->
 ```python
 import asyncio
 import xml.etree.ElementTree as ET
 
 from temporalio import activity
 
+# AWS publishes a live "What's New" RSS feed of recent service launches and updates.
 WHATS_NEW_FEED = "https://aws.amazon.com/about-aws/whats-new/recent/feed/"
+
 
 @activity.defn
 async def get_recent_aws_announcements(limit: int = 5) -> list[dict]:
@@ -43,6 +46,10 @@ async def get_recent_aws_announcements(limit: int = 5) -> list[dict]:
     Use this when the user asks what is new or recently launched in AWS. Returns a
     list of {title, link, published} for the latest service launches and updates.
     """
+    # Import requests lazily here (not at module top level) so the workflow can
+    # import this activity without pulling a non-deterministic module into the
+    # workflow sandbox. requests is blocking, so run it off the event loop;
+    # Temporal handles retries, so no client-side retry configuration is needed.
     import requests
 
     response = await asyncio.to_thread(requests.get, WHATS_NEW_FEED, timeout=10)
@@ -58,6 +65,7 @@ async def get_recent_aws_announcements(limit: int = 5) -> list[dict]:
         for item in root.findall(".//item")[:limit]
     ]
 ```
+<!--SNIPEND-->
 
 ## Create the Workflow
 
@@ -65,6 +73,7 @@ The Workflow creates a `TemporalAgent`, the replacement for the Strands `Agent` 
 
 *File: workflows/aws_assistant_workflow.py*
 
+<!--SNIPSTART:file workflows/aws_assistant_workflow.py-->
 ```python
 from datetime import timedelta
 
@@ -72,6 +81,8 @@ from temporalio import workflow
 from temporalio.contrib.strands import TemporalAgent, TemporalMCPClient
 from temporalio.contrib.strands.workflow import activity_as_tool
 
+# activities.tools imports only stdlib at module level (requests is imported lazily
+# inside the activity), so it is safe to import directly into the workflow sandbox.
 from activities.tools import get_recent_aws_announcements
 
 SYSTEM_PROMPT = (
@@ -80,9 +91,13 @@ SYSTEM_PROMPT = (
     "launches. Cite documentation links when they are relevant."
 )
 
+
 @workflow.defn
 class AWSAssistantWorkflow:
     def __init__(self) -> None:
+        # Reference the MCP server registered on the worker by name. The plugin runs
+        # the server's list-tools / call-tool operations as Temporal Activities.
+        # cache_tools avoids re-listing the server's tools on every model turn.
         aws_docs = TemporalMCPClient(
             server="aws-docs",
             cache_tools=True,
@@ -93,7 +108,9 @@ class AWSAssistantWorkflow:
             start_to_close_timeout=timedelta(seconds=120),
             system_prompt=SYSTEM_PROMPT,
             tools=[
+                # MCP tool: AWS documentation search/read, served over stdio.
                 aws_docs,
+                # Non-deterministic tool backed by a Temporal Activity (live HTTP call).
                 activity_as_tool(
                     get_recent_aws_announcements,
                     start_to_close_timeout=timedelta(seconds=30),
@@ -103,9 +120,12 @@ class AWSAssistantWorkflow:
 
     @workflow.run
     async def run(self, prompt: str) -> str:
+        # TemporalAgent drives the agentic loop; every model call, tool call, and MCP
+        # call runs as a durable Temporal Activity.
         result = await self.agent.invoke_async(prompt)
         return str(result)
 ```
+<!--SNIPEND-->
 
 ## Create the Worker
 
@@ -113,6 +133,7 @@ The Worker registers the `StrandsPlugin` on the client. The plugin installs the 
 
 *File: worker.py*
 
+<!--SNIPSTART:file worker.py-->
 ```python
 import asyncio
 
@@ -127,6 +148,7 @@ from workflows.aws_assistant_workflow import AWSAssistantWorkflow
 
 TASK_QUEUE = "strands-aws-assistant-task-queue"
 
+
 def make_aws_docs_client() -> MCPClient:
     """Factory for the AWS Documentation MCP server, run locally via uvx."""
     return MCPClient(
@@ -138,7 +160,11 @@ def make_aws_docs_client() -> MCPClient:
         )
     )
 
+
 async def main():
+    # The plugin registers the model invocation and MCP activities, installs the
+    # Pydantic data converter, and (since no `models` are given) uses the default
+    # BedrockModel(). MCP servers are registered by name via `mcp_clients`.
     plugin = StrandsPlugin(mcp_clients={"aws-docs": make_aws_docs_client})
     client = await Client.connect("localhost:7233", plugins=[plugin])
 
@@ -151,9 +177,11 @@ async def main():
     print(f"Worker started, task queue: {TASK_QUEUE}")
     await worker.run()
 
+
 if __name__ == "__main__":
     asyncio.run(main())
 ```
+<!--SNIPEND-->
 
 ## Create the Workflow Starter
 
@@ -161,6 +189,7 @@ The starter connects a client configured with the same plugin, so the Data Conve
 
 *File: start_workflow.py*
 
+<!--SNIPSTART:file start_workflow.py-->
 ```python
 import asyncio
 
@@ -172,9 +201,12 @@ from workflows.aws_assistant_workflow import AWSAssistantWorkflow
 
 TASK_QUEUE = "strands-aws-assistant-task-queue"
 
+
 async def main():
+    # Match the worker's plugin so the client uses the same data converter.
     client = await Client.connect("localhost:7233", plugins=[StrandsPlugin()])
 
+    print(80 * "-")
     user_input = input("Ask the AWS assistant a question: ")
 
     result = await client.execute_workflow(
@@ -184,11 +216,16 @@ async def main():
         task_queue=TASK_QUEUE,
         id_conflict_policy=WorkflowIDConflictPolicy.TERMINATE_EXISTING,
     )
+
+    print(80 * "-")
     print(f"Result: {result}")
+    print(80 * "-")
+
 
 if __name__ == "__main__":
     asyncio.run(main())
 ```
+<!--SNIPEND-->
 
 ## Running
 

@@ -1,7 +1,9 @@
-from temporalio import activity
+from dataclasses import dataclass
+
 from openai import AsyncOpenAI
 from openai.types.responses import Response
-from dataclasses import dataclass
+from temporalio import activity
+
 
 # Temporal best practice: Create a data structure to hold the request parameters.
 @dataclass

@@ -1,12 +1,13 @@
-from temporalio import workflow
-from temporalio.exceptions import ApplicationError
 import asyncio
 from typing import List
 
+from temporalio import workflow
+from temporalio.exceptions import ApplicationError
+
 from agents.research_planning import plan_research
 from agents.research_query_generation import generate_queries
-from agents.research_web_search import search_web
 from agents.research_report_synthesis import generate_synthesis
+from agents.research_web_search import search_web
 from agents.shared import SearchResult
 
 

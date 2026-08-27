@@ -1,7 +1,7 @@
 <!--
 description: Build a durable AI agent with the AI SDK by Vercel and Temporal that chooses tools to answer user questions.
 tags: [agents, typescript, openai]
-priority: 750
+priority: 980
 -->
 
 # Durable agent with tools using the AI SDK by Vercel
@@ -10,7 +10,7 @@ In this example, we show you how to build a durable agent using the [AI SDK by V
 
 This recipe highlights key implementation patterns:
 
-- **AI SDK client integration**: The Workflow uses `generateText` from `ai` and `temporalProvider` from `@temporalio/ai-sdk`. This automatically wraps the LLM invocation as an Activity, so it's retried and tracked like any other durable step. `temporalProvider` is configured for `gpt-4o-mini` here, but you can point it at any model the AI SDK supports.
+- **AI SDK client integration**: The Workflow uses `generateText` from `ai` and `temporalProvider` from `@temporalio/ai-sdk/workflow`. This automatically wraps the LLM invocation as an Activity, so it's retried and tracked like any other durable step. `temporalProvider` is configured for `gpt-4o-mini` here, but you can point it at any model the AI SDK supports.
 - **Tools-as-Activities**: `proxyActivities` wires the `getWeather` and `calculateAreaOfCircle` Activities into the Workflow so `toolsAgent` can offer tool schemas to the model, wait for results durably, and retry a tool call if it fails.
 
 Unlike some other Temporal AI integrations — for example, the OpenAI Agents SDK's `activity_as_tool` helper, which generates a tool schema from a Python function's type hints — the Vercel AI SDK's `tool()` has no equivalent auto-generation from a TypeScript function signature. Each tool's `inputSchema` is written by hand as a Zod schema.
@@ -21,7 +21,8 @@ Temporal Activities provide the tools that `toolsAgent` can call. `getWeather` d
 
 *File: src/activities.ts*
 
-```ts
+<!--SNIPSTART:file src/activities.ts-->
+```typescript
 const USER_AGENT = '(temporal-ai-cookbook, cookbook@temporal.io)';
 
 async function geocode(location: string): Promise<{ name: string; latitude: number; longitude: number }> {
@@ -75,6 +76,7 @@ export async function calculateAreaOfCircle(input: { radius: number }): Promise<
   return { area: Math.PI * input.radius * input.radius };
 }
 ```
+<!--SNIPEND-->
 
 ## Create the Workflow
 
@@ -82,11 +84,11 @@ The Workflow registers both Activities as tools with a Zod schema so the model c
 
 *File: src/workflows.ts*
 
-```ts
-import '@temporalio/ai-sdk/lib/load-polyfills';
+<!--SNIPSTART:file src/workflows.ts-->
+```typescript
 import type * as activities from './activities';
 import { generateText, stepCountIs, tool } from 'ai';
-import { temporalProvider } from '@temporalio/ai-sdk';
+import { temporalProvider } from '@temporalio/ai-sdk/workflow';
 import { proxyActivities } from '@temporalio/workflow';
 import z from 'zod';
 
@@ -123,6 +125,7 @@ export async function toolsAgent(question: string): Promise<string> {
   return result.text;
 }
 ```
+<!--SNIPEND-->
 
 ## Create the Worker
 
@@ -130,7 +133,8 @@ Create the process for executing Activities and Workflows. The Worker uses `AiSd
 
 *File: src/worker.ts*
 
-```ts
+<!--SNIPSTART:file src/worker.ts-->
+```typescript
 import { NativeConnection, Worker } from '@temporalio/worker';
 import * as activities from './activities';
 import { AiSdkPlugin } from '@temporalio/ai-sdk';
@@ -153,7 +157,9 @@ run().catch((err) => {
   console.error(err);
   process.exit(1);
 });
+
 ```
+<!--SNIPEND-->
 
 ## Create the Workflow Starter
 
@@ -161,7 +167,8 @@ The starter (`src/client.ts`) takes the question to ask as a command-line argume
 
 *File: src/client.ts*
 
-```ts
+<!--SNIPSTART:file src/client.ts-->
+```typescript
 import { Connection, Client } from '@temporalio/client';
 import { loadClientConnectConfig } from '@temporalio/envconfig';
 import { toolsAgent } from './workflows';
@@ -189,6 +196,7 @@ run().catch((err) => {
   process.exit(1);
 });
 ```
+<!--SNIPEND-->
 
 ## Running
 

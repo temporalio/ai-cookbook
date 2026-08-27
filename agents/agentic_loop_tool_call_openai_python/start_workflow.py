@@ -3,9 +3,9 @@ import sys
 import uuid
 
 from temporalio.client import Client
+from temporalio.contrib.pydantic import pydantic_data_converter
 
 from workflows.agent import AgentWorkflow
-from temporalio.contrib.pydantic import pydantic_data_converter
 
 
 async def main():

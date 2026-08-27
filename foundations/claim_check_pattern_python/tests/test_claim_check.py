@@ -1,10 +1,10 @@
 """Tests for codec/claim_check.py — ClaimCheckCodec encode/decode."""
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
 from temporalio.api.common.v1 import Payload
+
 from codec.claim_check import ClaimCheckCodec
 
 

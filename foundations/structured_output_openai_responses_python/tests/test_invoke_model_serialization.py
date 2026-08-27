@@ -1,7 +1,9 @@
-import pytest
 import json
-from activities.invoke_model import InvokeModelRequest, InvokeModelResponse
+
+import pytest
 from pydantic import BaseModel, Field, ValidationError
+
+from activities.invoke_model import InvokeModelRequest, InvokeModelResponse
 
 
 class MockResponse(BaseModel):

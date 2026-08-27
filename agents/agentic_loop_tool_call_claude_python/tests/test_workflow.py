@@ -1,16 +1,16 @@
 """Tests for AgentWorkflow with mocked Claude activities."""
 
+from collections.abc import Sequence
+from dataclasses import dataclass
+from datetime import timedelta
+
 import pytest
-from temporalio.testing import WorkflowEnvironment
-from temporalio.worker import Worker
+from anthropic.types import Message, TextBlock, ToolUseBlock, Usage
 from temporalio import activity
 from temporalio.common import RawValue
 from temporalio.contrib.pydantic import pydantic_data_converter
-from datetime import timedelta
-from collections.abc import Sequence
-from dataclasses import dataclass
-
-from anthropic.types import Message, TextBlock, ToolUseBlock, Usage
+from temporalio.testing import WorkflowEnvironment
+from temporalio.worker import Worker
 
 from workflows.agent import AgentWorkflow
 

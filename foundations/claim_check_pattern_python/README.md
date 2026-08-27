@@ -15,6 +15,12 @@ This recipe includes:
 - A lightweight codec server for a better Web UI experience
 - An AI/RAG example workflow that demonstrates the pattern end-to-end
 
+## Temporal's built-in external storage feature
+
+Since Python SDK 1.25, Temporal offers a built-in [external storage](https://docs.temporal.io/develop/python/data-handling/external-storage) feature that implements the same claim check pattern without a custom `PayloadCodec`. It's configured directly on the `DataConverter` via an `ExternalStorage` option, and Temporal provides an `S3StorageDriver` out of the box. The feature is in Public Preview, so its API may change before General Availability.
+
+Use the built-in feature first if S3 (or a self-hosted equivalent) is a good fit and you don't need custom encode/decode logic. Follow the codec-based approach in this recipe when you need a storage backend other than what the built-in drivers support, want to combine claim check with other codec logic (such as encryption) in a single codec, or want full control over the encode/decode implementation.
+
 ## How the Claim Check pattern works
 
 Each Temporal Workflow has an associated Event History that is stored in Temporal Server and used to provide durable execution. When using the Claim Check pattern, we store the payload content of the Event in a separate storage system, then store a reference to that storage in the Temporal Event History instead.
@@ -32,13 +38,14 @@ The `ClaimCheckCodec` implements `PayloadCodec` and adds an inline threshold to 
 
 *File: codec/claim_check.py*
 
+<!--SNIPSTART:file codec/claim_check.py-->
 ```python
-import uuid
 import logging
+import uuid
 from typing import Iterable, List
+
 import aioboto3
 from botocore.exceptions import ClientError
-
 from temporalio.api.common.v1 import Payload
 from temporalio.converter import PayloadCodec
 
@@ -215,6 +222,7 @@ class ClaimCheckCodec(PayloadCodec):
                 return None
             raise e
 ```
+<!--SNIPEND-->
 
 ### Inline payload threshold
 
@@ -270,10 +278,12 @@ The `ClaimCheckPlugin` integrates the codec with the Temporal client configurati
 
 *File: codec/plugin.py*
 
+<!--SNIPSTART:file codec/plugin.py-->
 ```python
 import os
-from temporalio.plugin import SimplePlugin
+
 from temporalio.converter import DataConverter
+from temporalio.plugin import SimplePlugin
 
 from .claim_check import ClaimCheckCodec
 
@@ -294,6 +304,7 @@ class ClaimCheckPlugin(SimplePlugin):
             ),
         )
 ```
+<!--SNIPEND-->
 
 ## Example: AI/RAG Workflow using Claim Check
 
@@ -303,9 +314,10 @@ This example ingests a large text, performs lightweight lexical retrieval, and a
 
 *File: shared/models.py*
 
+<!--SNIPSTART:file shared/models.py-->
 ```python
 from dataclasses import dataclass
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
 
 @dataclass
@@ -336,17 +348,19 @@ class RagAnswer:
     answer: str
     sources: List[Dict[str, Any]]
 ```
+<!--SNIPEND-->
 
 ### Activities
 
 *File: activities/ai_claim_check.py*
 
+<!--SNIPSTART:file activities/ai_claim_check.py-->
 ```python
 from typing import List
 
 from temporalio import activity
 
-from shared.models import IngestRequest, IngestResult, RagRequest, RagAnswer
+from shared.models import IngestRequest, IngestResult, RagAnswer, RagRequest
 
 
 def _split_text(text: str, chunk_size: int, overlap: int) -> List[str]:
@@ -415,18 +429,23 @@ async def rag_answer(req: RagRequest, ingest_result: IngestResult) -> RagAnswer:
     answer = chat.choices[0].message.content.strip()
 
     return RagAnswer(answer=answer, sources=sources)
+
+
 ```
+<!--SNIPEND-->
 
 ### Workflow
 
 *File: workflows/ai_rag_workflow.py*
 
+<!--SNIPSTART:file workflows/ai_rag_workflow.py-->
 ```python
-from temporalio import workflow
 from datetime import timedelta
 
-from shared.models import IngestRequest, IngestResult, RagRequest, RagAnswer
+from temporalio import workflow
+
 from activities.ai_claim_check import ingest_document, rag_answer
+from shared.models import IngestRequest, IngestResult, RagAnswer, RagRequest
 
 
 @workflow.defn
@@ -454,7 +473,10 @@ class AiRagWorkflow:
             summary="RAG answer using embedded chunks",
         )
         return answer
+
+
 ```
+<!--SNIPEND-->
 
 ## Running
 
@@ -534,17 +556,18 @@ When claim check is enabled, the Web UI would otherwise show opaque keys. This c
 
 *File: codec/codec_server.py*
 
+<!--SNIPSTART:file codec/codec_server.py-->
 ```python
-from functools import partial
-from typing import Awaitable, Callable, Iterable, List
 import json
 import os
+from functools import partial
+from typing import Awaitable, Callable, Iterable, List
 
 from aiohttp import hdrs, web
+from claim_check import ClaimCheckCodec
 from google.protobuf import json_format
 from temporalio.api.common.v1 import Payload, Payloads
 
-from claim_check import ClaimCheckCodec
 
 def build_codec_server() -> web.Application:
     # Create codec with environment variable configuration (same as plugin)
@@ -668,6 +691,7 @@ def build_codec_server() -> web.Application:
 if __name__ == "__main__":
     web.run_app(build_codec_server(), host="127.0.0.1", port=8081)
 ```
+<!--SNIPEND-->
 
 ### Running the codec server
 

@@ -3,7 +3,12 @@
 import pytest
 from pydantic import ValidationError
 
-from models.models import WorkflowInput, ProposedAction, ApprovalRequest, ApprovalDecision
+from models.models import (
+    ApprovalDecision,
+    ApprovalRequest,
+    ProposedAction,
+    WorkflowInput,
+)
 
 
 class TestWorkflowInput:

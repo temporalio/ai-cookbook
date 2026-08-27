@@ -1,9 +1,9 @@
-import uuid
 import logging
+import uuid
 from typing import Iterable, List
+
 import aioboto3
 from botocore.exceptions import ClientError
-
 from temporalio.api.common.v1 import Payload
 from temporalio.converter import PayloadCodec
 

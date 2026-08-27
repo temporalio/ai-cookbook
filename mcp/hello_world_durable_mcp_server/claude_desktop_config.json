@@ -6,7 +6,7 @@
         "--directory",
         "<full path to the directory containing the weather.py>",
         "run",
-        "weather.py"
+        "mcp_servers/weather.py"
       ]
     }
   }

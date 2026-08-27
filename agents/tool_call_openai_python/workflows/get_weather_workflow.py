@@ -1,10 +1,10 @@
-from temporalio import workflow
-from datetime import timedelta
 import json
+from datetime import timedelta
+
+from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
-    from activities import openai_responses
-    from activities import get_weather_alerts
+    from activities import get_weather_alerts, openai_responses
 
 
 @workflow.defn

@@ -1,10 +1,12 @@
-from .shared import QueryPlan, ResearchPlan, with_today
-from .config import EFFICIENT_PROCESSING_MODEL
-from temporalio import workflow
 from datetime import timedelta
 
+from temporalio import workflow
+
+from .config import EFFICIENT_PROCESSING_MODEL
+from .shared import QueryPlan, ResearchPlan, with_today
+
 with workflow.unsafe.imports_passed_through():
-    from activities.invoke_model import invoke_model, InvokeModelRequest
+    from activities.invoke_model import InvokeModelRequest, invoke_model
 
 QUERY_GENERATION_INSTRUCTIONS = """
 You are a search query specialist who crafts effective web searches.

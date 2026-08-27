@@ -1,10 +1,12 @@
-from .shared import SearchResult, SearchQuery, with_today
-from .config import EFFICIENT_PROCESSING_MODEL
-from temporalio import workflow
 from datetime import timedelta
 
+from temporalio import workflow
+
+from .config import EFFICIENT_PROCESSING_MODEL
+from .shared import SearchQuery, SearchResult, with_today
+
 with workflow.unsafe.imports_passed_through():
-    from activities.invoke_model import invoke_model, InvokeModelRequest
+    from activities.invoke_model import InvokeModelRequest, invoke_model
 
 WEB_SEARCH_INSTRUCTIONS = """
 You are a web research specialist who finds and evaluates information from web sources.

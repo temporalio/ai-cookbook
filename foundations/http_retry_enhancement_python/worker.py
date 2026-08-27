@@ -1,11 +1,11 @@
 import asyncio
 
 from temporalio.client import Client
+from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.worker import Worker
 
-from workflows.hello_world_workflow import HelloWorld
 from activities import openai_responses
-from temporalio.contrib.pydantic import pydantic_data_converter
+from workflows.hello_world_workflow import HelloWorld
 
 
 async def main():

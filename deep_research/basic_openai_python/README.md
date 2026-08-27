@@ -46,6 +46,7 @@ The Planning Agent creates a `ResearchPlan`, which includes a research question,
 a list of `ResearchAspects`, expected sources, a search strategy, and success
 criteria. ResearchAspects include an aspect name, a priority, and a description.
 
+<!--SNIPSTART agents/shared.py {"startPattern": "^class ResearchPlan\\(BaseModel\\):$", "endPattern": "^\\s*success_criteria: List\\[str\\]$"}-->
 ```python
 class ResearchPlan(BaseModel):
     research_question: str
@@ -54,22 +55,28 @@ class ResearchPlan(BaseModel):
     search_strategy: str
     success_criteria: List[str]
 ```
+<!--SNIPEND-->
 
+<!--SNIPSTART agents/shared.py {"startPattern": "^class ResearchAspect\\(BaseModel\\):$", "endPattern": "^\\s*description: str$"}-->
 ```python
 class ResearchAspect(BaseModel):
     aspect: str
     priority: int
     description: str
 ```
+<!--SNIPEND-->
 
 The Query Generation Agent creates a `QueryPlan`, and generates a list of
 `SearchQueries`.
 
+<!--SNIPSTART agents/shared.py {"startPattern": "^class QueryPlan\\(BaseModel\\):$", "endPattern": "^\\s*queries: List\\[SearchQuery\\]$"}-->
 ```python
 class QueryPlan(BaseModel):
     queries: List[SearchQuery]
 ```
+<!--SNIPEND-->
 
+<!--SNIPSTART agents/shared.py {"startPattern": "^class SearchQuery\\(BaseModel\\):$", "endPattern": "^\\s*priority: int$"}-->
 ```python
 class SearchQuery(BaseModel):
     query: str
@@ -77,10 +84,12 @@ class SearchQuery(BaseModel):
     expected_info_type: str
     priority: int
 ```
+<!--SNIPEND-->
 
 The Web Search Agent creates a `SearchResult`, which includes a query, a list of
 sources, a key finding, a relevance score, and a list of citations.
 
+<!--SNIPSTART agents/shared.py {"startPattern": "^class SearchResult\\(BaseModel\\):$", "endPattern": "^\\s*citations: List\\[str\\]$"}-->
 ```python
 class SearchResult(BaseModel):
     query: str
@@ -89,11 +98,13 @@ class SearchResult(BaseModel):
     relevance_score: float
     citations: List[str]
 ```
+<!--SNIPEND-->
 
 Finally, the Report Synthesis Agent creates a `ResearchReport`, which includes
 an executive summary, a detailed analysis, a list of key findings, a confidence
 assessment, a list of citations, and a list of follow-up questions.
 
+<!--SNIPSTART agents/shared.py {"startPattern": "^class ResearchReport\\(BaseModel\\):$", "endPattern": "^\\s*follow_up_questions: List\\[str\\]$"}-->
 ```python
 class ResearchReport(BaseModel):
     executive_summary: str
@@ -103,6 +114,7 @@ class ResearchReport(BaseModel):
     citations: List[str]
     follow_up_questions: List[str]
 ```
+<!--SNIPEND-->
 
 ## Create the agents
 
@@ -143,14 +155,17 @@ priorities, identifies expected source types, and defines success criteria.
 
 *File: agents/research_planning.py*
 
+<!--SNIPSTART:file agents/research_planning.py-->
 ```python
-from .shared import ResearchPlan, with_today
-from .config import COMPLEX_REASONING_MODEL
-from temporalio import workflow
 from datetime import timedelta
 
+from temporalio import workflow
+
+from .config import COMPLEX_REASONING_MODEL
+from .shared import ResearchPlan, with_today
+
 with workflow.unsafe.imports_passed_through():
-    from activities.invoke_model import invoke_model, InvokeModelRequest
+    from activities.invoke_model import InvokeModelRequest, invoke_model
 
 RESEARCH_PLANNING_INSTRUCTIONS = """
 You are a research planning specialist who creates focused research strategies.
@@ -165,7 +180,7 @@ OUTPUT REQUIREMENTS:
 - research_question: Clarified version of the original query
 - key_aspects: Specific areas requiring investigation, each with:
   - aspect: The research area name
-  - priority: 1-5 ranking (5 highest priority)
+  - priority: 1-5 ranking (5 highest priority)  
   - description: What needs to be investigated
 - expected_sources: Types of sources likely to contain relevant information
 - search_strategy: High-level approach for information gathering
@@ -187,6 +202,7 @@ async def plan_research(query: str) -> ResearchPlan:
     )
     return result.response
 ```
+<!--SNIPEND-->
 
 ### Query Generation Agent
 
@@ -196,14 +212,17 @@ case studies, recent news) with varied search styles and temporal modifiers.
 
 *File: agents/research_query_generation.py*
 
+<!--SNIPSTART:file agents/research_query_generation.py-->
 ```python
-from .shared import QueryPlan, ResearchPlan, with_today
-from .config import EFFICIENT_PROCESSING_MODEL
-from temporalio import workflow
 from datetime import timedelta
 
+from temporalio import workflow
+
+from .config import EFFICIENT_PROCESSING_MODEL
+from .shared import QueryPlan, ResearchPlan, with_today
+
 with workflow.unsafe.imports_passed_through():
-    from activities.invoke_model import invoke_model, InvokeModelRequest
+    from activities.invoke_model import InvokeModelRequest, invoke_model
 
 QUERY_GENERATION_INSTRUCTIONS = """
 You are a search query specialist who crafts effective web searches.
@@ -221,7 +240,7 @@ APPROACH:
 OUTPUT REQUIREMENTS:
 - queries: Search queries, each with:
   - query: The actual search string
-  - rationale: Why this query addresses research needs
+  - rationale: Why this query addresses research needs  
   - expected_info_type: One of "factual_data", "expert_analysis", "case_studies", "recent_news"
   - priority: 1-5 (5 highest priority)
 """
@@ -254,6 +273,7 @@ Success Criteria: {", ".join(research_plan.success_criteria)}
 
     return result.response
 ```
+<!--SNIPEND-->
 
 ### Web Search Agent
 
@@ -263,14 +283,17 @@ and provides proper citations with reliability assessments.
 
 *File: agents/research_web_search.py*
 
+<!--SNIPSTART:file agents/research_web_search.py-->
 ```python
-from .shared import SearchResult, SearchQuery, with_today
-from .config import EFFICIENT_PROCESSING_MODEL
-from temporalio import workflow
 from datetime import timedelta
 
+from temporalio import workflow
+
+from .config import EFFICIENT_PROCESSING_MODEL
+from .shared import SearchQuery, SearchResult, with_today
+
 with workflow.unsafe.imports_passed_through():
-    from activities.invoke_model import invoke_model, InvokeModelRequest
+    from activities.invoke_model import InvokeModelRequest, invoke_model
 
 WEB_SEARCH_INSTRUCTIONS = """
 You are a web research specialist who finds and evaluates information from web sources.
@@ -319,6 +342,7 @@ Please search for information using the provided query and analyze the results a
     )
     return result.response
 ```
+<!--SNIPEND-->
 
 ### Report Synthesis Agent
 
@@ -329,15 +353,18 @@ follow-up research questions.
 
 *File: agents/research_report_synthesis.py*
 
+<!--SNIPSTART:file agents/research_report_synthesis.py-->
 ```python
-from typing import List
-from temporalio import workflow
 from datetime import timedelta
-from .shared import ResearchReport, ResearchPlan, SearchResult, with_today
+from typing import List
+
+from temporalio import workflow
+
 from .config import COMPLEX_REASONING_MODEL
+from .shared import ResearchPlan, ResearchReport, SearchResult, with_today
 
 with workflow.unsafe.imports_passed_through():
-    from activities.invoke_model import invoke_model, InvokeModelRequest
+    from activities.invoke_model import InvokeModelRequest, invoke_model
 
 REPORT_SYNTHESIS_INSTRUCTIONS = """
 You are a research synthesis expert who creates comprehensive research reports.
@@ -414,6 +441,7 @@ Please synthesize all this information into a comprehensive research report foll
 
     return result.response
 ```
+<!--SNIPEND-->
 
 ## Create the Workflow
 
@@ -427,17 +455,19 @@ pulls together the findings into a comprehensive report.
 
 *File: workflows/deep_research_workflow.py*
 
+<!--SNIPSTART:file workflows/deep_research_workflow.py-->
 ```python
-from temporalio import workflow
-from temporalio.exceptions import ApplicationError
 import asyncio
 from typing import List
 
+from temporalio import workflow
+from temporalio.exceptions import ApplicationError
+
 from agents.research_planning import plan_research
 from agents.research_query_generation import generate_queries
-from agents.research_web_search import search_web
 from agents.research_report_synthesis import generate_synthesis
-from agents.models import SearchResult
+from agents.research_web_search import search_web
+from agents.shared import SearchResult
 
 
 @workflow.defn
@@ -514,8 +544,8 @@ class DeepResearchWorkflow:
 {chr(10).join([f"• {question}" for question in report.follow_up_questions])}
 
 """
-
 ```
+<!--SNIPEND-->
 
 ## Running
 

@@ -1,8 +1,9 @@
 # random_stuff.py
 
-from typing import Any
-from helpers import tool_helpers
 import random
+from typing import Any
+
+from helpers import tool_helpers
 
 # Build the tool definition for the OpenAI Responses API. 
 RANDOM_NUMBER_TOOL_OAI: dict[str, Any] = tool_helpers.oai_responses_tool_from_model(

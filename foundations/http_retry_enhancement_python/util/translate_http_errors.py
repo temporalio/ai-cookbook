@@ -1,12 +1,13 @@
 import email.utils
 import time
 from datetime import timedelta
-from temporalio.exceptions import ApplicationError
-from temporalio import workflow
 from typing import Optional, Tuple
 
+from temporalio import workflow
+from temporalio.exceptions import ApplicationError
+
 with workflow.unsafe.imports_passed_through():
-    from httpx import Response, Headers
+    from httpx import Headers, Response
 
 
 # Adapted from the OpenAI Python client (https://github.com/openai/openai-python/blob/main/src/openai/_base_client.py)

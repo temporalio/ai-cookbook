@@ -2,7 +2,10 @@
 
 from pydantic import BaseModel, Field
 
-from helpers.tool_helpers import oai_responses_tool_from_model, HELPFUL_AGENT_SYSTEM_INSTRUCTIONS
+from helpers.tool_helpers import (
+    HELPFUL_AGENT_SYSTEM_INSTRUCTIONS,
+    oai_responses_tool_from_model,
+)
 
 
 class _SampleModel(BaseModel):
