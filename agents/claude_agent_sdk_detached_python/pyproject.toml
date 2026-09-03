@@ -1,0 +1,18 @@
+[project]
+name = "claude-agent-sdk-detached"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "claude-agent-sdk>=0.2.142,<0.3",
+    "temporalio>=1.30,<1.31",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9",
+    "pytest-asyncio>=1",
+    "pytest-timeout>=2",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
