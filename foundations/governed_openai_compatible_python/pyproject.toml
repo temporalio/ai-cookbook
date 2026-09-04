@@ -1,0 +1,19 @@
+[project]
+name = "temporal-governed-openai-compatible-python"
+version = "0.1.0"
+description = "Durable Temporal workflow using an OpenAI-compatible model endpoint"
+authors = [{ name = "Temporal AI Cookbook contributors" }]
+requires-python = ">=3.10,<3.14"
+readme = "README.md"
+license = "MIT"
+dependencies = ["temporalio>=1.15.0,<2", "openai>=1.40.0"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-timeout>=2.4.0",
+    "pytest-asyncio>=0.26.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
