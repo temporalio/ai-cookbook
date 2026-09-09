@@ -1,5 +1,5 @@
 <!--
-description: Build a multi-agent pipeline (parallel + sequential) with Google ADK on Temporal — every LLM call and every tool call is a durable activity.
+description: Build a multi-agent pipeline (parallel + sequential) with Google ADK on Temporal — every LLM call and every I/O tool call runs as a durable activity.
 tags: [agents, python, gemini, google-adk]
 priority: 750
 -->
@@ -10,8 +10,9 @@ This recipe builds a **multi-agent dispatch pipeline** using
 [Google ADK](https://google.github.io/adk-docs/) and the
 [Google ADK integration for Temporal](https://github.com/temporalio/sdk-python/tree/main/temporalio/contrib/google_adk_agents).
 Two agents reason in parallel, a third synthesizes their output and submits a
-structured decision — and every LLM call and every tool call is a durable
-Temporal Activity.
+structured decision — and every LLM call and every I/O tool call is a durable
+Temporal Activity. (The final decision write is a plain in-workflow tool —
+see [Structured output via session state](#structured-output-via-session-state).)
 
 [![Watch the 60-second walkthrough](https://img.youtube.com/vi/Wq7hiN2KYnk/maxresdefault.jpg)](https://youtube.com/shorts/Wq7hiN2KYnk?feature=share)
 
@@ -69,7 +70,10 @@ This recipe highlights:
   `invoke_model` activity. Each call appears as a separate event in
   workflow history with retries, timeouts, and a Temporal-UI summary.
 - **Tool-as-activity** — `activity_tool` wraps a Temporal Activity so the
-  agent can call it. Each tool invocation is its own activity event.
+  agent can call it. Each of these tool invocations is its own activity
+  event. (The Dispatch agent's final `tool_submit_assignment` call is a
+  plain in-workflow tool, not an activity — it only writes to local
+  session state.)
 - **Structured output via session state** — the final agent calls a Python
   tool that writes to `tool_context.state`. The workflow reads that key
   back after the runner completes.
@@ -79,7 +83,7 @@ This recipe highlights:
 
 ## Prerequisites
 
-- Python 3.10+
+- Python 3.10 to 3.13
 - [`uv`](https://docs.astral.sh/uv/) for dependency management
 - A running Temporal Dev Server (`temporal server start-dev`)
 - A Google API key with access to Gemini (`GOOGLE_API_KEY`)
@@ -300,7 +304,10 @@ clocks).
 
 ```python
 # worker.py
-client = await Client.connect("localhost:7233")
+client = await Client.connect(
+    "localhost:7233",
+    data_converter=pydantic_data_converter,
+)
 worker = Worker(
     client,
     task_queue=TASK_QUEUE,

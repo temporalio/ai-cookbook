@@ -6,9 +6,12 @@ Pipeline:
                                           submits structured output
 
 Every LLM call routes through ``TemporalModel`` (an ``invoke_model``
-activity), and every tool call routes through ``activity_tool`` (one
-activity per call). That gives per-call durability and a complete trace
-of the agent reasoning in workflow history.
+activity), and every tool call that does I/O routes through
+``activity_tool`` (one activity per call). That gives per-call durability
+and a complete trace of the agent reasoning in workflow history. The
+Dispatch agent's final ``tool_submit_assignment`` call is the one
+exception: it only writes to local ADK session state, so it runs as a
+plain in-workflow tool rather than an activity.
 """
 
 from __future__ import annotations
