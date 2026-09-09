@@ -1568,6 +1568,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "google-adk" },
+    { name = "google-genai" },
     { name = "pydantic" },
     { name = "temporalio", extra = ["google-adk"] },
 ]
@@ -1582,6 +1583,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "google-adk", specifier = ">=1.0.0" },
+    { name = "google-genai", specifier = ">=1.0.0" },
     { name = "pydantic", specifier = ">=2.10.0" },
     { name = "temporalio", extras = ["google-adk"], specifier = ">=1.25.0,<2" },
 ]
