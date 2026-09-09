@@ -27,13 +27,13 @@ with workflow.unsafe.imports_passed_through():
     from google.genai.types import Content, Part
     from temporalio.contrib.google_adk_agents import TemporalModel
 
-    from workflows._activity_tool import activity_tool
     from activities.tools import (
         tool_get_fleet_status,
         tool_get_order_priorities,
         tool_get_route_info,
     )
     from models.models import AssignmentInput, AssignmentOutput
+    from workflows._activity_tool import activity_tool
 
 TASK_QUEUE = "multi-agent-adk-task-queue"
 DEFAULT_MODEL = "gemini-2.5-flash"
