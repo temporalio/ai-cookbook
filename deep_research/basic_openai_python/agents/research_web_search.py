@@ -1,10 +1,14 @@
-from .shared import SearchResult, SearchQuery, today_str
-from .config import EFFICIENT_PROCESSING_MODEL
-from activities.invoke_model import invoke_model, InvokeModelRequest
-from temporalio import workflow
 from datetime import timedelta
 
-WEB_SEARCH_INSTRUCTIONS = f"""
+from temporalio import workflow
+
+from .config import EFFICIENT_PROCESSING_MODEL
+from .shared import SearchQuery, SearchResult, with_today
+
+with workflow.unsafe.imports_passed_through():
+    from activities.invoke_model import InvokeModelRequest, invoke_model
+
+WEB_SEARCH_INSTRUCTIONS = """
 You are a web research specialist who finds and evaluates information from web sources.
 
 CORE RESPONSIBILITIES:
@@ -25,8 +29,6 @@ OUTPUT REQUIREMENTS:
 - key_findings: Synthesized information relevant to research question (2-4 paragraphs)
 - relevance_score: 0.0-1.0 assessment of how well results address the query
 - citations: Formatted sources with URLs
-
-TODAY'S DATE: {today_str()}
 """
 
 
@@ -43,7 +45,7 @@ Please search for information using the provided query and analyze the results a
         invoke_model,
         InvokeModelRequest(
             model=EFFICIENT_PROCESSING_MODEL,
-            instructions=WEB_SEARCH_INSTRUCTIONS,
+            instructions=with_today(WEB_SEARCH_INSTRUCTIONS),
             input=search_input,
             response_format=SearchResult,
             tools=[{"type": "web_search"}],

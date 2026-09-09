@@ -1,5 +1,6 @@
-from temporalio import workflow
 from datetime import timedelta
+
+from temporalio import workflow
 
 from activities import openai_responses
 

@@ -1,12 +1,12 @@
-from temporalio import activity
-from openai import AsyncOpenAI
-from typing import Optional, List, cast, Any, TypeVar, Generic
-from typing_extensions import Annotated
-from pydantic import BaseModel
-from pydantic.functional_validators import BeforeValidator
-from pydantic.functional_serializers import PlainSerializer
-
 import importlib
+from typing import Any, Generic, List, Optional, TypeVar, cast
+
+from openai import AsyncOpenAI
+from pydantic import BaseModel
+from pydantic.functional_serializers import PlainSerializer
+from pydantic.functional_validators import BeforeValidator
+from temporalio import activity
+from typing_extensions import Annotated
 
 T = TypeVar("T", bound=BaseModel)
 

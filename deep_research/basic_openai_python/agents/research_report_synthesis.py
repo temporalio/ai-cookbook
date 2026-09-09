@@ -1,11 +1,15 @@
-from typing import List
-from temporalio import workflow
 from datetime import timedelta
-from .shared import ResearchReport, ResearchPlan, SearchResult, today_str
-from .config import COMPLEX_REASONING_MODEL
-from activities.invoke_model import invoke_model, InvokeModelRequest
+from typing import List
 
-REPORT_SYNTHESIS_INSTRUCTIONS = f"""
+from temporalio import workflow
+
+from .config import COMPLEX_REASONING_MODEL
+from .shared import ResearchPlan, ResearchReport, SearchResult, with_today
+
+with workflow.unsafe.imports_passed_through():
+    from activities.invoke_model import InvokeModelRequest, invoke_model
+
+REPORT_SYNTHESIS_INSTRUCTIONS = """
 You are a research synthesis expert who creates comprehensive research reports.
 
 CORE RESPONSIBILITIES:
@@ -36,8 +40,6 @@ OUTPUT REQUIREMENTS:
 - confidence_assessment: Assessment of finding reliability
 - citations: All sources referenced
 - follow_up_questions: 3-5 specific questions for further research
-
-TODAY'S DATE: {today_str()}
 """
 
 
@@ -72,7 +74,7 @@ Please synthesize all this information into a comprehensive research report foll
         invoke_model,
         InvokeModelRequest(
             model=COMPLEX_REASONING_MODEL,
-            instructions=REPORT_SYNTHESIS_INSTRUCTIONS,
+            instructions=with_today(REPORT_SYNTHESIS_INSTRUCTIONS),
             input=synthesis_input,
             response_format=ResearchReport,
         ),

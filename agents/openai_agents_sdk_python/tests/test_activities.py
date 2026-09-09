@@ -30,10 +30,12 @@ class TestCalculateCircleArea:
 
 class TestGetWeather:
     @pytest.mark.asyncio
-    async def test_raises_exception(self):
+    async def test_returns_weather_for_city(self):
         env = ActivityEnvironment()
-        with pytest.raises(Exception, match="This is a test error"):
-            await env.run(get_weather, "New York")
+        result = await env.run(get_weather, "London")
+        assert result == Weather(
+            city="London", temperature_range="14-20C", conditions="Sunny with wind."
+        )
 
 
 class TestWeatherDataclass:

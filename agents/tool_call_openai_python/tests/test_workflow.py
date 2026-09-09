@@ -1,22 +1,20 @@
 """Tests for ToolCallingWorkflow with mocked activities."""
 
 import json
+from dataclasses import dataclass
+from datetime import timedelta
 
 import pytest
-from temporalio.testing import WorkflowEnvironment
-from temporalio.worker import Worker
-from temporalio import activity
-from temporalio.contrib.pydantic import pydantic_data_converter
-from datetime import timedelta
-from dataclasses import dataclass
-from typing import Any
-
 from openai.types.responses import (
     Response,
+    ResponseFunctionToolCall,
     ResponseOutputMessage,
     ResponseOutputText,
-    ResponseFunctionToolCall,
 )
+from temporalio import activity
+from temporalio.contrib.pydantic import pydantic_data_converter
+from temporalio.testing import WorkflowEnvironment
+from temporalio.worker import Worker
 
 from activities.get_weather_alerts import GetWeatherAlertsRequest
 from workflows.get_weather_workflow import ToolCallingWorkflow

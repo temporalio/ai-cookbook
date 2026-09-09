@@ -10,6 +10,7 @@ Usage:
 """
 
 import os
+
 from anthropic import Anthropic
 
 client = Anthropic(
@@ -40,7 +41,7 @@ tool_definition = {
 print("=" * 80)
 print("Calling Claude with tool...")
 message = client.messages.create(
-    model="claude-sonnet-4-20250514",
+    model="claude-sonnet-4-5-20250929",
     max_tokens=1024,
     tools=[tool_definition],
     messages=[
@@ -68,7 +69,7 @@ for block in message.content:
         print("Sending tool result back to Claude...")
         
         final_message = client.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-sonnet-4-5-20250929",
             max_tokens=1024,
             tools=[tool_definition],
             messages=[

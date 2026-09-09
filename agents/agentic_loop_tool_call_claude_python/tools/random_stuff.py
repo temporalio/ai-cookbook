@@ -1,9 +1,11 @@
 # random_stuff.py
 # Example of a simple tool with no parameters
 
-from typing import Any
 import random
+from typing import Any
+
 from pydantic import BaseModel, Field
+
 from helpers import tool_helpers
 
 # For tools without parameters, we can pass None as the model

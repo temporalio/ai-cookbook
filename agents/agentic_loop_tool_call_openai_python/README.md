@@ -1,9 +1,9 @@
 <!--
-description: A basic agentic loop that invokes a dynamic set of tools. 
-tags: [agents, python]
+description: Build a durable agentic loop in Python that calls a dynamic set of tools with Temporal and the OpenAI Responses API.
+tags: [agents, python, openai]
 priority: 775
 -->
-# Basic Agentic Loop with Tool Calling
+# Basic agentic loop with OpenAI and tool calling
 
 This example implements a basic agentic loop that has a set of tools available. If the
 agent determines that no tools are needed to satisfy a user request, it will respond
@@ -14,14 +14,14 @@ appropriate tool.
 Tools are supplied to the [`responses` API](https://platform.openai.com/docs/api-reference/responses/create) through the [`tools` parameter](https://platform.openai.com/docs/api-reference/responses/create#responses-create-tools). The `tools` parameter is in `json` format and includes a description of the function as well as descriptions of each of the arguments.
 
 > [!WARNING]
-> The API used to generate the tools `json` is an internal function from the [Open AI API](https://github.com/openai/openai-python) and may therefore change in the future. There currently is no public API to generate the tool definition from a Pydantic model or a function signature.
+> The API used to generate the tools `json` is an internal function from the [OpenAI API](https://github.com/openai/openai-python) and may therefore change in the future. There currently is no public API to generate the tool definition from a Pydantic model or a function signature.
 
 Being external API calls, invoking the LLM and invoking any functions/tools are done within a Temporal Activity.
 
 This recipe highlights the following key design decisions:
 - We use dynamic Activities to allow the agent to be loosely coupled from specific
 tools. This sample isolates the tools in the `tools` directory; changing the tools
-requires NO changes to the agent implementation.
+requires no changes to the agent implementation.
 - Because there is an agentic loop, each LLM invocation is passed the accumulated 
 *conversation history*, that includes the initial user input as well as LLM and tool 
 calls.
@@ -31,10 +31,10 @@ calls.
 
 Also see this foundational [recipe for basic tool calling](https://docs.temporal.io/ai-cookbook/tool-calling-python).
 
-## Application Components
+## Application components
 
 This example includes the following components:
-- The [workflow](#create-the-agent-agentic-loop) that contains the agentic loop and tool calling logic; this is the core of the agent implementation.
+- The [Workflow](#create-the-agent-agentic-loop) that contains the agentic loop and tool calling logic; this is the core of the agent implementation.
 - The activities for [invoking the LLM](#create-the-activity-for-llm-invocations) and for [invoking tools](#create-the-activity-for-the-tool-invocation).
 - A [helper function](#create-the-helper-function) that creates tool definitions of the appropriate form.
 - Sample [tools](#create-tool-definitions).
@@ -42,11 +42,11 @@ This example includes the following components:
 - An application that [initiates an interaction](#initiate-an-interaction-with-the-agent) with the agent.
 
 
-## Create the Agent (Agentic Loop)
+## Create the agent (agentic loop)
 
 ### Create the main agentic loop
 
-The agent is implemented as a Temporal workflow that:
+The agent is implemented as a Temporal Workflow that:
 - implements an agentic loop. The loop will continue until the agent responds with
 no tool calls.
 
@@ -61,16 +61,14 @@ however that the agent is not single shot.
 
 *File: workflows/agent.py*
 
+<!--SNIPSTART workflows/agent.py {"startPattern": "^from temporalio import workflow$", "endPattern": "return result\\.output_text"}-->
 ```python
 from temporalio import workflow
-from datetime import timedelta
-
-import json
 
 with workflow.unsafe.imports_passed_through():
-    from tools import get_tools
-    from helpers import tool_helpers
     from activities import openai_responses
+    from helpers import tool_helpers
+    from tools import get_tools
 
 @workflow.defn
 class AgentWorkflow:
@@ -117,6 +115,7 @@ class AgentWorkflow:
                 print(f"No tools chosen, responding with a message: {result.output_text}")
                 return result.output_text
 ```
+<!--SNIPEND-->
 
 ### Create the function call handler
 
@@ -129,27 +128,29 @@ configurations.
 
 *File: workflows/agent.py*
 
+<!--SNIPSTART workflows/agent.py {"startPattern": "^\\s*async def _handle_function_call\\(", "endPattern": "^\\s*return result$"}-->
 ```python
-    async def _handle_function_call(self, item, result, input_list):
-        # serialize the LLM output - the decision the LLM made to call a tool
-        i = result.output[0]
-        input_list += [
-            i.model_dump() if hasattr(i, "model_dump") else i
-        ]
-        # execute dynamic activity with the tool name chosen by the LLM
-        # and the arguments crafted by the LLM
-        args = json.loads(item.arguments) if isinstance(item.arguments, str) else item.arguments
+async def _handle_function_call(self, item, result, input_list):
+    # serialize the LLM output - the decision the LLM made to call a tool
+    i = result.output[0]
+    input_list += [
+        i.model_dump() if hasattr(i, "model_dump") else i
+    ]
+    # execute dynamic activity with the tool name chosen by the LLM
+    # and the arguments crafted by the LLM
+    args = json.loads(item.arguments) if isinstance(item.arguments, str) else item.arguments
 
-        result = await workflow.execute_activity(
-            item.name,
-            args,
-            start_to_close_timeout=timedelta(seconds=30),
-        )
+    result = await workflow.execute_activity(
+        item.name,
+        args,
+        start_to_close_timeout=timedelta(seconds=30),
+    )
 
-        print(f"Made a tool call to {item.name}")
+    print(f"Made a tool call to {item.name}")
 
-        return result
+    return result
 ```
+<!--SNIPEND-->
 
 ## Create the Activity for LLM invocations
 
@@ -164,12 +165,15 @@ the appropriate error type so that the workflow knows if it should retry the Act
 In this implementation, we allow for the model, instructions and input to be passed in, and also the list of tools.
 
 *File: activities/openai_responses.py*
+<!--SNIPSTART:file activities/openai_responses.py-->
 ```python
-from temporalio import activity
-from openai import AsyncOpenAI
-from openai.types.responses import Response
 from dataclasses import dataclass
 from typing import Any
+
+from openai import AsyncOpenAI
+from openai.types.responses import Response
+from temporalio import activity
+
 
 # Temporal best practice: Create a data structure to hold the request parameters.
 @dataclass
@@ -199,6 +203,7 @@ async def create(request: OpenAIResponsesRequest) -> Response:
     finally:
         await client.close()
 ```
+<!--SNIPEND-->
 
 ## Create the Activity for the tool invocation
 
@@ -211,19 +216,22 @@ that maps to the `tool_name`
 and that function is then called with the supplied arguments.
 
 *File: activities/tool_invoker.py*
+<!--SNIPSTART:file activities/tool_invoker.py-->
 ```python
-from temporalio import activity
-from typing import Sequence
-from temporalio.common import RawValue
 import inspect
+from collections.abc import Sequence
+
 from pydantic import BaseModel
+from temporalio import activity
+from temporalio.common import RawValue
+
 
 # We use dynamic activities to allow the agent to be defined independently of the tools it can call.
 @activity.defn(dynamic=True)
 async def dynamic_tool_activity(args: Sequence[RawValue]) -> dict:
     from tools import get_handler
 
-    # the name of the tool to execute - this is passed in via the execute_activity call in the workflow
+    # the name of the tool to execute - this is passed in via the execute_activity call in the Workflow
     tool_name = activity.info().activity_type 
     tool_args = activity.payload_converter().from_payload(args[0].payload, dict)
     activity.logger.info(f"Running dynamic tool '{tool_name}' with args: {tool_args}")
@@ -250,20 +258,24 @@ async def dynamic_tool_activity(args: Sequence[RawValue]) -> dict:
     activity.logger.info(f"Tool '{tool_name}' result: {result}")
     return result
 ```
+<!--SNIPEND-->
 
 ## Create the helper function
 
 The `oai_responses_tool_from_model` function accepts a tool name and description, as well as a list of argument name/description pairs and returns json that is in the format expected for tool definitions in the OpenAI responses API.
 
 > [!WARNING]
-> The API used to generate the tools json is an internal function from the [Open AI API](https://github.com/openai/openai-python) and may therefore change in the future. There currently is no public API to generate the tool definition from a Pydantic model or a function signature.
+> The API used to generate the tools json is an internal function from the [OpenAI API](https://github.com/openai/openai-python) and may therefore change in the future. There currently is no public API to generate the tool definition from a Pydantic model or a function signature.
 
 *File: helpers/tool_helpers.py*
+<!--SNIPSTART helpers/tool_helpers.py {"startPattern": "^from openai\\.lib\\._pydantic import to_strict_json_schema", "endPattern": "^\\s*\\}\\s*$"}-->
 ```python
 from openai.lib._pydantic import to_strict_json_schema  # private API; may change
+
 # there currently is no public API to generate the tool definition from a Pydantic model
 # or a function signature.
 from pydantic import BaseModel
+
 
 def oai_responses_tool_from_model(name: str, description: str, model: type[BaseModel]):
     return {
@@ -281,8 +293,10 @@ def oai_responses_tool_from_model(name: str, description: str, model: type[BaseM
         "strict": True,
     }
 ```
+<!--SNIPEND-->
 
 This file also holds the system instruction for the agent.
+<!--SNIPSTART helpers/tool_helpers.py {"startPattern": "^HELPFUL_AGENT_SYSTEM_INSTRUCTIONS = \"\"\"$", "endPattern": "^\"\"\"$"}-->
 ```python
 HELPFUL_AGENT_SYSTEM_INSTRUCTIONS = """
 You are a helpful agent that can use tools to help the user.
@@ -291,11 +305,12 @@ You may or may not need to use the tools to satisfy the user ask.
 If no tools are needed, respond in haikus.
 """
 ```
+<!--SNIPEND-->
 
 ## Create tool definitions
 
 Tools are defined in the `tools` directory and should be thought of as independent 
-from the agent implementation; as described above, dynamic Activities are leveraged 
+from the agent implementation; as described above, dynamic Activities are used 
 for this loose coupling. 
 
 The `__init__.py` file holds two examples of tool sets,
@@ -306,15 +321,21 @@ updating the `get_tools` and `get_handler` methods).
 the LLM.
 - The `get_handler` method captures the mapping from tool name to tool function
 
-*File: tools/__init__.py*
+*File: tools/\_\_init\_\_.py*
+<!--SNIPSTART:file tools/__init__.py-->
 ```python
 # Uncomment and comment out the tools you want to use
 
 from typing import Any, Awaitable, Callable
 
 # Location and weather related tools
-from .get_location import get_location_info, get_ip_address
-from .get_weather import get_weather_alerts
+from .get_location import (
+    GET_IP_ADDRESS_TOOL_OAI,
+    GET_LOCATION_TOOL_OAI,
+    get_ip_address,
+    get_location_info,
+)
+from .get_weather import WEATHER_ALERTS_TOOL_OAI, get_weather_alerts
 
 ToolHandler = Callable[..., Awaitable[Any]]
 
@@ -328,9 +349,9 @@ def get_handler(tool_name: str) -> ToolHandler:
     raise ValueError(f"Unknown tool name: {tool_name}")
 
 def get_tools() -> list[dict[str, Any]]:
-    return [get_weather.WEATHER_ALERTS_TOOL_OAI, 
-            get_location.GET_LOCATION_TOOL_OAI,
-            get_location.GET_IP_ADDRESS_TOOL_OAI]
+    return [WEATHER_ALERTS_TOOL_OAI,
+            GET_LOCATION_TOOL_OAI,
+            GET_IP_ADDRESS_TOOL_OAI]
 
 # Random number tool
 # from .random_stuff import get_random_number, RANDOM_NUMBER_TOOL_OAI
@@ -343,6 +364,7 @@ def get_tools() -> list[dict[str, Any]]:
 # def get_tools() -> list[dict[str, Any]]:
 #     return [RANDOM_NUMBER_TOOL_OAI]
 ```
+<!--SNIPEND-->
 
 The tool descriptions and functions are defined in `tools/get_location.py`, 
 `tools/get_weather.py` and `tools/random_stuff.py` files. Each of these files contains:
@@ -351,13 +373,17 @@ The tool descriptions and functions are defined in `tools/get_location.py`,
 - the function definitions.
 
 `tools/get_location.py`
+<!--SNIPSTART:file tools/get_location.py-->
 ```python
 # get_location.py
 
 from typing import Any
-import requests
+
+import httpx
 from pydantic import BaseModel, Field
+
 from helpers import tool_helpers
+
 
 # For the location finder we use Pydantic to create a structure that encapsulates the input parameter 
 # (an IP address). 
@@ -378,42 +404,48 @@ GET_IP_ADDRESS_TOOL_OAI: dict[str, Any] = tool_helpers.oai_responses_tool_from_m
     None)
 
 # The functions
-def get_ip_address() -> str:
-    response = requests.get("https://icanhazip.com")
-    response.raise_for_status()
-    return response.text.strip()
+async def get_ip_address() -> str:
+    async with httpx.AsyncClient() as client:
+        response = await client.get("https://icanhazip.com")
+        response.raise_for_status()
+        return response.text.strip()
 
-def get_location_info(req: GetLocationRequest) -> str:
-    response = requests.get(f"http://ip-api.com/json/{req.ipaddress}")
-    response.raise_for_status()
-    result = response.json()
-    return f"{result['city']}, {result['regionName']}, {result['country']}"
+async def get_location_info(req: GetLocationRequest) -> str:
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"http://ip-api.com/json/{req.ipaddress}")
+        response.raise_for_status()
+        result = response.json()
+        return f"{result['city']}, {result['regionName']}, {result['country']}"
 ```
+<!--SNIPEND-->
 
-See files in github for more tool definitions.
+See files in GitHub for more tool definitions.
 
 ## Create the Worker
 
-The worker is the process that dispatches work to the various parts of the agent implementation - the orchestrator and the activities for the LLM and tool invocations.
+The Worker is the process that dispatches work to the various parts of the agent implementation - the orchestrator and the Activities for the LLM and tool invocations.
 
 *File: worker.py*
 
+<!--SNIPSTART:file worker.py-->
 ```python
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 from temporalio.client import Client
+from temporalio.contrib.pydantic import pydantic_data_converter
+from temporalio.envconfig import ClientConfig
 from temporalio.worker import Worker
 
-from workflows.agent import AgentWorkflow
 from activities import openai_responses, tool_invoker
-from temporalio.contrib.pydantic import pydantic_data_converter
-
-from concurrent.futures import ThreadPoolExecutor
+from workflows.agent import AgentWorkflow
 
 
 async def main():
+    config = ClientConfig.load_client_connect_config()
+    config.setdefault("target_host", "localhost:7233")
     client = await Client.connect(
-        "localhost:7233",
+        **config,
         data_converter=pydantic_data_converter,
     )
 
@@ -435,21 +467,23 @@ async def main():
 if __name__ == "__main__":
     asyncio.run(main())
 ```
+<!--SNIPEND-->
 
 ## Initiate an interaction with the agent
 
-In order to interact with this simple AI agent, we create a Temporal client and execute a workflow.
+To interact with this simple AI agent, we create a Temporal client and execute a Workflow.
 
-*File:start_workflow.py*
+*File: start_workflow.py*
+<!--SNIPSTART:file start_workflow.py-->
 ```python
 import asyncio
 import sys
 import uuid
 
 from temporalio.client import Client
+from temporalio.contrib.pydantic import pydantic_data_converter
 
 from workflows.agent import AgentWorkflow
-from temporalio.contrib.pydantic import pydantic_data_converter
 
 
 async def main():
@@ -471,8 +505,9 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main()) 
+    asyncio.run(main())
 ```
+<!--SNIPEND-->
 
 
 ## Running the app
@@ -490,18 +525,18 @@ uv sync
 Start the agent worker:
 
 ```bash
-uv run python -m worker
+uv run worker.py
 ```
 
 Make request to the agent:
 
 ```bash
-uv run python -m start_workflow "are there any weather alerts for where I am?"
+uv run start_workflow.py "are there any weather alerts for where I am?"
 ```
 
 Try a number of different user prompts:
 ```bash
-uv run python -m start_workflow "where am I?"
-uv run python -m start_workflow "what is my ip address?"
-uv run python -m start_workflow "can I please have a random number?"
+uv run start_workflow.py "where am I?"
+uv run start_workflow.py "what is my ip address?"
+uv run start_workflow.py "can I please have a random number?"
 ```

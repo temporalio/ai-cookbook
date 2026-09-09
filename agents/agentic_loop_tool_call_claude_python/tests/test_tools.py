@@ -1,14 +1,18 @@
 """Tests for tools — registry, handler lookup, and individual tool functions."""
 
 import json
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from tools import get_handler, get_tools
-from tools.get_weather import get_weather_alerts, GetWeatherAlertsRequest
-from tools.get_location import get_ip_address, get_location_info, GetLocationRequest
-from tools.random_stuff import get_random_number, generate_random_text, GenerateRandomTextRequest
+from tools.get_location import GetLocationRequest, get_ip_address, get_location_info
+from tools.get_weather import GetWeatherAlertsRequest, get_weather_alerts
+from tools.random_stuff import (
+    GenerateRandomTextRequest,
+    generate_random_text,
+    get_random_number,
+)
 
 
 class TestToolRegistry:

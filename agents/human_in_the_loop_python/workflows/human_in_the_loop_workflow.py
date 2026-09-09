@@ -1,12 +1,18 @@
-from temporalio import workflow
+import asyncio
 from datetime import timedelta
 from typing import Optional
-import asyncio
+
+from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
-    from models.models import WorkflowInput, ProposedAction, ApprovalRequest, ApprovalDecision
+    from activities import execute_action, notify_approval_needed, openai_responses
     from models.agent_instructions import SYSTEM_INSTRUCTIONS
-    from activities import openai_responses, execute_action, notify_approval_needed
+    from models.models import (
+        ApprovalDecision,
+        ApprovalRequest,
+        ProposedAction,
+        WorkflowInput,
+    )
 
 
 @workflow.defn
@@ -73,7 +79,7 @@ class HumanInTheLoopWorkflow:
                 start_to_close_timeout=timedelta(seconds=60),
             )
             print(f"\n{'='*60}")
-            print(f"Action completed successfully (auto-approved)")
+            print("Action completed successfully (auto-approved)")
             print(f"{'='*60}\n")
 
             return f"Action completed successfully (auto-approved): {result}"

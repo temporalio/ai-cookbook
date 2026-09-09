@@ -1,9 +1,11 @@
-from temporalio import activity
-from openai import AsyncOpenAI
-from openai.types.responses import Response
 from dataclasses import dataclass
+
+from openai import APIStatusError, AsyncOpenAI
+from openai.types.responses import Response
+from temporalio import activity
+
 from util.translate_http_errors import http_response_to_application_error
-from openai import APIStatusError
+
 
 # Temporal best practice: Create a data structure to hold the request parameters.
 @dataclass

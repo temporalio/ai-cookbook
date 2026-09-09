@@ -5,9 +5,10 @@ from unittest.mock import AsyncMock, patch
 
 import litellm
 import pytest
+from temporalio.exceptions import ApplicationError
+
 from activities.litellm_completion import create
 from activities.models import LiteLLMRequest
-from temporalio.exceptions import ApplicationError
 
 
 class TestCreateActivity:

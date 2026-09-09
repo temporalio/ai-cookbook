@@ -1,9 +1,9 @@
 <!--
-description: A durable MCP server that uses Temporal workflows for reliable execution of weather tools.
+description: Build a durable MCP server in Python that runs weather tools reliably with Temporal Workflows.
 tags: [mcp, python, workflows]
 priority: 775
 -->
-# Durable MCP Weather Server
+# Durable MCP weather server
 
 This example demonstrates how to build a durable MCP (Model Context Protocol) server using Temporal Workflows for Durable Execution. The server exposes weather tools that fetch alerts and forecasts from the National Weather Service API.
 
@@ -12,45 +12,48 @@ MCP tools are "actions" that the MCP server can perform. Within a given MCP tool
 - Call the National Weather Service API again to retrieve the forecast for that region
 - Format and return the response to the user
 
-In this one tool alone, we are taking several steps to complete a given action. We implement these steps in a Temporal Workflow, which ensures durability out-of-the-box. This means that whenever your MCP tool is called, it kicks off the Temporal Workflow, and every step (API call, function) is executed reliably and all the way to completion.
+In this one tool alone, we are taking several steps to complete a given action. We implement these steps in a Temporal Workflow, which provides durability. This means that whenever your MCP tool is called, it kicks off the Temporal Workflow, and every step (API call, function) is executed reliably and all the way to completion.
 
 We use [FastMCP](https://github.com/jlowin/fastmcp) to implement the MCP Server and create tools using the decorator `@mcp.tool`.
 
 > [!NOTE]
-> External API calls are made within Temporal Activities. This ensures that network requests are retried appropriately and failures are handled gracefully.
+> External API calls are made within Temporal Activities. This ensures that network requests are retried appropriately and failures are handled.
 
 This recipe highlights the following key design decisions:
-- **Separation of concerns**: MCP tools act as thin wrappers that start Temporal Workflows. All business logic lives in workflows, ensuring durability and reliability.
+- **Separation of concerns**: MCP tools act as thin wrappers that start Temporal Workflows. All business logic lives in Workflows, ensuring durability and reliability.
 - **Durable Execution**: By moving multi-step operations into Temporal Workflows, we guarantee that operations complete even in the face of failures, network issues, or process restarts.
 - **Activity-based external calls**: All external API calls (like NWS API requests) are made within Temporal Activities, which provides automatic retries and proper error handling.
-- **Retry policies**: Workflows use configurable retry policies to handle transient failures gracefully.
+- **Retry policies**: Workflows use configurable retry policies to handle transient failures.
 
 Also see this foundational [recipe for basic tool calling](https://docs.temporal.io/ai-cookbook/tool-calling-python) using the same weather tools.
 
-## Application Components
+## Application components
 
 This example includes the following components:
-- The [MCP server](#create-the-mcp-server) (mcp_server.py) that exposes tools via FastMCP and starts Temporal workflows
+- The [MCP server](#create-the-mcp-server) (mcp_server.py) that exposes tools via FastMCP and starts Temporal Workflows
 - The [Workflows](#create-the-workflows) (weather_workflows.py) that orchestrate the multi-step weather operations
 - The [Activity](#create-the-activity) (weather_activities.py) for making external API calls to the National Weather Service
 - The [Worker](#create-the-worker) (worker.py) (that manages the Workflows and Activities)
 - [Config for Claude Desktop](#configure-claude-desktop) (claude_desktop_config.json) for connecting the MCP server to Claude Desktop
 
-## Create the MCP Server
+## Create the MCP server
 
 The MCP server is implemented using FastMCP and exposes tools via the `@mcp.tool` decorator. Each tool is a thin wrapper that starts a Temporal Workflow and waits for the result. This design ensures that all business logic lives in durable Workflows.
 
 *File: mcp_servers/weather.py*
 
+<!--SNIPSTART:file mcp_servers/weather.py-->
 ```python
-from temporalio.client import Client
 from fastmcp import FastMCP
+from temporalio.client import Client
+from temporalio.envconfig import ClientConfig
 
 # Initialize FastMCP server
 mcp = FastMCP("weather")
 
 # Temporal client setup (do this once, then reuse)
 temporal_client = None
+
 
 async def get_temporal_client():
     global temporal_client
@@ -59,6 +62,7 @@ async def get_temporal_client():
         config.setdefault("target_host", "localhost:7233")
         temporal_client = await Client.connect(**config)
     return temporal_client
+
 
 @mcp.tool
 async def get_alerts(state: str) -> str:
@@ -73,17 +77,18 @@ async def get_alerts(state: str) -> str:
         "GetAlerts",
         state,
         id=f"alerts-{state.lower()}",
-        task_queue="weather-task-queue"
+        task_queue="weather-task-queue",
     )
     return await handle.result()
 
+
 @mcp.tool
 async def get_forecast(latitude: float, longitude: float) -> str:
-    """Get weather forecast for a US location.
+    """Get weather forecast for a location.
 
     Args:
-        latitude: Latitude of the location (must be within the US)
-        longitude: Longitude of the location (must be within the US)
+        latitude: Latitude of the location
+        longitude: Longitude of the location
     """
     # The business logic has been moved into the Temporal Workflow, the MCP tool kicks off the Workflow
     client = await get_temporal_client()
@@ -95,14 +100,16 @@ async def get_forecast(latitude: float, longitude: float) -> str:
     )
     return await handle.result()
 
+
 if __name__ == "__main__":
     # Initialize and run the server
-    mcp.run(transport='stdio')
+    mcp.run(transport="stdio")
 ```
+<!--SNIPEND-->
 
 ## Create the Workflows
 
-The Workflows contain the business logic for fetching weather data. They orchestrate multiple steps, including API calls and data formatting. By implementing this logic in workflows, we ensure that operations complete reliably even if there are failures or interruptions.
+The Workflows contain the business logic for fetching weather data. They orchestrate multiple steps, including API calls and data formatting. By implementing this logic in Workflows, we ensure that operations complete reliably even if there are failures or interruptions.
 
 ### GetAlerts Workflow
 
@@ -110,8 +117,10 @@ The `GetAlerts` workflow fetches active weather alerts for a US state.
 
 *File: workflows/weather_workflows.py*
 
+<!--SNIPSTART workflows/weather_workflows.py {"startPattern": "^from datetime import timedelta$", "endPattern": "join\\(alerts\\)"}-->
 ```python
 from datetime import timedelta
+
 from temporalio import workflow
 from temporalio.common import RetryPolicy
 
@@ -124,21 +133,24 @@ retry_policy = RetryPolicy(
 
 # Constants
 NWS_API_BASE = "https://api.weather.gov"
+USER_AGENT = "weather-app/1.0"
 
-# Import Activities, passing them through the sandbox
+# Import Activities and models, passing them through the sandbox
 with workflow.unsafe.imports_passed_through():
     from activities.weather_activities import make_nws_request
+
 
 def format_alert(feature: dict) -> str:
     """Format an alert feature into a readable string."""
     props = feature["properties"]
     return f"""
-Event: {props.get('event', 'Unknown')}
-Area: {props.get('areaDesc', 'Unknown')}
-Severity: {props.get('severity', 'Unknown')}
-Description: {props.get('description', 'No description available')}
-Instructions: {props.get('instruction', 'No specific instructions provided')}
+Event: {props.get("event", "Unknown")}
+Area: {props.get("areaDesc", "Unknown")}
+Severity: {props.get("severity", "Unknown")}
+Description: {props.get("description", "No description available")}
+Instructions: {props.get("instruction", "No specific instructions provided")}
 """
+
 
 @workflow.defn
 class GetAlerts:
@@ -160,12 +172,10 @@ class GetAlerts:
         if not data or "features" not in data:
             return "Unable to fetch alerts or no alerts found."
 
-        if not data["features"]:
-            return "No active alerts for this state."
-
         alerts = [format_alert(feature) for feature in data["features"]]
         return "\n---\n".join(alerts)
 ```
+<!--SNIPEND-->
 
 ### GetForecast Workflow
 
@@ -173,16 +183,17 @@ The `GetForecast` workflow demonstrates a multi-step operation: it first fetches
 
 *File: workflows/weather_workflows.py*
 
+<!--SNIPSTART workflows/weather_workflows.py:get-forecast-workflow-->
 ```python
 @workflow.defn
 class GetForecast:
     @workflow.run
     async def get_forecast(self, latitude: float, longitude: float) -> str:
-        """Get weather forecast for a US location.
+        """Get weather forecast for a location.
 
         Args:
-            latitude: Latitude of the location (must be within the US)
-            longitude: Longitude of the location (must be within the US)
+            latitude: Latitude of the location
+            longitude: Longitude of the location
         """
         # First get the forecast grid endpoint
         points_url = f"{NWS_API_BASE}/points/{latitude},{longitude}"
@@ -212,15 +223,16 @@ class GetForecast:
         forecasts = []
         for period in periods[:5]:  # Only show next 5 periods
             forecast = f"""
-    {period['name']}:
-    Temperature: {period['temperature']}°{period['temperatureUnit']}
-    Wind: {period['windSpeed']} {period['windDirection']}
-    Forecast: {period['detailedForecast']}
+    {period["name"]}:
+    Temperature: {period["temperature"]}°{period["temperatureUnit"]}
+    Wind: {period["windSpeed"]} {period["windDirection"]}
+    Forecast: {period["detailedForecast"]}
     """
             forecasts.append(forecast)
 
         return "\n---\n".join(forecasts)
 ```
+<!--SNIPEND-->
 
 ## Create the Activity
 
@@ -228,42 +240,49 @@ We create an Activity for making HTTP requests to the National Weather Service A
 
 *File: activities/weather_activities.py*
 
+<!--SNIPSTART:file activities/weather_activities.py-->
 ```python
 from typing import Any
-from temporalio import activity
+
 import httpx
+from temporalio import activity
 
 USER_AGENT = "weather-app/1.0"
+
 
 # External calls happen via Activities
 @activity.defn
 async def make_nws_request(url: str) -> dict[str, Any] | None:
     """Make a request to the NWS API with proper error handling."""
-    headers = {
-        "User-Agent": USER_AGENT,
-        "Accept": "application/geo+json"
-    }
+    headers = {"User-Agent": USER_AGENT, "Accept": "application/geo+json"}
     async with httpx.AsyncClient() as client:
         response = await client.get(url, headers=headers, timeout=5.0)
         response.raise_for_status()
         return response.json()
 ```
+<!--SNIPEND-->
 
 ## Create the Worker
 
-The Worker is the process that excutes Activities and Workflows. 
+The Worker is the process that executes Activities and Workflows. 
 
 *File: worker.py*
 
+<!--SNIPSTART:file worker.py-->
 ```python
 import asyncio
+
 from temporalio.client import Client
+from temporalio.contrib.pydantic import pydantic_data_converter
+from temporalio.envconfig import ClientConfig
 from temporalio.worker import Worker
 
-from workflows.weather_workflows import GetAlerts, GetForecast
 from activities.weather_activities import make_nws_request
+from workflows.weather_workflows import GetAlerts, GetForecast
+
 
 async def main():
+    # Connect to Temporal server 
     config = ClientConfig.load_client_connect_config()
     config.setdefault("target_host", "localhost:7233")
     client = await Client.connect(
@@ -285,6 +304,7 @@ async def main():
 if __name__ == "__main__":
     asyncio.run(main())
 ```
+<!--SNIPEND-->
 
 ## Configure Claude Desktop
 
@@ -294,17 +314,17 @@ For this example, we are using Claude Desktop as the MCP Client. To use this MCP
 
 ```json
 {
-    "mcpServers": {
-        "weather": {
-        "command": "uv",
-        "args": [
-            "--directory",
-            "<full path to the directory containing the weather.py>",
-            "run",
-            "mcp_servers/weather.py"
-        ]
-        }
+  "mcpServers": {
+    "weather": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "<full path to the directory containing the weather.py>",
+        "run",
+        "mcp_servers/weather.py"
+      ]
     }
+  }
 }
 ```
 
@@ -328,7 +348,7 @@ This recipe uses Temporal's environment configuration system to connect to Tempo
 
    For TLS certificate authentication instead of API key, refer to the [Temporal environment configuration documentation](https://docs.temporal.io/develop/environment-configuration) for details.
 
-## Running the MCP Server
+## Running the MCP server
 
 1. Install dependencies:
    ```bash
@@ -343,7 +363,7 @@ This recipe uses Temporal's environment configuration system to connect to Tempo
 
 3. Start the worker in one terminal:
    ```bash
-   uv run python worker.py
+   uv run worker.py
    ```
 
 4. Configure Claude Desktop by adding the configuration from `claude_desktop_config.json` to your Claude Desktop config file (typically located at `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS).
@@ -357,4 +377,4 @@ You can now ask Claude something like `What is the weather like in San Francisco
 > [!NOTE]
 > The National Weather Service API only supports US locations. Asking about weather in non-US locations (e.g., "What is the weather in London?") will result in a 404 error from the API. 
 
-After tool execution, Claude Desktop will send the result over to the LLM (with other context) for human formating, and then returns that result to the user. You can see these and other MCP-related actions in the `mcp_server.log`.
+After tool execution, Claude Desktop will send the result over to the LLM (with other context) for human formatting, and then returns that result to the user. You can see these and other MCP-related actions in the `mcp_server.log`.

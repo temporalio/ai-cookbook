@@ -3,12 +3,12 @@ name = "cookbook-basic-python-litellm"
 version = "0.1"
 description = "Basic example using LiteLLM"
 authors = [{ name = "Temporal Technologies Inc", email = "sdk@temporal.io" }]
-requires-python = ">=3.10,<3.14"
+requires-python = ">=3.10"
 readme = "README.md"
 license = "MIT"
 dependencies = [
     "temporalio>=1.15.0,<2",
-    "litellm!=1.82.7,!=1.82.8,>=1.48.0,<2",
+    "litellm!=1.82.7,!=1.82.8,>=1.84.0,<2",
     "google-auth>=2.0.0,<3",
 ]
 

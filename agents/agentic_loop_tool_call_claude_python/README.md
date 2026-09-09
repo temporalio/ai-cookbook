@@ -1,9 +1,9 @@
 <!--
-description: A basic agentic loop using Claude (Anthropic) with tool calling.
+description: Build a durable agentic loop in Python with Claude tool calling and Temporal.
 tags: [agents, python, claude]
 priority: 775
 -->
-# Basic Agentic Loop with Claude and Tool Calling
+# Basic agentic loop with Claude and tool calling
 
 This example implements an agentic loop using Claude (Anthropic) that has a set of tools available. If the agent determines that no tools are needed to satisfy a user request, it will return the response directly. If Claude determines a tool should be used, it will return with the name of the chosen tool and any needed parameters. The agent then invokes the appropriate tool.
 
@@ -20,7 +20,7 @@ This recipe highlights the following key design decisions:
 
 Also see this foundational [recipe for basic tool calling](https://docs.temporal.io/ai-cookbook/tool-calling-python).
 
-## Application Components
+## Application components
 
 This example includes the following components:
 - The [Workflow](#create-the-agent-agentic-loop) that contains the agentic loop and tool calling logic; this is the core of the agent implementation.
@@ -30,7 +30,7 @@ This example includes the following components:
 - The [Worker](#create-the-worker) that manages the Workflow and the Activities.
 - An application that [initiates an interaction](#initiate-an-interaction-with-the-agent) with the agent.
 
-## Create the Agent (Agentic Loop)
+## Create the agent (agentic loop)
 
 ### Create the main agentic loop
 
@@ -44,15 +44,14 @@ Each time through the loop:
 
 *File: workflows/agent.py*
 
+<!--SNIPSTART workflows/agent.py {"startPattern": "^from temporalio import workflow$", "endPattern": "return \"No text response from Claude\""}-->
 ```python
 from temporalio import workflow
-from datetime import timedelta
-import json
 
 with workflow.unsafe.imports_passed_through():
-    from tools import get_tools
-    from helpers import tool_helpers
     from activities import claude_responses
+    from helpers import tool_helpers
+    from tools import get_tools
 
 @workflow.defn
 class AgentWorkflow:
@@ -61,16 +60,16 @@ class AgentWorkflow:
         
         # Initialize messages list with user input
         messages = [{"role": "user", "content": input}]
+        print(f"\n[User] {input}")
 
         # The agentic loop
         while True:
-            print(80 * "=")
                 
             # Consult Claude
             result = await workflow.execute_activity(
                 claude_responses.create,
                 claude_responses.ClaudeResponsesRequest(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-sonnet-4-5-20250929",
                     system=tool_helpers.HELPFUL_AGENT_SYSTEM_INSTRUCTIONS,
                     messages=messages,
                     tools=get_tools(),
@@ -91,6 +90,7 @@ class AgentWorkflow:
                     if block.type == "text":
                         assistant_content.append({"type": "text", "text": block.text})
                     elif block.type == "tool_use":
+                        print(f"[Agent] Calling tool: {block.name}")
                         assistant_content.append({
                             "type": "tool_use",
                             "id": block.id,
@@ -103,12 +103,8 @@ class AgentWorkflow:
                 # Execute all tool calls and collect results
                 tool_results = []
                 for block in tool_use_blocks:
-                    print(f"[Agent] Tool call: {block.name}({block.input})")
-                    
                     # Execute the tool
                     tool_result = await self._execute_tool(block.name, block.input)
-                    
-                    print(f"[Agent] Tool result: {tool_result}")
                     
                     # Add tool result in Claude's expected format
                     tool_results.append({
@@ -117,18 +113,21 @@ class AgentWorkflow:
                         "content": str(tool_result)
                     })
                 
-                # Add tool results as a user message
+                # Add tool results as a user message. Claude has only two message roles: user and assistant,
+                # and the user message role is used to send tool results back to Claude; in this case the content
+                # block includes the tool result.
                 messages.append({"role": "user", "content": tool_results})
             else:
                 # No tool calls - extract the text response and return
                 text_blocks = [block for block in result.content if block.type == "text"]
                 if text_blocks:
                     response_text = text_blocks[0].text
-                    print(f"[Agent] Final response: {response_text}")
+                    print(f"[Agent] Final response: {response_text}\n")
                     return response_text
                 else:
                     return "No text response from Claude"
 ```
+<!--SNIPEND-->
 
 ### Create the tool execution handler
 
@@ -136,39 +135,48 @@ The tool execution handler is invoked by the main agentic loop when Claude has c
 
 *File: workflows/agent.py*
 
+<!--SNIPSTART workflows/agent.py {"startPattern": "async def _execute_tool\\(self, tool_name: str, tool_input: dict\\) -> str:", "endPattern": "^\\s*return result$"}-->
 ```python
-    async def _execute_tool(self, tool_name: str, tool_input: dict) -> str:
-        """
-        Execute a tool dynamically.
-        
-        Args:
-            tool_name: Name of the tool to execute
-            tool_input: Dictionary of input parameters
-        """
-        # Execute dynamic Activity with the tool name and arguments
-        result = await workflow.execute_activity(
-            tool_name,
-            tool_input,
-            start_to_close_timeout=timedelta(seconds=30),
-        )
-        return result
+async def _execute_tool(self, tool_name: str, tool_input: dict) -> str:
+    """
+    Execute a tool dynamically.
+
+    Args:
+        tool_name: Name of the tool to execute
+        tool_input: Dictionary of input parameters
+    """
+    # Execute dynamic activity with the tool name and arguments
+    result = await workflow.execute_activity(
+        tool_name,
+        tool_input,
+        start_to_close_timeout=timedelta(seconds=30),
+    )
+    return result
 ```
+<!--SNIPEND-->
 
 ## Create the Activity for Claude invocations
 
 We create a wrapper for the `create` method of the `AsyncAnthropic` client object. This is a generic Activity that invokes Claude's Messages API.
 
-We set `max_retries=0` when creating the `AsyncAnthropic` client. This moves the responsibility for retries from the Anthropic client to Temporal. This means that the Activity should interpret any errors coming from Claude's API call and return the appropriate error type so that the Workflow knows if it should retry the Activity or not.
+We set `max_retries=0` when creating the `AsyncAnthropic` client. This moves the responsibility for retries from the Anthropic client to Temporal. The Activity then has to interpret the errors coming from Claude's API so the Workflow knows whether to retry.
 
-In this implementation, we allow for the model, system instructions, messages, lis6t of tools, and max_tokens (required) to be passed in.
+Errors that can never succeed on a retry, such as a 404 for a retired model identifier or a 401 for a bad API key, are re-raised as a non-retryable `ApplicationError`. Without this they would be retried under the default retry policy until the Workflow timed out, which hides the real problem. Transient errors such as rate limits and 5xx responses propagate unchanged so that Temporal retries them.
+
+In this implementation, we allow for the model, system instructions, messages, list of tools, and max_tokens (required) to be passed in.
 
 *File: activities/claude_responses.py*
+<!--SNIPSTART:file activities/claude_responses.py-->
 ```python
-from temporalio import activity
-from anthropic import AsyncAnthropic
-from anthropic.types import Message
 from dataclasses import dataclass
 from typing import Any
+
+import anthropic
+from anthropic import AsyncAnthropic
+from anthropic.types import Message
+from temporalio import activity
+from temporalio.exceptions import ApplicationError
+
 
 # Temporal best practice: Create a data structure to hold the request parameters.
 @dataclass
@@ -182,8 +190,6 @@ class ClaudeResponsesRequest:
 @activity.defn
 async def create(request: ClaudeResponsesRequest) -> Message:
     # We disable retry logic in Anthropic API client library so that Temporal can handle retries.
-    # In a real setting, you would need to handle any errors coming back from the Anthropic API,
-    # so that Temporal can appropriately retry in the manner that Anthropic API would.
     client = AsyncAnthropic(max_retries=0)
 
     try:
@@ -195,28 +201,49 @@ async def create(request: ClaudeResponsesRequest) -> Message:
             max_tokens=request.max_tokens,
         )
         return resp
+    except (
+        anthropic.BadRequestError,
+        anthropic.AuthenticationError,
+        anthropic.PermissionDeniedError,
+        anthropic.NotFoundError,
+        anthropic.UnprocessableEntityError,
+    ) as exc:
+        # These errors will never succeed on a retry: a retired model identifier, for
+        # example, returns 404. Retrying them under the default policy would loop
+        # forever instead of surfacing the problem. Everything else, such as rate
+        # limits and 5xx responses, propagates so Temporal can retry it.
+        raise ApplicationError(
+            str(exc),
+            type=exc.__class__.__name__,
+            non_retryable=True,
+        ) from exc
     finally:
         await client.close()
+
 ```
+<!--SNIPEND-->
 
 ## Create the Activity for the tool invocation
 
 Implement a single tool invocation Activity, as a dynamic Activity (note the `@activity.defn(dynamic=True)` annotation) that acts as a broker to the right tool function. The name of the Activity is drawn from the `activity.info()` and the property bag of arguments from the Activity payload. The `handler` is the function that maps to the `tool_name` (see [Create Tool Definitions](#create-tool-definitions) for more details) and that function is then called with the supplied arguments.
 
 *File: activities/tool_invoker.py*
+<!--SNIPSTART:file activities/tool_invoker.py-->
 ```python
-from temporalio import activity
-from typing import Sequence
-from temporalio.common import RawValue
 import inspect
+from collections.abc import Sequence
+
 from pydantic import BaseModel
+from temporalio import activity
+from temporalio.common import RawValue
+
 
 # We use dynamic activities to allow the agent to be defined independently of the tools it can call.
 @activity.defn(dynamic=True)
 async def dynamic_tool_activity(args: Sequence[RawValue]) -> dict:
     from tools import get_handler
 
-    # the name of the tool to execute - this is passed in via the execute_activity call in the Workflow
+    # the name of the tool to execute - this is passed in via the execute_activity call in the workflow
     tool_name = activity.info().activity_type 
     tool_args = activity.payload_converter().from_payload(args[0].payload, dict)
     activity.logger.info(f"Running dynamic tool '{tool_name}' with args: {tool_args}")
@@ -242,18 +269,17 @@ async def dynamic_tool_activity(args: Sequence[RawValue]) -> dict:
     # Optionally log or augment the result
     activity.logger.info(f"Tool '{tool_name}' result: {result}")
     return result
+
 ```
+<!--SNIPEND-->
 
 ## Create the helper function
 
 The `claude_tool_from_model` function accepts a tool name and description, as well as a Pydantic model for the parameters, and returns JSON that is in the format expected for tool definitions in Claude's Messages API.
 
 *File: helpers/tool_helpers.py*
+<!--SNIPSTART helpers/tool_helpers.py:claude-tool-from-model-->
 ```python
-from pydantic import BaseModel
-from typing import Any
-import json
-
 def claude_tool_from_model(name: str, description: str, model: type[BaseModel] | None) -> dict[str, Any]:
     """
     Convert a Pydantic model to Claude's tool format.
@@ -284,19 +310,17 @@ def claude_tool_from_model(name: str, description: str, model: type[BaseModel] |
     # Get the JSON schema from the Pydantic model
     schema = model.model_json_schema()
     
-    # Claude expects an input_schema field
+    # Claude expects an input_schema field instead of parameters
     return {
         "name": name,
         "description": description,
-        "input_schema": {
-            "type": "object",
-            "properties": schema.get("properties", {}),
-            "required": schema.get("required", [])
-        }
+        "input_schema": schema
     }
 ```
+<!--SNIPEND-->
 
 This file also holds the system instruction for the agent.
+<!--SNIPSTART helpers/tool_helpers.py {"startPattern": "^HELPFUL_AGENT_SYSTEM_INSTRUCTIONS = \"\"\"$", "endPattern": "^\"\"\"$"}-->
 ```python
 HELPFUL_AGENT_SYSTEM_INSTRUCTIONS = """
 You are a helpful agent that can use tools to help the user.
@@ -305,24 +329,26 @@ You may or may not need to use the tools to satisfy the user ask.
 If no tools are needed, respond in haikus.
 """
 ```
+<!--SNIPEND-->
 
 ## Create tool definitions
 
-Tools are defined in the `tools` directory and should be thought of as independent from the agent implementation; as described above, dynamic Activities are leveraged for this loose coupling.
+Tools are defined in the `tools` directory and should be thought of as independent from the agent implementation; as described above, dynamic Activities are used for this loose coupling.
 
 The `__init__.py` file holds tools for providing location (`get_location_info`), IP address (`get_ip_address`), and weather alerts (`get_weather_alerts`).
 - The `get_tools` method returns the set of tool definitions that will be passed to Claude.
 - The `get_handler` method captures the mapping from tool name to tool function.
 
-*File: tools/__init__.py*
+*File: tools/\_\_init\_\_.py*
+<!--SNIPSTART:file tools/__init__.py-->
 ```python
 from typing import Any, Awaitable, Callable
 
+from . import get_location, get_weather
+
 # Location and weather related tools
-from .get_location import get_location_info, get_ip_address
+from .get_location import get_ip_address, get_location_info
 from .get_weather import get_weather_alerts
-from . import get_weather
-from . import get_location
 
 ToolHandler = Callable[..., Awaitable[Any]]
 
@@ -341,7 +367,9 @@ def get_tools() -> list[dict[str, Any]]:
         get_location.GET_LOCATION_TOOL_CLAUDE,
         get_location.GET_IP_ADDRESS_TOOL_CLAUDE
     ]
+
 ```
+<!--SNIPEND-->
 
 The tool descriptions and functions are defined in `tools/get_location.py`, `tools/get_weather.py` and `tools/random_stuff.py` files. Each of these files contains:
 - data structures for function arguments
@@ -349,13 +377,17 @@ The tool descriptions and functions are defined in `tools/get_location.py`, `too
 - the function definitions.
 
 `tools/get_location.py`
+<!--SNIPSTART:file tools/get_location.py-->
 ```python
 # get_location.py
 
 from typing import Any
+
 import httpx
 from pydantic import BaseModel, Field
+
 from helpers import tool_helpers
+
 
 # For the location finder we use Pydantic to create a structure that encapsulates the input parameter 
 # (an IP address). 
@@ -388,25 +420,27 @@ async def get_location_info(req: GetLocationRequest) -> str:
         response.raise_for_status()
         result = response.json()
         return f"{result['city']}, {result['regionName']}, {result['country']}"
+
 ```
+<!--SNIPEND-->
 
 ## Create the Worker
 
-The worker is the process that dispatches work to the various parts of the agent implementation - the orchestrator and the Activities for Claude and tool invocations.
+The Worker is the process that dispatches work to the various parts of the agent implementation - the orchestrator and the Activities for Claude and tool invocations.
 
 *File: worker.py*
 
+<!--SNIPSTART:file worker.py-->
 ```python
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 from temporalio.client import Client
+from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.worker import Worker
 
-from workflows.agent import AgentWorkflow
 from activities import claude_responses, tool_invoker
-from temporalio.contrib.pydantic import pydantic_data_converter
-
-from concurrent.futures import ThreadPoolExecutor
+from workflows.agent import AgentWorkflow
 
 
 async def main():
@@ -432,22 +466,25 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 ```
+<!--SNIPEND-->
 
 ## Initiate an interaction with the agent
 
-In order to interact with this simple AI agent, we create a Temporal client and execute a Workflow.
+To interact with this simple AI agent, we create a Temporal client and execute a Workflow.
 
 *File: start_workflow.py*
+<!--SNIPSTART:file start_workflow.py-->
 ```python
 import asyncio
 import sys
 import uuid
 
 from temporalio.client import Client
+from temporalio.contrib.pydantic import pydantic_data_converter
 
 from workflows.agent import AgentWorkflow
-from temporalio.contrib.pydantic import pydantic_data_converter
 
 
 async def main():
@@ -458,7 +495,7 @@ async def main():
 
     query = sys.argv[1] if len(sys.argv) > 1 else "Tell me about recursion"
 
-    # Submit the agent Workflow for execution
+    # Submit the agent workflow for execution
     result = await client.execute_workflow(
         AgentWorkflow.run,
         query,
@@ -471,6 +508,7 @@ async def main():
 if __name__ == "__main__":
     asyncio.run(main())
 ```
+<!--SNIPEND-->
 
 ## Running the app
 
@@ -487,18 +525,26 @@ uv sync
 Start the agent Worker:
 
 ```bash
-uv run python -m worker
+uv run worker.py
 ```
 
 Make request to the agent:
 
 ```bash
-uv run python -m start_workflow "are there any weather alerts for where I am?"
+uv run start_workflow.py "are there any weather alerts for where I am?"
 ```
 
 Try a number of different user prompts:
 ```bash
-uv run python -m start_workflow "where am I?"
-uv run python -m start_workflow "what is my ip address?"
-uv run python -m start_workflow "tell me about recursion"
+uv run start_workflow.py "where am I?"
+uv run start_workflow.py "what is my ip address?"
+uv run start_workflow.py "tell me about recursion"
 ```
+
+## Troubleshooting
+
+**`not_found_error` naming the model**: Anthropic retires older model identifiers, and this recipe pins one in `workflows/agent.py`. Check the [list of current models](https://docs.claude.com/en/docs/about-claude/models/overview) and update the identifier. The Activity classifies this error as non-retryable, so the Workflow fails with the API message rather than retrying.
+
+**`authentication_error`**: `ANTHROPIC_API_KEY` is unset or invalid in the terminal running the Worker. The Activity, not `start_workflow`, makes the API call, so the key has to be set where the Worker runs.
+
+**Workflow runs but no tool is invoked**: Claude decides whether a tool is needed. Prompts like "tell me about recursion" are answered directly. Check the Event History in the [Temporal UI](http://localhost:8233) to see which Activities were scheduled.

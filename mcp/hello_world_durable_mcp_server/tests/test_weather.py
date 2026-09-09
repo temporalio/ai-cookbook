@@ -6,10 +6,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
-from activities.weather_activities import make_nws_request
 from temporalio import activity
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
+
+from activities.weather_activities import make_nws_request
 from workflows.weather_workflows import GetAlerts, GetForecast
 
 

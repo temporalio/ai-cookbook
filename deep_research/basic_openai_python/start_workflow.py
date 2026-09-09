@@ -1,7 +1,7 @@
 import asyncio
+import os
 import sys
 import uuid
-import os
 from datetime import datetime
 
 from temporalio.client import Client

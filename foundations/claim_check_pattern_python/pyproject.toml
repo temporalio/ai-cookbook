@@ -3,7 +3,7 @@ name = "claim-check-pattern-python"
 version = "0.1"
 description = "Claim Check pattern implementation for handling large payloads in Temporal"
 authors = [{ name = "Temporal Technologies Inc", email = "sdk@temporal.io" }]
-requires-python = ">=3.10,<3.14"
+requires-python = ">=3.10"
 readme = "README.md"
 license = "MIT"
 dependencies = [

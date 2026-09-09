@@ -1,0 +1,7 @@
+{
+  "buildCommand": "bash scripts/build-docs-preview.sh",
+  "outputDirectory": ".docs-build",
+  "installCommand": "echo 'Dependencies installed during build script'",
+  "framework": null,
+  "ignoreCommand": ""
+}

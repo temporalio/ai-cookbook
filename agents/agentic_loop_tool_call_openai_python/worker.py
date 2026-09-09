@@ -1,14 +1,13 @@
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 from temporalio.client import Client
-from temporalio.worker import Worker
-from temporalio.envconfig import ClientConfig
-
-from workflows.agent import AgentWorkflow
-from activities import openai_responses, tool_invoker
 from temporalio.contrib.pydantic import pydantic_data_converter
+from temporalio.envconfig import ClientConfig
+from temporalio.worker import Worker
 
-from concurrent.futures import ThreadPoolExecutor
+from activities import openai_responses, tool_invoker
+from workflows.agent import AgentWorkflow
 
 
 async def main():
