@@ -18,7 +18,7 @@ class HelloWorld:
             LiteLLMRequest(
                 # LiteLLM allows you to switch between models easily
                 # model="gpt-4o-mini",
-                model="gemini-2.5-flash-lite",
+                model="gemini/gemini-3.5-flash-lite",
                 messages=messages,
             ),
             start_to_close_timeout=timedelta(seconds=30),
