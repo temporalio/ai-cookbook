@@ -39,7 +39,7 @@ with workflow.unsafe.imports_passed_through():
     from workflows._activity_tool import activity_tool
 
 TASK_QUEUE = "multi-agent-adk-task-queue"
-DEFAULT_MODEL = "gemini-2.5-flash"
+DEFAULT_MODEL = "gemini-3.6-flash"
 APP_NAME = "multi_agent_adk_recipe"
 
 _TOOL_RETRY = RetryPolicy(
@@ -48,6 +48,12 @@ _TOOL_RETRY = RetryPolicy(
     maximum_interval=timedelta(seconds=30),
     maximum_attempts=5,
 )
+
+# The upstream invoke_model activity (temporalio.contrib.google_adk_agents)
+# doesn't classify provider errors, so a permanent failure (bad model name,
+# invalid API key) would otherwise retry indefinitely with Temporal's
+# default policy. Bound it so the workflow fails fast instead of hanging.
+_LLM_RETRY = RetryPolicy(maximum_attempts=3)
 
 
 # --- Activity-backed tools (one Temporal activity per tool call) ---
@@ -107,6 +113,7 @@ def _fleet_agent() -> Agent:
             activity_config=ActivityConfig(
                 task_queue=TASK_QUEUE,
                 summary="Fleet Agent — LLM reasoning",
+                retry_policy=_LLM_RETRY,
             ),
         ),
         description=(
@@ -141,6 +148,7 @@ def _customer_agent() -> Agent:
             activity_config=ActivityConfig(
                 task_queue=TASK_QUEUE,
                 summary="Customer Agent — LLM reasoning",
+                retry_policy=_LLM_RETRY,
             ),
         ),
         description=(
@@ -168,6 +176,7 @@ def _dispatch_agent() -> Agent:
             activity_config=ActivityConfig(
                 task_queue=TASK_QUEUE,
                 summary="Dispatch Agent — LLM reasoning",
+                retry_policy=_LLM_RETRY,
             ),
         ),
         description=(
