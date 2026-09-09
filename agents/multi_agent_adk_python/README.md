@@ -147,17 +147,21 @@ multi_agent_adk_python/
 
 Each tool the agents can call is a Temporal Activity:
 
+*File: activities/tools.py*
+<!--SNIPSTART activities/tools.py {"startPattern": "^async def tool_get_fleet_status\\(\\) -> str:$", "endPattern": "^    \\)$"}-->
 ```python
-# activities/tools.py
-@activity.defn
 async def tool_get_fleet_status() -> str:
     """Return current fleet state: driver positions, capacity, and status."""
     return (
         "Fleet status:\n"
         "- driver-a: pos=(36.1147, -115.1728)  capacity=2/3  status=AVAILABLE\n"
-        ...
+        "- driver-b: pos=(36.1099, -115.1750)  capacity=0/3  status=AVAILABLE\n"
+        "- driver-c: pos=(36.1162, -115.1745)  capacity=3/3  status=FULL\n"
+        "- driver-d: pos=(36.1213, -115.1700)  capacity=1/3  status=AVAILABLE\n"
+        "- driver-e: pos=(36.1080, -115.1760)  capacity=2/3  status=DISCONNECTED"
     )
 ```
+<!--SNIPEND-->
 
 In a real system the body would query a fleet database or hit an internal
 service. Here we return canned strings so the recipe runs without any
@@ -170,30 +174,34 @@ backing infrastructure.
 `generate_content_async` runs through a Temporal Activity. The plugin
 registers that activity (`invoke_model`) on your worker for you.
 
+*File: workflows/assignment_workflow.py*
+<!--SNIPSTART workflows/assignment_workflow.py {"startPattern": "^def _fleet_agent\\(\\) -> Agent:$", "endPattern": "^    \\)$", "selectedLines": ["1-10", "30-32"]}-->
 ```python
-# workflows/assignment_workflow.py
-agent = Agent(
-    name="fleet_agent",
-    model=TemporalModel(
-        DEFAULT_MODEL,
-        activity_config=ActivityConfig(
-            task_queue=TASK_QUEUE,
-            summary="Fleet Agent — LLM reasoning",
+def _fleet_agent() -> Agent:
+    return Agent(
+        name="fleet_agent",
+        model=TemporalModel(
+            DEFAULT_MODEL,
+            activity_config=ActivityConfig(
+                task_queue=TASK_QUEUE,
+                summary="Fleet Agent — LLM reasoning",
+            ),
         ),
-    ),
-    instruction="...",
-    tools=[_fleet_status_tool, _route_info_tool],
-    output_key="fleet_assessment",
-)
+        ...
+        tools=[_fleet_status_tool, _route_info_tool],
+        output_key="fleet_assessment",
+    )
 ```
+<!--SNIPEND-->
 
 ### activity_tool — every tool call is an activity
 
 `activity_tool` wraps a `@activity.defn` so it presents to ADK as a regular
 Python tool, but the call body executes via `workflow.execute_activity`:
 
+*File: workflows/assignment_workflow.py*
+<!--SNIPSTART workflows/assignment_workflow.py {"startPattern": "^_fleet_status_tool = activity_tool\\($", "endPattern": "^\\)$"}-->
 ```python
-# workflows/assignment_workflow.py
 _fleet_status_tool = activity_tool(
     tool_get_fleet_status,
     task_queue=TASK_QUEUE,
@@ -202,6 +210,7 @@ _fleet_status_tool = activity_tool(
     retry_policy=_TOOL_RETRY,
 )
 ```
+<!--SNIPEND-->
 
 The local `workflows/_activity_tool.py` adds **graceful failure** on top of the
 upstream `temporalio.contrib.google_adk_agents.workflow.activity_tool`:
@@ -215,9 +224,11 @@ already handles multi-arg activities and local non-workflow ADK runs.
 
 ### Composing the pipeline
 
+*File: workflows/assignment_workflow.py*
+<!--SNIPSTART workflows/assignment_workflow.py {"startPattern": "^def build_assignment_pipeline\\(\\) -> SequentialAgent:$", "endPattern": "^    \\)$"}-->
 ```python
-# workflows/assignment_workflow.py
 def build_assignment_pipeline() -> SequentialAgent:
+    """Compose the full pipeline: Parallel(Fleet, Customer) → Dispatch."""
     return SequentialAgent(
         name="order_assignment",
         sub_agents=[
@@ -229,6 +240,7 @@ def build_assignment_pipeline() -> SequentialAgent:
         ],
     )
 ```
+<!--SNIPEND-->
 
 Fleet and Customer agents run concurrently inside `ParallelAgent`. When
 both finish, the Dispatch agent runs. Each sub-agent's `output_key`
@@ -241,23 +253,33 @@ without passing it explicitly.
 The final agent calls a plain Python tool (not a Temporal activity) that
 writes the decision into ADK session state:
 
+*File: workflows/assignment_workflow.py*
+<!--SNIPSTART workflows/assignment_workflow.py {"startPattern": "^async def tool_submit_assignment\\($", "endPattern": "Assignment submitted"}-->
 ```python
 async def tool_submit_assignment(
     tool_context: ToolContext,
     driver_id: str,
     reasoning_summary: str,
 ) -> str:
+    """Submit the final order assignment. You MUST call this tool with your decision.
+
+    Args:
+        driver_id: The driver to assign the order to (e.g. "driver-a").
+        reasoning_summary: One-sentence explanation of the choice.
+    """
     tool_context.state["assignment"] = {
         "driver_id": driver_id,
         "reasoning_summary": reasoning_summary,
     }
     return "Assignment submitted."
 ```
+<!--SNIPEND-->
 
 The workflow runs the pipeline to exhaustion, then reads that key back:
 
+*File: workflows/assignment_workflow.py*
+<!--SNIPSTART workflows/assignment_workflow.py:workflow-run-tail-->
 ```python
-# workflows/assignment_workflow.py
 async for _ in runner.run_async(
     user_id="workflow",
     session_id=session.id,
@@ -265,8 +287,14 @@ async for _ in runner.run_async(
 ):
     pass
 
-updated = await session_service.get_session(...)
-assignment = (updated.state or {}).get("assignment") or {}
+updated = await session_service.get_session(
+    app_name=APP_NAME,
+    user_id="workflow",
+    session_id=session.id,
+)
+state = (updated.state if updated else None) or {}
+assignment = state.get("assignment") or {}
+
 return AssignmentOutput(
     driver_id=assignment.get("driver_id", ""),
     reasoning_summary=assignment.get(
@@ -274,6 +302,7 @@ return AssignmentOutput(
     ),
 )
 ```
+<!--SNIPEND-->
 
 This pattern — a tool call that writes structured output into session
 state — is how you reliably extract a typed decision from a multi-agent
@@ -285,8 +314,9 @@ ADK and `google.genai` aren't safe under Temporal's workflow sandbox by
 default, so they're imported under
 `workflow.unsafe.imports_passed_through()`:
 
+*File: workflows/assignment_workflow.py*
+<!--SNIPSTART workflows/assignment_workflow.py {"startPattern": "^with workflow\\.unsafe\\.imports_passed_through\\(\\):$", "endPattern": "^    from temporalio\\.contrib\\.google_adk_agents import TemporalModel$"}-->
 ```python
-# workflows/assignment_workflow.py
 with workflow.unsafe.imports_passed_through():
     from google.adk.agents import Agent, ParallelAgent, SequentialAgent
     from google.adk.runners import Runner
@@ -295,6 +325,7 @@ with workflow.unsafe.imports_passed_through():
     from google.genai.types import Content, Part
     from temporalio.contrib.google_adk_agents import TemporalModel
 ```
+<!--SNIPEND-->
 
 The `GoogleAdkPlugin` registered on the worker handles the rest of the
 sandbox passthroughs and deterministic-runtime overrides ADK needs (UUIDs,
@@ -302,12 +333,17 @@ clocks).
 
 ### Worker — one queue, one plugin
 
+*File: worker.py*
+<!--SNIPSTART worker.py {"startPattern": "^    client = await Client\\.connect\\($", "endPattern": "^    await worker\\.run\\(\\)$"}-->
 ```python
-# worker.py
 client = await Client.connect(
     "localhost:7233",
     data_converter=pydantic_data_converter,
 )
+
+# GoogleAdkPlugin registers the `invoke_model` activity (used by
+# TemporalModel for LLM calls) and provides the workflow-sandbox
+# passthroughs and deterministic runtime overrides ADK needs.
 worker = Worker(
     client,
     task_queue=TASK_QUEUE,
@@ -319,8 +355,10 @@ worker = Worker(
     ],
     plugins=[GoogleAdkPlugin()],
 )
+
 await worker.run()
 ```
+<!--SNIPEND-->
 
 `GoogleAdkPlugin` registers the `invoke_model` activity that
 `TemporalModel` routes LLM calls to — you don't need to register it

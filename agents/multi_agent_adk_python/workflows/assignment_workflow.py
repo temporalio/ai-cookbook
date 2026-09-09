@@ -241,6 +241,7 @@ class MultiAgentAssignmentWorkflow:
             f"reasoning."
         )
 
+        # @@@SNIPSTART workflow-run-tail
         async for _ in runner.run_async(
             user_id="workflow",
             session_id=session.id,
@@ -262,3 +263,4 @@ class MultiAgentAssignmentWorkflow:
                 "reasoning_summary", "Dispatch agent did not submit a decision."
             ),
         )
+        # @@@SNIPEND
