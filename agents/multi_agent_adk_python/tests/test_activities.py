@@ -5,6 +5,8 @@ it's exercised end-to-end by running ``worker.py`` + ``start_workflow.py``
 with ``GOOGLE_API_KEY`` set.
 """
 
+import re
+
 import pytest
 from temporalio.testing import ActivityEnvironment
 
@@ -14,6 +16,12 @@ from activities.tools import (
     tool_get_route_info,
 )
 from models.models import AssignmentInput, AssignmentOutput
+
+
+def _parse_route(route_info: str) -> tuple[float, int]:
+    distance = float(re.search(r"Distance:\s*([\d.]+)\s*km", route_info).group(1))
+    eta = int(re.search(r"ETA:\s*(\d+)\s*min", route_info).group(1))
+    return distance, eta
 
 
 class TestFleetStatus:
@@ -63,10 +71,10 @@ class TestRouteInfo:
             "far",
             "origin",
         )
-        # Crude check: the far route should report a larger distance.
-        assert "Distance:" in near
-        assert "Distance:" in far
-        assert "ETA:" in near and "ETA:" in far
+        near_distance, near_eta = _parse_route(near)
+        far_distance, far_eta = _parse_route(far)
+        assert far_distance > near_distance
+        assert far_eta > near_eta
 
 
 class TestModels:
