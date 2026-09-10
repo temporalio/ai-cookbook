@@ -1,5 +1,6 @@
 from fastmcp import FastMCP
 from temporalio.client import Client
+from temporalio.common import WorkflowIDConflictPolicy
 from temporalio.envconfig import ClientConfig
 
 # Initialize FastMCP server
@@ -32,6 +33,7 @@ async def get_alerts(state: str) -> str:
         state,
         id=f"alerts-{state.lower()}",
         task_queue="weather-task-queue",
+        id_conflict_policy=WorkflowIDConflictPolicy.USE_EXISTING,
     )
     return await handle.result()
 
@@ -51,6 +53,7 @@ async def get_forecast(latitude: float, longitude: float) -> str:
         args=[latitude, longitude],
         id=f"forecast-{latitude}-{longitude}",
         task_queue="weather-task-queue",
+        id_conflict_policy=WorkflowIDConflictPolicy.USE_EXISTING,
     )
     return await handle.result()
 
