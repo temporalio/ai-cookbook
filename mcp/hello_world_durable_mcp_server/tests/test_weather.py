@@ -1,12 +1,14 @@
 # ABOUTME: Tests for weather workflows and activities.
 # Covers format_alert, make_nws_request activity, and GetAlerts/GetForecast workflows.
 
+import sys
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
 from temporalio import activity
+from temporalio.common import WorkflowIDConflictPolicy
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
@@ -238,3 +240,33 @@ class TestGetForecastWorkflow:
                     task_queue="test-forecast-none",
                 )
         assert result == "Unable to fetch forecast data for this location."
+
+
+class TestMcpTools:
+    @pytest.mark.asyncio
+    async def test_reuses_running_workflows(self, monkeypatch):
+        fastmcp = MagicMock()
+        fastmcp.FastMCP.return_value.tool.side_effect = lambda function: function
+        monkeypatch.setitem(sys.modules, "fastmcp", fastmcp)
+
+        # FastMCP's dependency import exceeds the per-test timeout on this path.
+        from mcp_servers import weather
+
+        client = AsyncMock()
+        client.start_workflow.return_value.result.return_value = "weather result"
+        monkeypatch.setattr(
+            weather,
+            "get_temporal_client",
+            AsyncMock(return_value=client),
+        )
+
+        assert await weather.get_alerts("TX") == "weather result"
+        assert await weather.get_forecast(40.0, -89.0) == "weather result"
+
+        assert [
+            call.kwargs.get("id_conflict_policy")
+            for call in client.start_workflow.await_args_list
+        ] == [
+            WorkflowIDConflictPolicy.USE_EXISTING,
+            WorkflowIDConflictPolicy.USE_EXISTING,
+        ]
