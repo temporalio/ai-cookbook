@@ -236,7 +236,7 @@ The `max_inline_bytes` threshold controls which payloads are offloaded to S3 and
 
 #### Temporal Service size limits
 
-Temporal enforces size limits at several levels ([self-hosted defaults](https://docs.temporal.io/self-hosted-guide/defaults), [Temporal Cloud limits](https://docs.temporal.io/evaluate/cloud/limits)):
+Temporal enforces size limits at several levels ([self-hosted defaults](https://docs.temporal.io/self-hosted-guide/defaults), [Temporal Cloud limits](https://docs.temporal.io/cloud/limits)):
 
 | Limit | Warning | Error / Termination |
 |-------|---------|---------------------|
