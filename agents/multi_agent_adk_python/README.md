@@ -185,12 +185,13 @@ def _fleet_agent() -> Agent:
             activity_config=ActivityConfig(
                 task_queue=TASK_QUEUE,
                 summary="Fleet Agent — LLM reasoning",
+                retry_policy=_LLM_RETRY,
             ),
-        ),
         ...
+        ),
         tools=[_fleet_status_tool, _route_info_tool],
         output_key="fleet_assessment",
-    )
+        ...
 ```
 <!--SNIPEND-->
 
