@@ -17,7 +17,7 @@ Being external API calls, invoking the LLM and invoking the function are each do
 
 This example lays the foundation for the core agentic pattern where the LLM makes the decision on functions/tools to invoke, the agent calls the function/tool(s) and the response from such calls is sent back to the LLM for interpretation.
 
-<img src="_assets/tool-calling-flow.png">
+<img src="_assets/tool-calling-flow.png" alt="Diagram of the tool-calling loop: the LLM reads the context, calls a tool, the tool result is appended to the context, and the LLM decides again, returning a result or exiting if no tool call is needed">
 
 This recipe highlights these key design decisions:
 

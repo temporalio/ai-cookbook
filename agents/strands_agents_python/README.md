@@ -18,7 +18,7 @@ It uses the Strands default Bedrock model. As of `strands-agents` 1.42.0 that mo
 ## Prerequisites
 
 1. **AWS Bedrock access**: Request access to Claude Sonnet 4.6 in the [Bedrock console](https://console.aws.amazon.com/bedrock/). To use a different model, pass a configured `BedrockModel` to `StrandsPlugin`.
-2. **AWS credentials and region**: See [Strands' Amazon Bedrock guide](https://strandsagents.com/docs/user-guide/concepts/model-providers/amazon-bedrock/) for credential setup and model configuration. Strands falls back to `us-west-2` when `AWS_REGION` is unset, so set the region where you have model access.
+2. **AWS credentials and region**: See [Strands' Amazon Bedrock guide](https://strandsagents.com/docs/user-guide/sdk/model-providers/amazon-bedrock/) for credential setup and model configuration. Strands falls back to `us-west-2` when `AWS_REGION` is unset, so set the region where you have model access.
 3. **`uvx`**: Required to run the AWS Documentation MCP server (ships with [`uv`](https://docs.astral.sh/uv/)).
 4. **A running Temporal dev server**: `temporal server start-dev`.
 
@@ -265,7 +265,7 @@ The agent decides which tools to use. Open the [Temporal UI](http://localhost:82
 
 ## Troubleshooting
 
-**Credentials not found**: See [Strands' Amazon Bedrock guide](https://strandsagents.com/docs/user-guide/concepts/model-providers/amazon-bedrock/).
+**Credentials not found**: See [Strands' Amazon Bedrock guide](https://strandsagents.com/docs/user-guide/sdk/model-providers/amazon-bedrock/).
 
 **Access denied or model not found**: Confirm you have access to Claude Sonnet 4.6 in the Bedrock console for the region you are using, and that `AWS_REGION` names that region. Strands defaults to `us-west-2` when the region is unset.
 
@@ -274,6 +274,6 @@ The agent decides which tools to use. Open the [Temporal UI](http://localhost:82
 ## Learn more
 
 - [Temporal Strands Agents Plugin](https://github.com/temporalio/sdk-python/tree/main/temporalio/contrib/strands)
-- [Strands' Amazon Bedrock guide](https://strandsagents.com/docs/user-guide/concepts/model-providers/amazon-bedrock/)
+- [Strands' Amazon Bedrock guide](https://strandsagents.com/docs/user-guide/sdk/model-providers/amazon-bedrock/)
 - [Temporal Strands Agents Samples (samples-python)](https://github.com/temporalio/samples-python/tree/main/strands_plugin)
-- [Strands Agents Documentation](https://strandsagents.com/latest/documentation/)
+- [Strands Agents Documentation](https://strandsagents.com/docs/)

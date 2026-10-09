@@ -14,7 +14,7 @@ MCP tools are "actions" that the MCP server can perform. Within a given MCP tool
 
 In this one tool alone, we are taking several steps to complete a given action. We implement these steps in a Temporal Workflow, which provides durability. This means that whenever your MCP tool is called, it kicks off the Temporal Workflow, and every step (API call, function) is executed reliably and all the way to completion.
 
-We use [FastMCP](https://github.com/jlowin/fastmcp) to implement the MCP Server and create tools using the decorator `@mcp.tool`.
+We use [FastMCP](https://github.com/PrefectHQ/fastmcp) to implement the MCP Server and create tools using the decorator `@mcp.tool`.
 
 > [!NOTE]
 > External API calls are made within Temporal Activities. This ensures that network requests are retried appropriately and failures are handled.
