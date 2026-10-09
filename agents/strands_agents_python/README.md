@@ -227,7 +227,7 @@ if __name__ == "__main__":
 ```
 <!--SNIPEND-->
 
-## Running
+## Run the recipe
 
 Start the Temporal dev server:
 

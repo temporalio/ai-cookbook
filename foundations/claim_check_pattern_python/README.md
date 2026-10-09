@@ -6,7 +6,7 @@ priority: 400
 
 # Claim check pattern with Temporal
 
-This recipe demonstrates how to use the Claim Check pattern to offload data from Temporal Server's Event History to external storage. This can be useful in conversational AI applications that include the full conversation history with each LLM call, creating large Event History that can exceed server size limits.
+This recipe demonstrates how to use the Claim Check pattern to offload data from Temporal Service's Event History to external storage. This can be useful in conversational AI applications that include the full conversation history with each LLM call, creating large Event History that can exceed server size limits.
 
 This recipe includes:
 
@@ -23,7 +23,7 @@ Use the built-in feature first if S3 (or a self-hosted equivalent) is a good fit
 
 ## How the Claim Check pattern works
 
-Each Temporal Workflow has an associated Event History that is stored in Temporal Server and used to provide durable execution. When using the Claim Check pattern, we store the payload content of the Event in a separate storage system, then store a reference to that storage in the Temporal Event History instead.
+Each Temporal Workflow has an associated Event History that is stored in Temporal Service and used to provide durable execution. When using the Claim Check pattern, you store the payload content of the Event in a separate storage system, then store a reference to that storage in the Temporal Event History instead.
 
 The Claim Check Recipe implements a `PayloadCodec` that:
 
@@ -230,7 +230,7 @@ class ClaimCheckCodec(PayloadCodec):
 - Where configured: `ClaimCheckCodec(max_inline_bytes=20 * 1024)` in `codec/claim_check.py`
 - Change by passing a different `max_inline_bytes` when constructing `ClaimCheckCodec`
 
-### Choosing the right threshold
+### Choose the right threshold
 
 The `max_inline_bytes` threshold controls which payloads are offloaded to S3 and which stay inline in Event History. Here is how to choose the right value for your use case.
 
@@ -478,7 +478,7 @@ class AiRagWorkflow:
 ```
 <!--SNIPEND-->
 
-## Running
+## Run the recipe
 
 ### Prerequisites
 
@@ -693,7 +693,7 @@ if __name__ == "__main__":
 ```
 <!--SNIPEND-->
 
-### Running the codec server
+### Run the codec server
 
 ```bash
 uv run codec/codec_server.py

@@ -23,7 +23,7 @@ Key features:
 ## Prerequisites
 
 - Python 3.10+
-- Temporal server running locally
+- Temporal Service running locally
 - OpenAI API key
 
 ## Setup
@@ -43,7 +43,7 @@ export OPENAI_API_KEY='your-api-key-here'
 temporal server start-dev
 ```
 
-## Running
+## Run the recipe
 
 ### Start the Worker
 

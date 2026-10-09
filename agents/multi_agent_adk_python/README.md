@@ -95,7 +95,7 @@ uv sync
 export GOOGLE_API_KEY='your-api-key-here'
 ```
 
-## Running
+## Run the recipe
 
 In one terminal, start the Temporal Dev Server:
 
@@ -222,7 +222,7 @@ history.) Programming bugs — e.g. argument-binding errors — are not
 caught and propagate normally. Upstream `activity_tool` (temporalio>=1.25)
 already handles multi-arg activities and local non-workflow ADK runs.
 
-### Composing the pipeline
+### Compose the pipeline
 
 *File: workflows/assignment_workflow.py*
 <!--SNIPSTART workflows/assignment_workflow.py {"startPattern": "^def build_assignment_pipeline\\(\\) -> SequentialAgent:$", "endPattern": "^    \\)$"}-->

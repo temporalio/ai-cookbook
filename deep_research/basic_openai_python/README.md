@@ -547,7 +547,7 @@ class DeepResearchWorkflow:
 ```
 <!--SNIPEND-->
 
-## Running
+## Run the recipe
 
 Start the Temporal Dev Server:
 
