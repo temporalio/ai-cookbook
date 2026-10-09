@@ -2,13 +2,16 @@ import asyncio
 
 from temporalio.client import Client
 from temporalio.contrib.pydantic import pydantic_data_converter
+from temporalio.envconfig import ClientConfig
 
 from models.signals import ContentSignals
 from workflows.classify_workflow import ClassifyContentWorkflow
 
 
 async def main():
-    client = await Client.connect("localhost:7233", data_converter=pydantic_data_converter)
+    config = ClientConfig.load_client_connect_config()
+    config.setdefault("target_host", "localhost:7233")
+    client = await Client.connect(**config, data_converter=pydantic_data_converter)
 
     # Example 1: LLM would likely say "safe", but the email address triggers a hard rule.
     print("--- Example 1: Hard rule override ---")

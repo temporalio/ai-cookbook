@@ -136,16 +136,18 @@ Create the process for executing Activities and Workflows. The Worker uses `AiSd
 <!--SNIPSTART:file src/worker.ts-->
 ```typescript
 import { NativeConnection, Worker } from '@temporalio/worker';
+import { loadClientConnectConfig } from '@temporalio/envconfig';
 import * as activities from './activities';
 import { AiSdkPlugin } from '@temporalio/ai-sdk';
 import { openai } from '@ai-sdk/openai';
 
 async function run() {
-  const connection = await NativeConnection.connect({ address: 'localhost:7233' });
+  const config = loadClientConnectConfig();
+  const connection = await NativeConnection.connect(config.connectionOptions);
   const worker = await Worker.create({
     plugins: [new AiSdkPlugin({ modelProvider: openai })],
     connection,
-    namespace: 'default',
+    namespace: config.namespace,
     taskQueue: 'ai-sdk',
     workflowsPath: require.resolve('./workflows'),
     activities,
@@ -179,7 +181,7 @@ async function run() {
 
   const config = loadClientConnectConfig();
   const connection = await Connection.connect(config.connectionOptions);
-  const client = new Client({ connection });
+  const client = new Client({ connection, namespace: config.namespace });
 
   const handle = await client.workflow.start(toolsAgent, {
     taskQueue: 'ai-sdk',
@@ -236,3 +238,24 @@ Try asking the agent questions like:
 - "What is the weather in Chicago and calculate the area of a circle with radius 3"
 
 The agent decides which tools to use. Open the [Temporal UI](http://localhost:8233) to see the `invokeModel`, `getWeather`, and `calculateAreaOfCircle` Activities recorded in the Event History.
+
+## Connect to Temporal Cloud
+
+This recipe connects to Temporal using [environment configuration](https://docs.temporal.io/develop/environment-configuration). With nothing configured, it connects to a local Temporal Service at `localhost:7233`.
+
+To run it against Temporal Cloud, save your connection details as a profile with the Temporal CLI:
+
+```bash
+temporal config set --profile cloud --prop address --value "<your Temporal Cloud endpoint>"
+temporal config set --profile cloud --prop namespace --value "<your Namespace>"
+temporal config set --profile cloud --prop api_key --value "<your API key>"
+```
+
+Select the profile in each terminal you use for the recipe, and check that it connects:
+
+```bash
+export TEMPORAL_PROFILE=cloud
+temporal workflow count
+```
+
+To authenticate with mTLS certificates instead of an API key, see [environment configuration](https://docs.temporal.io/develop/environment-configuration).

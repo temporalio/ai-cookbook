@@ -3,6 +3,7 @@ import asyncio
 from temporalio.client import Client
 from temporalio.common import WorkflowIDConflictPolicy
 from temporalio.contrib.strands import StrandsPlugin
+from temporalio.envconfig import ClientConfig
 
 from workflows.aws_assistant_workflow import AWSAssistantWorkflow
 
@@ -11,7 +12,9 @@ TASK_QUEUE = "strands-aws-assistant-task-queue"
 
 async def main():
     # Match the worker's plugin so the client uses the same data converter.
-    client = await Client.connect("localhost:7233", plugins=[StrandsPlugin()])
+    config = ClientConfig.load_client_connect_config()
+    config.setdefault("target_host", "localhost:7233")
+    client = await Client.connect(**config, plugins=[StrandsPlugin()])
 
     print(80 * "-")
     user_input = input("Ask the AWS assistant a question: ")

@@ -79,6 +79,27 @@ uv run send_approval.py <workflow-id> <request-id> reject "Too risky"
 
 To test timeout behavior, don't send any approval signal. After 5 minutes (default), the Workflow will automatically complete with a timeout result.
 
+## Connect to Temporal Cloud
+
+This recipe connects to Temporal using [environment configuration](https://docs.temporal.io/develop/environment-configuration). With nothing configured, it connects to a local Temporal Service at `localhost:7233`.
+
+To run it against Temporal Cloud, save your connection details as a profile with the Temporal CLI:
+
+```bash
+temporal config set --profile cloud --prop address --value "<your Temporal Cloud endpoint>"
+temporal config set --profile cloud --prop namespace --value "<your Namespace>"
+temporal config set --profile cloud --prop api_key --value "<your API key>"
+```
+
+Select the profile in each terminal you use for the recipe, and check that it connects:
+
+```bash
+export TEMPORAL_PROFILE=cloud
+temporal workflow count
+```
+
+To authenticate with mTLS certificates instead of an API key, see [environment configuration](https://docs.temporal.io/develop/environment-configuration).
+
 ## Architecture
 
 - **Models** (`models/models.py`): Data structures for workflow input, approval requests and decisions

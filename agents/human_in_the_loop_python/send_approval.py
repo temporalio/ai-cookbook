@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 from temporalio.client import Client
 from temporalio.contrib.pydantic import pydantic_data_converter
+from temporalio.envconfig import ClientConfig
 
 from models.models import ApprovalDecision
 
@@ -25,8 +26,10 @@ async def main():
         print("Decision must be 'approve' or 'reject'")
         sys.exit(1)
 
+    config = ClientConfig.load_client_connect_config()
+    config.setdefault("target_host", "localhost:7233")
     client = await Client.connect(
-        "localhost:7233",
+        **config,
         data_converter=pydantic_data_converter,
     )
 
