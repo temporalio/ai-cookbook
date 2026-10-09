@@ -135,7 +135,7 @@ dev = [
 requires-dist = [
     { name = "openai", specifier = ">=1.59.6" },
     { name = "pydantic", specifier = ">=2.10.3" },
-    { name = "temporalio", specifier = ">=1.8.0" },
+    { name = "temporalio", specifier = ">=1.14.0" },
 ]
 
 [package.metadata.requires-dev]

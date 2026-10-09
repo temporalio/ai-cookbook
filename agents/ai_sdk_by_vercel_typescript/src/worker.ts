@@ -1,14 +1,16 @@
 import { NativeConnection, Worker } from '@temporalio/worker';
+import { loadClientConnectConfig } from '@temporalio/envconfig';
 import * as activities from './activities';
 import { AiSdkPlugin } from '@temporalio/ai-sdk';
 import { openai } from '@ai-sdk/openai';
 
 async function run() {
-  const connection = await NativeConnection.connect({ address: 'localhost:7233' });
+  const config = loadClientConnectConfig();
+  const connection = await NativeConnection.connect(config.connectionOptions);
   const worker = await Worker.create({
     plugins: [new AiSdkPlugin({ modelProvider: openai })],
     connection,
-    namespace: 'default',
+    namespace: config.namespace,
     taskQueue: 'ai-sdk',
     workflowsPath: require.resolve('./workflows'),
     activities,
