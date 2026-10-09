@@ -6,7 +6,7 @@ priority: 750
 
 # Durable agent with tools using the OpenAI Agents SDK
 
-In this example, we show you how to build a durable agent using the [OpenAI Agents SDK Integration for Temporal](https://github.com/temporalio/sdk-python/tree/main/temporalio/contrib/openai_agents). The AI agent we build will have access to [tools](https://github.com/temporalio/sdk-python/tree/main/temporalio/contrib/openai_agents#tool-calling) (Temporal Activities) to answer user questions. The agent can determine which tools to use based on the user's input and execute them as needed.
+This recipe shows how to build a durable agent using the [OpenAI Agents SDK Integration for Temporal](https://github.com/temporalio/sdk-python/tree/main/temporalio/contrib/openai_agents). The agent has access to [tools](https://github.com/temporalio/sdk-python/tree/main/temporalio/contrib/openai_agents) (Temporal Activities) to answer user questions. The agent can determine which tools to use based on the user's input and execute them as needed.
 
 This recipe highlights key implementation patterns:
 
@@ -20,7 +20,7 @@ This recipe highlights key implementation patterns:
 
 ## Create the Activity
 
-We create Activities that serve as tools for the agent. These Activities can perform tasks like getting weather information or performing calculations.
+This recipe creates Activities that serve as tools for the agent. These Activities can perform tasks like getting weather information or performing calculations.
 
 *File: activities/tools.py*
 
@@ -53,7 +53,7 @@ async def calculate_circle_area(radius: float) -> float:
 
 ## Create the Workflow
 
-The Workflow creates an agent with specific instructions and tools. The agent can then process user input and decide which tools to use to answer questions. Since LLM invocation is an external API call, this typically would happen in a Temporal Activity. However, because of the Temporal integration with the OpenAI Agents SDK, this is handled for us and we do not need to implement the Activity ourselves.
+The Workflow creates an agent with specific instructions and tools. The agent can then process user input and decide which tools to use to answer questions. Since LLM invocation is an external API call, this typically would happen in a Temporal Activity. However, because of the Temporal integration with the OpenAI Agents SDK, the integration handles this, so you do not need to implement the Activity.
 
 *File: workflows/hello_world_workflow.py*
 
@@ -97,7 +97,7 @@ class HelloWorldAgent:
 ## Create the Worker
 
 Create the process for executing Activities and Workflows.
-We configure the Temporal client with the `OpenAIAgentsPlugin` to enable OpenAI Agents SDK integration.
+You configure the Temporal client with the `OpenAIAgentsPlugin` to enable OpenAI Agents SDK integration.
 
 *File: worker.py*
 
@@ -191,7 +191,7 @@ if __name__ == "__main__":
 ```
 <!--SNIPEND-->
 
-## Running
+## Run the recipe
 
 Start the Temporal Dev Server:
 

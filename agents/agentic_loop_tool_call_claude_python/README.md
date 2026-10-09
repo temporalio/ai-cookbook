@@ -510,7 +510,7 @@ if __name__ == "__main__":
 ```
 <!--SNIPEND-->
 
-## Running the app
+## Run the app
 
 In the terminal where you run the agent Worker, set an Anthropic API key:
 

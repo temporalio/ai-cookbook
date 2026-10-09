@@ -12,16 +12,16 @@ MCP tools are "actions" that the MCP server can perform. Within a given MCP tool
 - Call the National Weather Service API again to retrieve the forecast for that region
 - Format and return the response to the user
 
-In this one tool alone, we are taking several steps to complete a given action. We implement these steps in a Temporal Workflow, which provides durability. This means that whenever your MCP tool is called, it kicks off the Temporal Workflow, and every step (API call, function) is executed reliably and all the way to completion.
+This one tool takes several steps to complete a given action. You implement these steps in a Temporal Workflow, which provides durability. This means that whenever your MCP tool is called, it kicks off the Temporal Workflow, and every step (API call, function) is executed reliably and all the way to completion.
 
-We use [FastMCP](https://github.com/jlowin/fastmcp) to implement the MCP Server and create tools using the decorator `@mcp.tool`.
+This recipe uses [FastMCP](https://github.com/PrefectHQ/fastmcp) to implement the MCP Server and create tools using the decorator `@mcp.tool`.
 
 > [!NOTE]
 > External API calls are made within Temporal Activities. This ensures that network requests are retried appropriately and failures are handled.
 
 This recipe highlights the following key design decisions:
 - **Separation of concerns**: MCP tools act as thin wrappers that start Temporal Workflows. All business logic lives in Workflows, ensuring durability and reliability.
-- **Durable Execution**: By moving multi-step operations into Temporal Workflows, we guarantee that operations complete even in the face of failures, network issues, or process restarts.
+- **Durable Execution**: By moving multi-step operations into Temporal Workflows, you guarantee that operations complete even in the face of failures, network issues, or process restarts.
 - **Activity-based external calls**: All external API calls (like NWS API requests) are made within Temporal Activities, which provides automatic retries and proper error handling.
 - **Retry policies**: Workflows use configurable retry policies to handle transient failures.
 
@@ -109,7 +109,7 @@ if __name__ == "__main__":
 
 ## Create the Workflows
 
-The Workflows contain the business logic for fetching weather data. They orchestrate multiple steps, including API calls and data formatting. By implementing this logic in Workflows, we ensure that operations complete reliably even if there are failures or interruptions.
+The Workflows contain the business logic for fetching weather data. They orchestrate multiple steps, including API calls and data formatting. By implementing this logic in Workflows, you ensure that operations complete reliably even if there are failures or interruptions.
 
 ### GetAlerts Workflow
 
@@ -236,7 +236,7 @@ class GetForecast:
 
 ## Create the Activity
 
-We create an Activity for making HTTP requests to the National Weather Service API. All external API calls happen within Activities, which provides automatic retries and proper error handling through Temporal's retry mechanisms.
+This recipe creates an Activity for making HTTP requests to the National Weather Service API. All external API calls happen within Activities, which provides automatic retries and proper error handling through Temporal's retry mechanisms.
 
 *File: activities/weather_activities.py*
 
@@ -308,7 +308,7 @@ if __name__ == "__main__":
 
 ## Configure Claude Desktop
 
-For this example, we are using Claude Desktop as the MCP Client. To use this MCP server with Claude Desktop, you need to configure it in your Claude Desktop configuration file. The config file tells Claude Desktop how to start the MCP server.
+This recipe uses Claude Desktop as the MCP Client. To use this MCP server with Claude Desktop, you need to configure it in your Claude Desktop configuration file. The config file tells Claude Desktop how to start the MCP server.
 
 *File: claude_desktop_config.json*
 
@@ -348,7 +348,7 @@ This recipe uses Temporal's environment configuration system to connect to Tempo
 
    For TLS certificate authentication instead of API key, refer to the [Temporal environment configuration documentation](https://docs.temporal.io/develop/environment-configuration) for details.
 
-## Running the MCP server
+## Run the MCP server
 
 1. Install dependencies:
    ```bash

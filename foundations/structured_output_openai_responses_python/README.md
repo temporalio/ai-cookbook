@@ -276,7 +276,7 @@ Return null for any field that cannot be reliably extracted or validated.""",
 ```
 <!--SNIPEND-->
 
-## Running
+## Run the recipe
 
 Start the Temporal Dev Server:
 

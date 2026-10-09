@@ -6,7 +6,7 @@ priority: 980
 
 # Durable agent with tools using the AI SDK by Vercel
 
-In this example, we show you how to build a durable agent using the [AI SDK by Vercel](https://docs.temporal.io/develop/typescript/integrations/ai-sdk#provide-your-durable-agent-with-tools). The agent calls tools backed by Temporal Activities to answer user questions, and it can determine which tools to use based on the input it receives.
+This recipe shows how to build a durable agent using the [AI SDK by Vercel](https://docs.temporal.io/develop/typescript/integrations/ai-sdk#provide-your-durable-agent-with-tools). The agent calls tools backed by Temporal Activities to answer user questions, and it can determine which tools to use based on the input it receives.
 
 This recipe highlights key implementation patterns:
 
@@ -198,7 +198,7 @@ run().catch((err) => {
 ```
 <!--SNIPEND-->
 
-## Running
+## Run the recipe
 
 Start the Temporal Dev Server:
 ```bash

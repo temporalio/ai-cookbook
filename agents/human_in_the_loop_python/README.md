@@ -23,7 +23,7 @@ Key features:
 ## Prerequisites
 
 - Python 3.10+
-- Temporal server running locally
+- Temporal Service running locally
 - OpenAI API key
 
 ## Setup
@@ -43,7 +43,7 @@ export OPENAI_API_KEY='your-api-key-here'
 temporal server start-dev
 ```
 
-## Running
+## Run the recipe
 
 ### Start the Worker
 
@@ -100,7 +100,7 @@ To test timeout behavior, don't send any approval signal. After 5 minutes (defau
 
 We use a Temporal Signal to inject information from the human into the waiting Workflow. The Signal is delivered from some UI (in this case the `send_approval.py` script) that uses a Temporal client to deliver the data.
 
-<img src="_assets/temporal_signal_handling.png">
+<img src="_assets/temporal_signal_handling.png" alt="Diagram of a Temporal Client in a UI invoking a Signal handler, which writes to application state variables that the Workflow main loop waits on">
 
 Within the agent implementation there are three main elements to the solution.
 
