@@ -259,6 +259,7 @@ import asyncio
 
 from temporalio.client import Client
 from temporalio.contrib.pydantic import pydantic_data_converter
+from temporalio.envconfig import ClientConfig
 from temporalio.worker import Worker
 
 from activities import get_weather_alerts, openai_responses
@@ -266,8 +267,10 @@ from workflows.get_weather_workflow import ToolCallingWorkflow
 
 
 async def main():
+    config = ClientConfig.load_client_connect_config()
+    config.setdefault("target_host", "localhost:7233")
     client = await Client.connect(
-        "localhost:7233",
+        **config,
         data_converter=pydantic_data_converter,
     )
 
@@ -302,13 +305,16 @@ import sys
 
 from temporalio.client import Client
 from temporalio.contrib.pydantic import pydantic_data_converter
+from temporalio.envconfig import ClientConfig
 
 from workflows.get_weather_workflow import ToolCallingWorkflow
 
 
 async def main():
+    config = ClientConfig.load_client_connect_config()
+    config.setdefault("target_host", "localhost:7233")
     client = await Client.connect(
-        "localhost:7233",
+        **config,
         data_converter=pydantic_data_converter,
     )
 
@@ -366,3 +372,24 @@ This user input should invoke the tool and respond with current weather alerts f
 ```bash
 uv run start_workflow.py "Are there any weather alerts in California?"
 ```
+
+## Connect to Temporal Cloud
+
+This recipe connects to Temporal using [environment configuration](https://docs.temporal.io/develop/environment-configuration). With nothing configured, it connects to a local Temporal Service at `localhost:7233`.
+
+To run it against Temporal Cloud, save your connection details as a profile with the Temporal CLI:
+
+```bash
+temporal config set --profile cloud --prop address --value "<your Temporal Cloud endpoint>"
+temporal config set --profile cloud --prop namespace --value "<your Namespace>"
+temporal config set --profile cloud --prop api_key --value "<your API key>"
+```
+
+Select the profile in each terminal you use for the recipe, and check that it connects:
+
+```bash
+export TEMPORAL_PROFILE=cloud
+temporal workflow count
+```
+
+To authenticate with mTLS certificates instead of an API key, see [environment configuration](https://docs.temporal.io/develop/environment-configuration).

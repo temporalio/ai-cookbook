@@ -5,6 +5,7 @@ from pathlib import Path
 
 import requests
 from temporalio.client import Client
+from temporalio.envconfig import ClientConfig
 
 from codec.plugin import ClaimCheckPlugin
 from workflows.ai_rag_workflow import AiRagWorkflow
@@ -21,8 +22,10 @@ async def main():
     claim_check_enabled = os.getenv("CLAIM_CHECK_ENABLED", "true").lower() != "false"
     plugins = [ClaimCheckPlugin()] if claim_check_enabled else []
 
+    config = ClientConfig.load_client_connect_config()
+    config.setdefault("target_host", "localhost:7233")
     client = await Client.connect(
-        "localhost:7233",
+        **config,
         plugins=plugins,
     )
 

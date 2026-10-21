@@ -3,6 +3,7 @@ import logging
 import os
 
 from temporalio.client import Client
+from temporalio.envconfig import ClientConfig
 from temporalio.worker import Worker
 
 from activities.ai_claim_check import ingest_document, rag_answer
@@ -21,8 +22,10 @@ async def main():
     plugins = [ClaimCheckPlugin()] if claim_check_enabled else []
 
     # Connect to Temporal server
+    config = ClientConfig.load_client_connect_config()
+    config.setdefault("target_host", "localhost:7233")
     client = await Client.connect(
-        "localhost:7233",
+        **config,
         plugins=plugins,
     )
     
