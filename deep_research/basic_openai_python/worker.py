@@ -2,6 +2,7 @@ import asyncio
 
 from temporalio.client import Client
 from temporalio.contrib.pydantic import pydantic_data_converter
+from temporalio.envconfig import ClientConfig
 from temporalio.worker import Worker
 
 from activities import invoke_model
@@ -10,8 +11,10 @@ from workflows.deep_research_workflow import DeepResearchWorkflow
 
 async def main():
     # Connect to Temporal server with pydantic data converter for our data classes
+    config = ClientConfig.load_client_connect_config()
+    config.setdefault("target_host", "localhost:7233")
     client = await Client.connect(
-        "localhost:7233",
+        **config,
         data_converter=pydantic_data_converter,
     )
 

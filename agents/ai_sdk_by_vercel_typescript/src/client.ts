@@ -8,7 +8,7 @@ async function run() {
 
   const config = loadClientConnectConfig();
   const connection = await Connection.connect(config.connectionOptions);
-  const client = new Client({ connection });
+  const client = new Client({ connection, namespace: config.namespace });
 
   const handle = await client.workflow.start(toolsAgent, {
     taskQueue: 'ai-sdk',

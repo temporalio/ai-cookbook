@@ -125,6 +125,27 @@ Reasoning:       Closest available driver with capacity for VIP order
 Open the Temporal UI at http://localhost:8233 to see each LLM call and
 tool call recorded as its own activity in the workflow history.
 
+## Connect to Temporal Cloud
+
+This recipe connects to Temporal using [environment configuration](https://docs.temporal.io/develop/environment-configuration). With nothing configured, it connects to a local Temporal Service at `localhost:7233`.
+
+To run it against Temporal Cloud, save your connection details as a profile with the Temporal CLI:
+
+```bash
+temporal config set --profile cloud --prop address --value "<your Temporal Cloud endpoint>"
+temporal config set --profile cloud --prop namespace --value "<your Namespace>"
+temporal config set --profile cloud --prop api_key --value "<your API key>"
+```
+
+Select the profile in each terminal you use for the recipe, and check that it connects:
+
+```bash
+export TEMPORAL_PROFILE=cloud
+temporal workflow count
+```
+
+To authenticate with mTLS certificates instead of an API key, see [environment configuration](https://docs.temporal.io/develop/environment-configuration).
+
 ## Architecture
 
 ```
@@ -334,10 +355,12 @@ clocks).
 ### Worker — one queue, one plugin
 
 *File: worker.py*
-<!--SNIPSTART worker.py {"startPattern": "^    client = await Client\\.connect\\($", "endPattern": "^    await worker\\.run\\(\\)$"}-->
+<!--SNIPSTART worker.py {"startPattern": "^    config = ClientConfig\\.load_client_connect_config\\(\\)$", "endPattern": "^    await worker\\.run\\(\\)$"}-->
 ```python
+config = ClientConfig.load_client_connect_config()
+config.setdefault("target_host", "localhost:7233")
 client = await Client.connect(
-    "localhost:7233",
+    **config,
     data_converter=pydantic_data_converter,
 )
 
