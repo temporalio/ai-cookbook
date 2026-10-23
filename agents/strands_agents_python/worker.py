@@ -4,6 +4,7 @@ from mcp import StdioServerParameters, stdio_client
 from strands.tools.mcp import MCPClient
 from temporalio.client import Client
 from temporalio.contrib.strands import StrandsPlugin
+from temporalio.envconfig import ClientConfig
 from temporalio.worker import Worker
 
 from activities.tools import get_recent_aws_announcements
@@ -29,7 +30,9 @@ async def main():
     # Pydantic data converter, and (since no `models` are given) uses the default
     # BedrockModel(). MCP servers are registered by name via `mcp_clients`.
     plugin = StrandsPlugin(mcp_clients={"aws-docs": make_aws_docs_client})
-    client = await Client.connect("localhost:7233", plugins=[plugin])
+    config = ClientConfig.load_client_connect_config()
+    config.setdefault("target_host", "localhost:7233")
+    client = await Client.connect(**config, plugins=[plugin])
 
     worker = Worker(
         client,

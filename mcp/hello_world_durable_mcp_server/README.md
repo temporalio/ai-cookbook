@@ -330,24 +330,6 @@ This recipe uses Claude Desktop as the MCP Client. To use this MCP server with C
 
 Replace `<full path to the directory containing the weather.py>` with the absolute path to the `hello_world_durable_mcp_server` directory.
 
-## Configuration
-
-This recipe uses Temporal's environment configuration system to connect to Temporal. By default, it connects to a local Temporal server. To use Temporal Cloud:
-
-1. Set the `TEMPORAL_PROFILE` environment variable to use the cloud profile:
-   ```bash
-   export TEMPORAL_PROFILE=cloud
-   ```
-
-2. Configure the cloud profile using the Temporal CLI:
-   ```bash
-   temporal config set --profile cloud --prop address --value "<your temporal cloud endpoint>"
-   temporal config set --profile cloud --prop namespace --value "<your temporal cloud namespace>"
-   temporal config set --profile cloud --prop api_key --value "<your temporal cloud api key>"
-   ```
-
-   For TLS certificate authentication instead of API key, refer to the [Temporal environment configuration documentation](https://docs.temporal.io/develop/environment-configuration) for details.
-
 ## Run the MCP server
 
 1. Install dependencies:
@@ -378,3 +360,34 @@ You can now ask Claude something like `What is the weather like in San Francisco
 > The National Weather Service API only supports US locations. Asking about weather in non-US locations (e.g., "What is the weather in London?") will result in a 404 error from the API. 
 
 After tool execution, Claude Desktop will send the result over to the LLM (with other context) for human formatting, and then returns that result to the user. You can see these and other MCP-related actions in the `mcp_server.log`.
+
+## Connect to Temporal Cloud
+
+This recipe connects to Temporal using [environment configuration](https://docs.temporal.io/develop/environment-configuration). With nothing configured, the Worker and the MCP server connect to a local Temporal Service at `localhost:7233`.
+
+To run it against Temporal Cloud, save your connection details as a profile with the Temporal CLI:
+
+```bash
+temporal config set --profile cloud --prop address --value "<your Temporal Cloud endpoint>"
+temporal config set --profile cloud --prop namespace --value "<your Namespace>"
+temporal config set --profile cloud --prop api_key --value "<your API key>"
+```
+
+Select the profile in the terminal where you start the Worker, and check that it connects:
+
+```bash
+export TEMPORAL_PROFILE=cloud
+temporal workflow count
+```
+
+Claude Desktop starts the MCP server itself, so the server doesn't see that `export`. Set the profile in the server's entry in your Claude Desktop config instead:
+
+```json
+"weather": {
+  "command": "uv",
+  "args": ["--directory", "<full path to the directory containing the weather.py>", "run", "mcp_servers/weather.py"],
+  "env": { "TEMPORAL_PROFILE": "cloud" }
+}
+```
+
+To authenticate with mTLS certificates instead of an API key, see [environment configuration](https://docs.temporal.io/develop/environment-configuration).
