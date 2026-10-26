@@ -2,9 +2,9 @@ import asyncio
 import logging
 
 from temporalio.client import Client
-from temporalio.contrib.google_adk_agents import GoogleAdkPlugin
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.envconfig import ClientConfig
+from temporalio.google_adk import GoogleAdkPlugin
 from temporalio.worker import Worker
 
 from activities.tools import (

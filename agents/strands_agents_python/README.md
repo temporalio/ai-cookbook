@@ -6,7 +6,7 @@ priority: 750
 
 # Durable agent with MCP and Activity-backed tools using the Strands Agents SDK
 
-This recipe builds a durable AI agent using the [Strands Agents SDK Integration for Temporal](https://github.com/temporalio/sdk-python/tree/main/temporalio/contrib/strands). The `StrandsPlugin` makes every model call, tool call, and MCP interaction run as a durable Temporal Activity. The Workflow creates an agent and invokes it.
+This recipe builds a durable AI agent using the [Strands Agents SDK Integration for Temporal](https://github.com/temporalio/ai-integrations/tree/main/python/strands_agents). The `StrandsPlugin` makes every model call, tool call, and MCP interaction run as a durable Temporal Activity. The Workflow creates an agent and invokes it.
 
 The agent acts as an AWS assistant with two kinds of tools:
 
@@ -78,8 +78,8 @@ The Workflow creates a `TemporalAgent`, the replacement for the Strands `Agent` 
 from datetime import timedelta
 
 from temporalio import workflow
-from temporalio.contrib.strands import TemporalAgent, TemporalMCPClient
-from temporalio.contrib.strands.workflow import activity_as_tool
+from temporalio.strands_agents import TemporalAgent, TemporalMCPClient
+from temporalio.strands_agents.workflow import activity_as_tool
 
 # activities.tools imports only stdlib at module level (requests is imported lazily
 # inside the activity), so it is safe to import directly into the workflow sandbox.
@@ -140,8 +140,8 @@ import asyncio
 from mcp import StdioServerParameters, stdio_client
 from strands.tools.mcp import MCPClient
 from temporalio.client import Client
-from temporalio.contrib.strands import StrandsPlugin
 from temporalio.envconfig import ClientConfig
+from temporalio.strands_agents import StrandsPlugin
 from temporalio.worker import Worker
 
 from activities.tools import get_recent_aws_announcements
@@ -198,8 +198,8 @@ import asyncio
 
 from temporalio.client import Client
 from temporalio.common import WorkflowIDConflictPolicy
-from temporalio.contrib.strands import StrandsPlugin
 from temporalio.envconfig import ClientConfig
+from temporalio.strands_agents import StrandsPlugin
 
 from workflows.aws_assistant_workflow import AWSAssistantWorkflow
 
@@ -300,7 +300,7 @@ To authenticate with mTLS certificates instead of an API key, see [environment c
 
 ## Learn more
 
-- [Temporal Strands Agents Plugin](https://github.com/temporalio/sdk-python/tree/main/temporalio/contrib/strands)
+- [Temporal Strands Agents Plugin](https://github.com/temporalio/ai-integrations/tree/main/python/strands_agents)
 - [Strands' Amazon Bedrock guide](https://strandsagents.com/docs/user-guide/sdk/model-providers/amazon-bedrock/)
 - [Temporal Strands Agents Samples (samples-python)](https://github.com/temporalio/samples-python/tree/main/strands_plugin)
 - [Strands Agents Documentation](https://strandsagents.com/docs/)

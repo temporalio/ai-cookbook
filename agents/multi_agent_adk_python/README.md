@@ -8,7 +8,7 @@ priority: 750
 
 This recipe builds a **multi-agent dispatch pipeline** using
 [Google ADK](https://adk.dev/) and the
-[Google ADK integration for Temporal](https://github.com/temporalio/sdk-python/tree/main/temporalio/contrib/google_adk_agents).
+[Google ADK integration for Temporal](https://github.com/temporalio/ai-integrations/tree/main/python/google_adk).
 Two agents reason in parallel, a third synthesizes their output and submits a
 structured decision — and every LLM call and every I/O tool call is a durable
 Temporal Activity. (The final decision write is a plain in-workflow tool —
@@ -191,7 +191,7 @@ backing infrastructure.
 ### TemporalModel — every LLM call is an activity
 
 `TemporalModel` (from
-`temporalio.contrib.google_adk_agents`) is an ADK `BaseLlm` whose
+`temporalio.google_adk`) is an ADK `BaseLlm` whose
 `generate_content_async` runs through a Temporal Activity. The plugin
 registers that activity (`invoke_model`) on your worker for you.
 
@@ -206,12 +206,13 @@ def _fleet_agent() -> Agent:
             activity_config=ActivityConfig(
                 task_queue=TASK_QUEUE,
                 summary="Fleet Agent — LLM reasoning",
+                retry_policy=_LLM_RETRY,
             ),
-        ),
         ...
+        ),
         tools=[_fleet_status_tool, _route_info_tool],
         output_key="fleet_assessment",
-    )
+        ...
 ```
 <!--SNIPEND-->
 
@@ -234,13 +235,13 @@ _fleet_status_tool = activity_tool(
 <!--SNIPEND-->
 
 The local `workflows/_activity_tool.py` adds **graceful failure** on top of the
-upstream `temporalio.contrib.google_adk_agents.workflow.activity_tool`:
+upstream `temporalio.google_adk.workflow.activity_as_tool`:
 when an activity execution fails (retry policy exhausted, non-retryable
 application error, timeout), the wrapper catches the `ActivityError`
 and returns it to the LLM as a string so the agent can adapt instead of
 crashing the pipeline. (The retry attempts still appear in workflow
 history.) Programming bugs — e.g. argument-binding errors — are not
-caught and propagate normally. Upstream `activity_tool` (temporalio>=1.25)
+caught and propagate normally. Upstream `activity_as_tool`
 already handles multi-arg activities and local non-workflow ADK runs.
 
 ### Compose the pipeline
@@ -336,7 +337,7 @@ default, so they're imported under
 `workflow.unsafe.imports_passed_through()`:
 
 *File: workflows/assignment_workflow.py*
-<!--SNIPSTART workflows/assignment_workflow.py {"startPattern": "^with workflow\\.unsafe\\.imports_passed_through\\(\\):$", "endPattern": "^    from temporalio\\.contrib\\.google_adk_agents import TemporalModel$"}-->
+<!--SNIPSTART workflows/assignment_workflow.py {"startPattern": "^with workflow\\.unsafe\\.imports_passed_through\\(\\):$", "endPattern": "^    from temporalio\\.google_adk import TemporalModel$"}-->
 ```python
 with workflow.unsafe.imports_passed_through():
     from google.adk.agents import Agent, ParallelAgent, SequentialAgent
@@ -344,7 +345,7 @@ with workflow.unsafe.imports_passed_through():
     from google.adk.sessions import InMemorySessionService
     from google.adk.tools import ToolContext
     from google.genai.types import Content, Part
-    from temporalio.contrib.google_adk_agents import TemporalModel
+    from temporalio.google_adk import TemporalModel
 ```
 <!--SNIPEND-->
 

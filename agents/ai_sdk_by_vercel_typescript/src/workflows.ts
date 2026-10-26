@@ -1,6 +1,6 @@
 import type * as activities from './activities';
 import { generateText, stepCountIs, tool } from 'ai';
-import { temporalProvider } from '@temporalio/ai-sdk/workflow';
+import { temporalProvider } from '@temporalio/vercel-ai-sdk/workflow';
 import { proxyActivities } from '@temporalio/workflow';
 import z from 'zod';
 

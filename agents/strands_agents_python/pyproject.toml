@@ -7,7 +7,7 @@ requires-python = ">=3.10"
 readme = "README.md"
 license = "MIT"
 dependencies = [
-    "temporalio[strands-agents]>=1.28.0,<2",
+    "temporalio-strands-agents>=0.1.0,<1",
     "requests>=2.31.0",
     # Required by the AWS SSO ("aws login") credential provider.
     "botocore[crt]>=1.34.0",

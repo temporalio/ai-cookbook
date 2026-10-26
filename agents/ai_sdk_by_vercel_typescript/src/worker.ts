@@ -1,7 +1,7 @@
 import { NativeConnection, Worker } from '@temporalio/worker';
 import { loadClientConnectConfig } from '@temporalio/envconfig';
 import * as activities from './activities';
-import { AiSdkPlugin } from '@temporalio/ai-sdk';
+import { AiSdkPlugin } from '@temporalio/vercel-ai-sdk';
 import { openai } from '@ai-sdk/openai';
 
 async function run() {

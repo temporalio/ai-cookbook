@@ -28,7 +28,7 @@ with workflow.unsafe.imports_passed_through():
     from google.adk.sessions import InMemorySessionService
     from google.adk.tools import ToolContext
     from google.genai.types import Content, Part
-    from temporalio.contrib.google_adk_agents import TemporalModel
+    from temporalio.google_adk import TemporalModel
 
     from activities.tools import (
         tool_get_fleet_status,
@@ -49,7 +49,7 @@ _TOOL_RETRY = RetryPolicy(
     maximum_attempts=5,
 )
 
-# The upstream invoke_model activity (temporalio.contrib.google_adk_agents)
+# The upstream invoke_model activity (temporalio.google_adk)
 # doesn't classify provider errors, so a permanent failure (bad model name,
 # invalid API key) would otherwise retry indefinitely with Temporal's
 # default policy. Bound it so the workflow fails fast instead of hanging.
