@@ -5,9 +5,9 @@ description = "Multi-agent orchestration with Google ADK and Temporal — parall
 readme = "README.md"
 requires-python = ">=3.10,<3.14"
 dependencies = [
-    "temporalio[google-adk]>=1.25.0,<2",
-    "google-adk>=1.0.0",
-    "google-genai>=1.0.0",
+    "temporalio-google-adk>=0.0.1,<1",
+    "google-adk>=2.8.0,<3",
+    "google-genai>=2.21.0,<3",
     "pydantic>=2.10.0",
 ]
 

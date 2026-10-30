@@ -3,8 +3,8 @@ import asyncio
 from mcp import StdioServerParameters, stdio_client
 from strands.tools.mcp import MCPClient
 from temporalio.client import Client
-from temporalio.contrib.strands import StrandsPlugin
 from temporalio.envconfig import ClientConfig
+from temporalio.strands_agents import StrandsPlugin
 from temporalio.worker import Worker
 
 from activities.tools import get_recent_aws_announcements

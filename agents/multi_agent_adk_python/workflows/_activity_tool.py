@@ -1,6 +1,6 @@
 """activity_tool wrapper for ADK + Temporal.
 
-Thin adapter over ``temporalio.contrib.google_adk_agents.workflow.activity_tool``
+Thin adapter over ``temporalio.google_adk.workflow.activity_as_tool``
 that adds **graceful failure**: when an activity execution fails (retry
 policy exhausted, non-retryable application error, timeout, etc.), the
 ``ActivityError`` is caught and returned as a string to the LLM instead
@@ -14,7 +14,7 @@ Only ``ActivityError`` is caught. Programming bugs (e.g. argument-binding
 propagate normally so they surface clearly instead of being silently
 re-presented to the LLM.
 
-The upstream ``activity_tool`` (temporalio>=1.25) already handles multi-arg
+The upstream ``activity_as_tool`` (temporalio-google-adk) already handles multi-arg
 activities and local (non-workflow) ADK runs; this wrapper only layers the
 error-to-tool-response behavior on top.
 """
@@ -25,10 +25,10 @@ import inspect
 from collections.abc import Callable
 from typing import Any
 
-from temporalio.contrib.google_adk_agents.workflow import (
-    activity_tool as _upstream_activity_tool,
-)
 from temporalio.exceptions import ActivityError
+from temporalio.google_adk.workflow import (
+    activity_as_tool as _upstream_activity_tool,
+)
 
 
 def activity_tool(activity_def: Callable, **kwargs: Any) -> Callable:

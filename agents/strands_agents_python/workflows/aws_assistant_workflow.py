@@ -1,8 +1,8 @@
 from datetime import timedelta
 
 from temporalio import workflow
-from temporalio.contrib.strands import TemporalAgent, TemporalMCPClient
-from temporalio.contrib.strands.workflow import activity_as_tool
+from temporalio.strands_agents import TemporalAgent, TemporalMCPClient
+from temporalio.strands_agents.workflow import activity_as_tool
 
 # activities.tools imports only stdlib at module level (requests is imported lazily
 # inside the activity), so it is safe to import directly into the workflow sandbox.

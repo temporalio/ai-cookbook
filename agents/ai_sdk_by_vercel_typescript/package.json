@@ -24,13 +24,13 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.0",
-    "@ai-sdk/provider": "^4.0.0",
-    "@temporalio/ai-sdk": "^1.22.0",
+    "@ai-sdk/provider": "^4.0.21",
     "@temporalio/client": "^1.22.0",
     "@temporalio/envconfig": "^1.22.0",
+    "@temporalio/vercel-ai-sdk": "^1.0.0",
     "@temporalio/worker": "^1.22.0",
     "@temporalio/workflow": "^1.22.0",
-    "ai": "^7.0.0",
+    "ai": "^7.0.127",
     "nanoid": "3.x",
     "zod": "^3.25.76"
   },
