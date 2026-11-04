@@ -1,0 +1,14 @@
+[project]
+name = "pydantic-ai-docs-bot"
+version = "0.1.0"
+description = "Documentation Q&A agent using PydanticAI and Temporal with autonomous tool calling"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic-ai>=0.1.0",
+    "openai>=1.0.0",
+    "temporalio>=1.6.0",
+    "pydantic>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "rich>=13.0.0",
+    "httpx>=0.27.0",
+]
