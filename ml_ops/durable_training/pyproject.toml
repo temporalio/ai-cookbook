@@ -1,0 +1,16 @@
+[project]
+name = "durable-training"
+version = "0.1.0"
+description = "Make a durable PyTorch training loop with temporal!"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "accelerate>=1.12.0",
+    "asyncio>=4.0.0",
+    "datasets>=4.5.0",
+    "datetime>=6.0",
+    "pydantic>=2.12.5",
+    "temporalio>=1.22.0",
+    "torch>=2.10.0",
+    "transformers>=5.2.0",
+]

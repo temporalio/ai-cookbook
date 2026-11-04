@@ -1,0 +1,18 @@
+[project]
+name = "hyperparam-optimization"
+version = "0.1.0"
+description = "Build custom HPO logic with Temporal!"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "accelerate>=1.12.0",
+    "asyncio>=4.0.0",
+    "datasets>=4.5.0",
+    "datetime>=6.0",
+    "pydantic>=2.12.5",
+    "sentencepiece>=0.2.1",
+    "temporalio>=1.22.0",
+    "tiktoken>=0.12.0",
+    "torch>=2.10.0",
+    "transformers>=5.2.0",
+]
