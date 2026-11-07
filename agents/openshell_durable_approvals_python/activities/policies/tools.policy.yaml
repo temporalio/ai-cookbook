@@ -1,0 +1,11 @@
+# OpenShell policy v1 for the TOOLS sandbox: the agent's networked tools run here, never the code the model wrote.
+# No host is allowed up front. The first search is denied; the operator's grant is applied live (`openshell policy update`)
+# and, because the workflow records it, appended below by `OpenShellCLI.policy_file` on every rebuild.
+version: 1
+filesystem_policy:
+  include_workdir: true
+  read_only: [/usr, /lib, /etc, /proc, /dev/urandom, /var/log]
+  read_write: [/tmp, /dev/null]
+landlock:
+  compatibility: hard_requirement
+network_policies: {}
