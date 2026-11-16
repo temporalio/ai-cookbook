@@ -3,9 +3,12 @@ while it runs, export its log and delete it. Every side effect lives here; the w
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import hashlib
 import shutil
 from pathlib import Path
+from typing import Any, AsyncIterator
 
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
@@ -25,14 +28,38 @@ from models import (
     SearchOutput,
 )
 
+HEARTBEAT_EVERY = 10.0  # seconds; the activities run with a 60 s heartbeat timeout (workflows/tools.py)
+
 
 def sandbox_name(workflow_id: str, kind: str, gen: int) -> str:
     """Deterministic, DNS-style names: a retried activity converges on the same sandbox instead of creating another."""
     return f"cookbook-{hashlib.sha1(workflow_id.encode()).hexdigest()[:8]}-{kind}-g{gen}"
 
 
-def _hb(phase: str) -> None:
-    activity.heartbeat({"phase": phase})
+@contextlib.asynccontextmanager
+async def heartbeating() -> AsyncIterator[dict[str, Any]]:
+    """Heartbeat for the whole activity from a background task. OpenShell calls can stay silent for minutes (an image
+    pull on a cold host, `policy update --wait`, the delete poll); a heartbeat only between them lets the timeout fire
+    and start a second attempt while the first is still running."""
+    details: dict[str, Any] = {"phase": "start"}
+
+    async def beat() -> None:
+        while True:
+            activity.heartbeat(details)
+            await asyncio.sleep(HEARTBEAT_EVERY)
+
+    task = asyncio.create_task(beat())
+    try:
+        yield details
+    finally:
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+
+
+def _phase(details: dict[str, Any], phase: str) -> None:
+    details["phase"] = phase
+    activity.heartbeat(details)
 
 
 def _lost(e: SandboxLost, what: str) -> ApplicationError:
@@ -49,31 +76,33 @@ async def ensure_sandboxes(inp: EnsureInput) -> SandboxesRef:
     names = {kind: sandbox_name(inp.workflow_id, kind, inp.gen) for kind in ("exec", "tools")}
     logs_dir = runs_dir() / inp.run_id / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
-    retired: list[str] = []
-    if inp.gen > 1:  # whatever survives of the previous generation: keep its gateway log, then delete it
-        for kind in ("exec", "tools"):
-            old = sandbox_name(inp.workflow_id, kind, inp.gen - 1)
-            if await sb.exists(old):
-                _hb(f"retire:{old}")
-                (logs_dir / f"g{inp.gen - 1}-{kind}.log").write_text(await sb.logs(old))
-                await sb.delete(old)
-                retired.append(old)
-    created: list[str] = []
-    for kind, name in names.items():
-        _hb(f"ensure:{kind}")
-        if await sb.ensure(name, kind, inp.grants, heartbeat=lambda phase, k=kind: _hb(f"{k}:{phase}")):
-            created.append(name)
-    rehydrated: list[str] = []
-    for a in inp.artifacts:
-        _hb(f"rehydrate:{a.name}")
-        src = Path(a.path)
-        if not src.exists() or hashlib.sha256(src.read_bytes()).hexdigest() != a.sha256:
-            raise ApplicationError(f"artifact {a.name} is missing or changed on the host; generation {inp.gen} cannot be rehydrated", type="ArtifactMissing", non_retryable=True)
-        try:
-            await sb.upload(names["exec"], src, a.name)
-        except SandboxLost as e:
-            raise _lost(e, "rehydrate")
-        rehydrated.append(a.name)
+    async with heartbeating() as hb:
+        retired: list[str] = []
+        if inp.gen > 1:  # whatever survives of the previous generation: keep its gateway log, then delete it
+            for kind in ("exec", "tools"):
+                old = sandbox_name(inp.workflow_id, kind, inp.gen - 1)
+                if await sb.exists(old):
+                    _phase(hb, f"retire:{old}")
+                    (logs_dir / f"g{inp.gen - 1}-{kind}.log").write_text(await sb.logs(old))
+                    await sb.delete(old)
+                    retired.append(old)
+        created: list[str] = []
+        for kind, name in names.items():
+            _phase(hb, f"ensure:{kind}")
+            if await sb.ensure(name, kind, inp.grants, heartbeat=lambda phase, k=kind: _phase(hb, f"{k}:{phase}")):
+                created.append(name)
+        rehydrated: list[str] = []
+        for a in inp.artifacts:
+            _phase(hb, f"rehydrate:{a.name}")
+            src = Path(a.path)
+            if not src.exists() or hashlib.sha256(src.read_bytes()).hexdigest() != a.sha256:
+                raise ApplicationError(f"artifact {a.name} is missing or changed on this host; generation {inp.gen} cannot be rehydrated here",
+                                       type="ArtifactMissing", non_retryable=True)
+            try:
+                await sb.upload(names["exec"], src, a.name)
+            except SandboxLost as e:
+                raise _lost(e, "rehydrate")
+            rehydrated.append(a.name)
     return SandboxesRef(gen=inp.gen, exec_sandbox=names["exec"], tools_sandbox=names["tools"], created=created, rehydrated=rehydrated, retired=retired)
 
 
@@ -81,11 +110,12 @@ async def ensure_sandboxes(inp: EnsureInput) -> SandboxesRef:
 async def sandbox_search(inp: SearchInput) -> SearchOutput:
     """The agent's catalog search, from inside the tools sandbox. A denied egress is a result, not an error: the tool
     decides what to do about it (ask a human)."""
-    _hb("search")
-    try:
-        out = await backend().search(inp.tools_sandbox, inp.host, inp.query)
-    except SandboxLost as e:
-        raise _lost(e, "search")
+    async with heartbeating() as hb:
+        _phase(hb, "search")
+        try:
+            out = await backend().search(inp.tools_sandbox, inp.host, inp.query)
+        except SandboxLost as e:
+            raise _lost(e, "search")
     results = out.get("results") or []
     return SearchOutput(denied=bool(out.get("denied")), results=[r for r in results if isinstance(r, dict)][:8], detail=str(out.get("error") or "")[:200])
 
@@ -93,26 +123,28 @@ async def sandbox_search(inp: SearchInput) -> SearchOutput:
 @activity.defn
 async def sandbox_run_code(inp: RunCodeInput) -> RunCodeOutput:
     """Model-written Python runs in the exec sandbox (no network). Every file it leaves in the work directory is copied to
-    the host right away, with its hash: the artifact outlives the sandbox."""
+    the host right away, with its hash: the artifact outlives the sandbox. The workflow runs this activity with a single
+    attempt: model-written code is not safe to repeat on a transient failure."""
     sb = backend()
-    _hb("run")
-    try:
-        r = await sb.run_code(inp.exec_sandbox, inp.code)
-        out_dir = runs_dir() / inp.run_id / "artifacts"
-        out_dir.mkdir(parents=True, exist_ok=True)
-        artifacts: list[Artifact] = []
-        for name in await sb.list_files(inp.exec_sandbox):
-            dst, tmp = out_dir / name, out_dir / f".{name}.part"
-            _hb(f"download:{name}")
-            await sb.download(inp.exec_sandbox, name, tmp)
-            digest = hashlib.sha256(tmp.read_bytes()).hexdigest()
-            if dst.exists() and hashlib.sha256(dst.read_bytes()).hexdigest() == digest:
-                tmp.unlink()  # a file the code did not change (for example a rehydrated input) is not a new artifact
-                continue
-            tmp.replace(dst)
-            artifacts.append(Artifact(name=name, path=str(dst), sha256=digest, step=inp.step))
-    except SandboxLost as e:
-        raise _lost(e, "run_code")
+    async with heartbeating() as hb:
+        _phase(hb, "run")
+        try:
+            r = await sb.run_code(inp.exec_sandbox, inp.code)
+            out_dir = runs_dir() / inp.run_id / "artifacts"
+            out_dir.mkdir(parents=True, exist_ok=True)
+            artifacts: list[Artifact] = []
+            for name in await sb.list_files(inp.exec_sandbox):
+                dst, tmp = out_dir / name, out_dir / f".{name}.part"
+                _phase(hb, f"download:{name}")
+                await sb.download(inp.exec_sandbox, name, tmp)
+                digest = hashlib.sha256(tmp.read_bytes()).hexdigest()
+                if dst.exists() and hashlib.sha256(dst.read_bytes()).hexdigest() == digest:
+                    tmp.unlink()  # a file the code did not change (for example a rehydrated input) is not a new artifact
+                    continue
+                tmp.replace(dst)
+                artifacts.append(Artifact(name=name, path=str(dst), sha256=digest, step=inp.step))
+        except SandboxLost as e:
+            raise _lost(e, "run_code")
     return RunCodeOutput(ok=r.exit_code == 0, exit_code=r.exit_code, stdout_tail=r.stdout[-1500:], stderr_tail=r.stderr[-1500:], artifacts=artifacts)
 
 
@@ -121,34 +153,36 @@ async def apply_grant(inp: GrantInput) -> Grant:
     """Apply an approved grant to the running tools sandbox (a live policy update). Rejected grants are recorded only."""
     if inp.grant.decision != "approved":
         return inp.grant
-    _hb("policy_update")
-    try:
-        await backend().apply_grant(inp.tools_sandbox, inp.grant)
-    except SandboxLost as e:
-        raise _lost(e, "apply_grant")
+    async with heartbeating() as hb:
+        _phase(hb, "policy_update")
+        try:
+            await backend().apply_grant(inp.tools_sandbox, inp.grant)
+        except SandboxLost as e:
+            raise _lost(e, "apply_grant")
     return inp.grant.model_copy(update={"applied": True})
 
 
 @activity.defn
 async def release_sandboxes(inp: ReleaseInput) -> ReleaseOutput:
-    """Before a human review: export each sandbox's gateway log (the record of what it tried to reach), then delete it.
-    The review can take days; nothing is held while it does."""
+    """Export each sandbox's gateway log (the record of what it tried to reach), then delete it. Runs before every human
+    review and whenever a round ends another way, so no sandbox outlives its round."""
     sb = backend()
     logs_dir = runs_dir() / inp.run_id / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
     deleted, logs = [], []
-    for kind, name in (("exec", inp.exec_sandbox), ("tools", inp.tools_sandbox)):
-        if not name or not await sb.exists(name):
-            continue
-        _hb(f"logs:{kind}")
-        text = await sb.logs(name)
-        if text.strip():
-            p = logs_dir / f"g{inp.gen}-{kind}.log"
-            p.write_text(text)
-            logs.append(str(p))
-        _hb(f"delete:{kind}")
-        await sb.delete(name)
-        deleted.append(name)
+    async with heartbeating() as hb:
+        for kind, name in (("exec", inp.exec_sandbox), ("tools", inp.tools_sandbox)):
+            if not name or not await sb.exists(name):
+                continue
+            _phase(hb, f"logs:{kind}")
+            text = await sb.logs(name)
+            if text.strip():
+                p = logs_dir / f"g{inp.gen}-{kind}.log"
+                p.write_text(text)
+                logs.append(str(p))
+            _phase(hb, f"delete:{kind}")
+            await sb.delete(name)
+            deleted.append(name)
     return ReleaseOutput(deleted=deleted, logs=logs)
 
 

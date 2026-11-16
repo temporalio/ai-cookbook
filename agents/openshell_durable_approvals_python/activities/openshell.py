@@ -71,8 +71,19 @@ def runs_dir() -> Path:
 
 
 def backend():
-    choice = os.environ.get("SANDBOX_BACKEND") or ("openshell" if shutil.which(os.environ.get("OPENSHELL_BIN", "openshell")) else "fake")
-    return OpenShellCLI() if choice == "openshell" else FakeSandboxes()
+    """SANDBOX_BACKEND=openshell (the default when the `openshell` binary is on PATH) or SANDBOX_BACKEND=fake. The fake must
+    be asked for by name: a recipe about sandboxing model-written code does not fall back to no isolation on its own."""
+    choice = os.environ.get("SANDBOX_BACKEND")
+    if choice is None:
+        if not shutil.which(os.environ.get("OPENSHELL_BIN", "openshell")):
+            raise RuntimeError("no `openshell` binary on PATH. Install NVIDIA OpenShell, or set SANDBOX_BACKEND=fake to run the control flow "
+                               "with no sandbox at all (the fake runs model-written code on this host).")
+        choice = "openshell"
+    if choice == "openshell":
+        return OpenShellCLI()
+    if choice == "fake":
+        return FakeSandboxes()
+    raise RuntimeError(f"SANDBOX_BACKEND={choice!r}: expected 'openshell' or 'fake'")
 
 
 def _sha256(path: Path) -> str:
@@ -109,6 +120,7 @@ class OpenShellCLI:
             return False
         raise SandboxError(f"sandbox get {name}: {r.stderr.strip()[:300]}")
 
+    # @@@SNIPSTART policy-file
     def policy_file(self, kind: str, grants: list[Grant]) -> Path:
         """The base policy for this kind of sandbox plus the approved grants recorded in the workflow (OpenShell policy v1).
         The exec sandbox never gets network rules; grants only ever extend the tools sandbox."""
@@ -124,6 +136,7 @@ class OpenShellCLI:
         with os.fdopen(fd, "w") as f:
             f.write("\n".join(lines) + "\n")
         return Path(path)
+    # @@@SNIPEND
 
     async def ensure(self, name: str, kind: str, grants: list[Grant], heartbeat=lambda phase: None) -> bool:
         """Idempotent: get, create if missing, wait until ready. Returns whether this call created it."""
@@ -157,9 +170,14 @@ class OpenShellCLI:
             await asyncio.sleep(1)
         raise SandboxError(f"sandbox {name} still present 60s after delete")
 
+    async def _gone(self, name: str, r: ExecResult) -> bool:
+        """A failed call whose stderr says "not found" is a lost sandbox only if the sandbox really is gone: the stderr of the
+        program running inside the sandbox (model-written code included) travels the same way and may say the same words."""
+        return bool(NOT_FOUND.search(r.stderr)) and not await self.exists(name)
+
     async def exec(self, name: str, argv: Sequence[str], *, stdin: bytes | None = None, timeout: float = 120) -> ExecResult:
         r = await self._run("sandbox", "exec", "-n", name, "--timeout", str(int(timeout)), "--no-login-shell", "--", *argv, stdin=stdin, timeout=timeout + 15)
-        if r.exit_code != 0 and NOT_FOUND.search(r.stderr):
+        if r.exit_code != 0 and await self._gone(name, r):
             raise SandboxLost(f"sandbox {name}: {r.stderr.strip()[:200]}")
         if r.exit_code == 124:
             raise SandboxError(f"command in {name} hit its {timeout:.0f}s timeout")
@@ -182,20 +200,22 @@ class OpenShellCLI:
     async def download(self, name: str, filename: str, dst: Path) -> None:
         r = await self._run("sandbox", "download", name, f"{WORKDIR}/{filename}", str(dst), timeout=120)
         if r.exit_code != 0:
-            raise (SandboxLost if NOT_FOUND.search(r.stderr) else SandboxError)(f"download {name}:{filename}: {r.stderr.strip()[:200]}")
+            raise (SandboxLost if await self._gone(name, r) else SandboxError)(f"download {name}:{filename}: {r.stderr.strip()[:200]}")
 
     async def upload(self, name: str, src: Path, filename: str) -> None:
         r = await self._run("sandbox", "upload", name, str(src), f"{WORKDIR}/{filename}", timeout=120)
         if r.exit_code != 0:
-            raise (SandboxLost if NOT_FOUND.search(r.stderr) else SandboxError)(f"upload {name}:{filename}: {r.stderr.strip()[:200]}")
+            raise (SandboxLost if await self._gone(name, r) else SandboxError)(f"upload {name}:{filename}: {r.stderr.strip()[:200]}")
 
+    # @@@SNIPSTART apply-grant
     async def apply_grant(self, name: str, grant: Grant) -> None:
         """The documented live policy update: `openshell policy update <sandbox> --rule-name … --binary … --add-endpoint … --wait`.
         The sandbox logs `CONFIG:LOADED Policy reloaded`; re-adding the same endpoint is accepted, so retries are safe."""
         r = await self._run("policy", "update", name, "--rule-name", grant.rule_name, "--binary", self.python,
                             "--add-endpoint", f"{grant.host}:{grant.port}:read-write:rest:enforce", "--wait", timeout=120)
         if r.exit_code != 0:
-            raise (SandboxLost if NOT_FOUND.search(r.stderr) else SandboxError)(f"policy update {name}: {r.stderr.strip()[:300]}")
+            raise (SandboxLost if await self._gone(name, r) else SandboxError)(f"policy update {name}: {r.stderr.strip()[:300]}")
+    # @@@SNIPEND
 
     async def logs(self, name: str) -> str:
         r = await self._run("logs", name, "--source", "sandbox", "-n", "20000", timeout=60)
@@ -250,7 +270,16 @@ class FakeSandboxes:
         hits = [a for a in CATALOG if words & set(re.split(r"[\W_]+", a["name"]))]
         return {"denied": False, "results": hits or CATALOG}
 
+    def run_code_calls(self) -> int:
+        """How many times run_code was invoked on this fake (the tests check that model code is not re-run on a transient error)."""
+        p = self.root / ".run_code_calls"
+        return int(p.read_text()) if p.exists() else 0
+
     async def run_code(self, name: str, code: str) -> ExecResult:
+        self.root.mkdir(parents=True, exist_ok=True)
+        (self.root / ".run_code_calls").write_text(str(self.run_code_calls() + 1))
+        if os.environ.get("FAKE_RUN_CODE_FAIL_ONCE") == "1" and self.run_code_calls() == 1:
+            raise SandboxError("fake: transient CLI failure on the first run_code")  # chaos for the tests
         if os.environ.get("FAKE_LOSE_ONCE") == "exec" and not (self.root / ".lost-once").exists():
             # Chaos for the tests: the sandbox disappears under the first run_code, as if an operator had deleted it.
             self.root.mkdir(parents=True, exist_ok=True)

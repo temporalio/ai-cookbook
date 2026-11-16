@@ -34,6 +34,13 @@ SANDBOX_OPTS: dict[str, Any] = dict(
     heartbeat_timeout=timedelta(seconds=60),
     retry_policy=RetryPolicy(maximum_attempts=3, non_retryable_error_types=["SandboxLost", "ArtifactMissing"]),
 )
+RUN_CODE_OPTS: dict[str, Any] = dict(
+    start_to_close_timeout=timedelta(minutes=10),
+    heartbeat_timeout=timedelta(seconds=60),
+    # Model-written code is not safe to repeat (it may append to a file): a timeout or a CLI error is one attempt and
+    # goes back to the model as a tool error. A lost sandbox is still rebuilt once by `_with_rebuild`.
+    retry_policy=RetryPolicy(maximum_attempts=1),
+)
 
 
 @dataclass
@@ -74,6 +81,7 @@ def _cause_type(e: ActivityError) -> str:
     return c.type or "" if isinstance(c, ApplicationError) else type(c).__name__
 
 
+# @@@SNIPSTART with-rebuild
 async def _with_rebuild(ctx: AgentCtx, call: Callable[[], Awaitable[Any]]) -> Any:
     """Run a sandbox activity. If the sandbox is gone (somebody deleted it), build the next generation, with every grant the
     workflow recorded, and retry once."""
@@ -84,6 +92,7 @@ async def _with_rebuild(ctx: AgentCtx, call: Callable[[], Awaitable[Any]]) -> An
             raise
         await ctx.rebuild()
         return await call()
+# @@@SNIPEND
 
 
 def _names(results: list[dict[str, Any]]) -> list[str]:
@@ -95,6 +104,7 @@ def _names(results: list[dict[str, Any]]) -> list[str]:
     return names[:8]
 
 
+# @@@SNIPSTART search-assets
 @function_tool(failure_error_function=tool_error_to_json)
 async def search_assets(rc: RunContextWrapper[AgentCtx], query: str) -> str:
     """Search the asset catalog for warehouse equipment. Returns asset names to use in the layout."""
@@ -135,6 +145,7 @@ async def search_assets(rc: RunContextWrapper[AgentCtx], query: str) -> str:
                            "assets": _names(out.results) if not out.denied else LOCAL_CATALOG})
     ctx.state = ctx.state.with_grant(grant)  # a rejection is recorded too: the agent will not ask again this run
     return json.dumps({"ok": True, "source": "local_catalog", "denied": True, "operator": "rejected", "operator_notes": decision.notes, "assets": LOCAL_CATALOG})
+# @@@SNIPEND
 
 
 @function_tool(failure_error_function=tool_error_to_json)
@@ -144,7 +155,7 @@ async def run_code(rc: RunContextWrapper[AgentCtx], code: str, purpose: str) -> 
     step = ctx.state.step + 1
     out = await _with_rebuild(ctx, lambda: workflow.execute_activity(
         sb.sandbox_run_code, RunCodeInput(run_id=ctx.run_id, exec_sandbox=ctx.state.exec_sandbox or "", step=step, code=code),
-        summary=f"step {step}: {purpose[:40]}", **SANDBOX_OPTS))
+        summary=f"step {step}: {purpose[:40]}", **RUN_CODE_OPTS))
     ctx.state = ctx.state.with_artifacts(out.artifacts, step)  # new or changed files, and the step count
     return json.dumps({"ok": out.ok, "exit_code": out.exit_code, "stdout": out.stdout_tail[-800:], "stderr": out.stderr_tail[-800:],
                        "artifacts": [a.name for a in out.artifacts]})

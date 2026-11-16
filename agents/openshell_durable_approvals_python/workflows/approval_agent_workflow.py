@@ -10,10 +10,12 @@ Human decisions are Workflow Updates with validators: `grant` (an egress the san
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from datetime import timedelta
 from typing import Any
 
 from temporalio import workflow
+from temporalio.workflow import ActivityCancellationType
 
 with workflow.unsafe.imports_passed_through():
     from agents import Agent, RunConfig, Runner
@@ -73,20 +75,14 @@ class ApprovalAgentWorkflow:
         while True:
             self.round += 1
             self.ctx = AgentCtx(run_id=self.state.run_id, workflow_id=wf_id, state=self.state, rebuild=self._rebuild)
-            await self._ensure_sandboxes()
-            workflow.set_current_details(f"round {self.round}: agent working, sandbox generation {self.state.gen}")
-            prompt = _turn_prompt(inp, self.state, self.notes)
             try:
-                for _ in range(3):  # StopAtTools ends the run when request_review is called, even when the tool refused
-                    await Runner.run(agent, prompt, context=self.ctx, max_turns=20, run_config=run_config)
-                    if self.ctx.review_summary is not None:
-                        break
-                    prompt = _turn_prompt(inp, self.ctx.state, self.notes) + "\nYour request_review was refused: write layout.json with run_code first, then request_review again."
-            except MaxTurnsExceeded:
-                self.ctx.review_summary = "Turn budget exhausted; requesting review of what is there."
-            self.state = self.ctx.state
-            summary = self.ctx.review_summary or "The agent ended its turn without requesting review."
-
+                summary = await self._round(agent, run_config, inp)
+            except BaseException:
+                # The round ended with an error or a cancellation: the sandboxes do not outlive it. The release is
+                # shielded from the cancellation, and a failure to release must not hide the original error.
+                with contextlib.suppress(Exception):
+                    await self._release_sandboxes()
+                raise
             # Review: nothing is held while a person decides. The sandboxes are gone, their logs are on disk, the
             # artifacts and the grants are in the workflow's state.
             await self._release_sandboxes()
@@ -105,6 +101,23 @@ class ApprovalAgentWorkflow:
                 return AgentResult(run_id=self.state.run_id, status=status, rounds=self.round, gen=self.state.gen, grants=self.state.grants,
                                    artifacts=self.state.artifacts, decisions=self.decisions, run_dir=f"runs/{self.state.run_id}")
             self.notes = [*self.notes, decision.notes]  # revise: another round, in a new sandbox generation
+
+    async def _round(self, agent: Agent, run_config: RunConfig, inp: AgentInput) -> str:
+        """One round: this round's sandboxes, then the agent's turns until it asks for review. Returns the agent's summary."""
+        assert self.ctx is not None
+        await self._ensure_sandboxes()
+        workflow.set_current_details(f"round {self.round}: agent working, sandbox generation {self.state.gen}")
+        prompt = _turn_prompt(inp, self.state, self.notes)
+        try:
+            for _ in range(3):  # StopAtTools ends the run when request_review is called, even when the tool refused
+                await Runner.run(agent, prompt, context=self.ctx, max_turns=20, run_config=run_config)
+                if self.ctx.review_summary is not None:
+                    break
+                prompt = _turn_prompt(inp, self.ctx.state, self.notes) + "\nYour request_review was refused: write layout.json with run_code first, then request_review again."
+        except MaxTurnsExceeded:
+            self.ctx.review_summary = "Turn budget exhausted; requesting review of what is there."
+        self.state = self.ctx.state
+        return self.ctx.review_summary or "The agent ended its turn without requesting review."
 
     # ------------------------------------------------------------ sandboxes
 
@@ -131,17 +144,21 @@ class ApprovalAgentWorkflow:
             self.ctx.state = self.state
 
     async def _release_sandboxes(self) -> None:
-        if not (self.state.exec_sandbox or self.state.tools_sandbox):
+        """Export the gateway logs and delete this round's sandboxes. Shielded so a Workflow cancellation cannot interrupt
+        it, and abandoned rather than cancelled so the Worker finishes the delete even if the Workflow has closed."""
+        st = self._current()
+        if not (st.exec_sandbox or st.tools_sandbox):
             return
-        await workflow.execute_activity(
-            sb.release_sandboxes, ReleaseInput(run_id=self.state.run_id, gen=self.state.gen, exec_sandbox=self.state.exec_sandbox, tools_sandbox=self.state.tools_sandbox),
-            summary="release sandboxes", **SANDBOX_OPTS)
-        self.state = self.state.with_sandboxes(self.state.gen, None, None)
+        await asyncio.shield(workflow.execute_activity(
+            sb.release_sandboxes, ReleaseInput(run_id=st.run_id, gen=st.gen, exec_sandbox=st.exec_sandbox, tools_sandbox=st.tools_sandbox),
+            summary="release sandboxes", cancellation_type=ActivityCancellationType.ABANDON, **SANDBOX_OPTS))
+        self.state = st.with_sandboxes(st.gen, None, None)
         if self.ctx:
             self.ctx.state = self.state
 
     # ------------------------------------------------------------ human decisions
 
+    # @@@SNIPSTART grant-update
     @workflow.update
     async def grant(self, decision: GrantDecision) -> str:
         """The operator's decision on an egress the sandbox policy denied. The tool waiting on it applies it."""
@@ -154,6 +171,7 @@ class ApprovalAgentWorkflow:
         pending = self.ctx.pending_grant if self.ctx else None
         if not pending or decision.host != pending["host"] or self.ctx.grant_decision is not None:
             raise ValueError(f"no grant pending for {decision.host!r} (pending: {pending['host'] if pending else None!r})")
+    # @@@SNIPEND
 
     @workflow.update
     async def review(self, decision: ReviewDecision) -> str:

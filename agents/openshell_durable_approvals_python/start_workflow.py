@@ -25,7 +25,7 @@ async def main() -> None:
                                          id=f"packing-cell-{uuid.uuid4().hex[:8]}", task_queue=TASK_QUEUE)
     print(handle.id)
     print(f"watch it: temporal workflow show -w {handle.id}   (or the Temporal UI)")
-    print(f"operator: uv run python -m grant {handle.id} approved   ·   uv run python -m review {handle.id} approve")
+    print(f"operator: uv run grant.py {handle.id} approved   |   uv run review.py {handle.id} approve")
 
 
 if __name__ == "__main__":
