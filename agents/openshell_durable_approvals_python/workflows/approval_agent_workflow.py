@@ -136,9 +136,20 @@ class ApprovalAgentWorkflow:
 
     async def _build(self, gen: int) -> None:
         base = self._current()
-        ref = await workflow.execute_activity(
-            sb.ensure_sandboxes, EnsureInput(run_id=base.run_id, workflow_id=workflow.info().workflow_id, gen=gen, grants=base.grants, artifacts=base.artifacts),
-            summary=f"sandboxes: generation {gen}", **SANDBOX_OPTS)
+        wf_id = workflow.info().workflow_id
+        try:
+            ref = await workflow.execute_activity(
+                sb.ensure_sandboxes, EnsureInput(run_id=base.run_id, workflow_id=wf_id, gen=gen, grants=base.grants, artifacts=base.artifacts),
+                summary=f"sandboxes: generation {gen}", **SANDBOX_OPTS)
+        except BaseException:
+            # The build may have created part of generation `gen` before it failed, and state never recorded it. The names
+            # are deterministic, so release them by name; a failure to release must not hide the original error.
+            with contextlib.suppress(Exception):
+                await asyncio.shield(workflow.execute_activity(
+                    sb.release_sandboxes, ReleaseInput(run_id=base.run_id, gen=gen, exec_sandbox=sb.sandbox_name(wf_id, "exec", gen),
+                                                       tools_sandbox=sb.sandbox_name(wf_id, "tools", gen)),
+                    summary=f"release failed generation {gen}", cancellation_type=ActivityCancellationType.ABANDON, **SANDBOX_OPTS))
+            raise
         self.state = base.with_sandboxes(ref.gen, ref.exec_sandbox, ref.tools_sandbox)
         if self.ctx:
             self.ctx.state = self.state

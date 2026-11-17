@@ -76,6 +76,13 @@ async def ensure_sandboxes(inp: EnsureInput) -> SandboxesRef:
     names = {kind: sandbox_name(inp.workflow_id, kind, inp.gen) for kind in ("exec", "tools")}
     logs_dir = runs_dir() / inp.run_id / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
+    # Check the artifacts before touching any sandbox: a generation that cannot be rehydrated is never created, and the
+    # previous generation's survivors are not retired for nothing.
+    for a in inp.artifacts:
+        src = Path(a.path)
+        if not src.exists() or hashlib.sha256(src.read_bytes()).hexdigest() != a.sha256:
+            raise ApplicationError(f"artifact {a.name} is missing or changed on this host; generation {inp.gen} cannot be rehydrated here",
+                                   type="ArtifactMissing", non_retryable=True)
     async with heartbeating() as hb:
         retired: list[str] = []
         if inp.gen > 1:  # whatever survives of the previous generation: keep its gateway log, then delete it
@@ -94,12 +101,8 @@ async def ensure_sandboxes(inp: EnsureInput) -> SandboxesRef:
         rehydrated: list[str] = []
         for a in inp.artifacts:
             _phase(hb, f"rehydrate:{a.name}")
-            src = Path(a.path)
-            if not src.exists() or hashlib.sha256(src.read_bytes()).hexdigest() != a.sha256:
-                raise ApplicationError(f"artifact {a.name} is missing or changed on this host; generation {inp.gen} cannot be rehydrated here",
-                                       type="ArtifactMissing", non_retryable=True)
             try:
-                await sb.upload(names["exec"], src, a.name)
+                await sb.upload(names["exec"], Path(a.path), a.name)
             except SandboxLost as e:
                 raise _lost(e, "rehydrate")
             rehydrated.append(a.name)

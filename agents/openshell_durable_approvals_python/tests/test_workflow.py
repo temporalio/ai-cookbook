@@ -184,3 +184,21 @@ async def test_a_transient_sandbox_error_does_not_re_run_model_code(fake_env, mo
                 assert FakeSandboxes().run_code_calls() == 2, "the failed call was reported to the model, not retried"
                 assert await handle.execute_update(ApprovalAgentWorkflow.review, ReviewDecision(review_id=rid, action="approve", notes="")) == "approve"
                 await handle.result()
+
+
+@pytest.mark.timeout(120)
+async def test_a_generation_that_cannot_be_rehydrated_leaves_no_sandbox_behind(fake_env):
+    async with await WorkflowEnvironment.start_time_skipping() as env:
+        async with AgentEnvironment(model=scripted_model(ROUND_1 + ROUND_2), model_params=ModelActivityParameters(start_to_close_timeout=timedelta(seconds=30))) as agent_env:
+            client = agent_env.applied_on_client(env.client)
+            tq = f"test-{uuid.uuid4().hex[:6]}"
+            async with Worker(client, task_queue=tq, workflows=[ApprovalAgentWorkflow], activities=ACTIVITIES):
+                handle = await client.start_workflow(ApprovalAgentWorkflow.run, AgentInput(brief="Lay out a packing cell.", model="test-model", review_timeout_hours=1),
+                                                     id=f"packing-{uuid.uuid4().hex[:8]}", task_queue=tq, execution_timeout=timedelta(minutes=5))
+                rid = await until_review(handle, [])
+                (fake_env / handle.id / "artifacts" / "layout.json").unlink()  # as if round 2 ran on a Worker without this disk
+                await handle.execute_update(ApprovalAgentWorkflow.review, ReviewDecision(review_id=rid, action="revise", notes="move the pallet 1 m"))
+                with pytest.raises(WorkflowFailureError) as info:
+                    await handle.result()
+                assert info.value.cause.cause.type == "ArtifactMissing"
+    assert not any(p.is_dir() for p in (fake_env / "_fake_sandboxes").iterdir()), "the failed generation left no sandbox behind"
