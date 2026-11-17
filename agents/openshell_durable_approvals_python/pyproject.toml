@@ -1,0 +1,26 @@
+[project]
+name = "openshell-durable-approvals-python"
+version = "0.1.0"
+description = "Durable human approvals for sandboxed agents: NVIDIA OpenShell sandboxes, Nemotron on NVIDIA NIM, and Temporal"
+authors = [{ name = "Temporal Technologies Inc", email = "sdk@temporal.io" }]
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "temporalio>=1.34,<2",
+    "temporalio-openai-agents>=1.1,<2",
+    "openai-agents>=0.22,<0.23",
+    "openai>=3,<4",
+    "pydantic>=2.10",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-timeout>=2.4.0",
+    "pytest-asyncio>=0.26.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+asyncio_mode = "auto"
