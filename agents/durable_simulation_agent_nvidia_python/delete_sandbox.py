@@ -21,7 +21,8 @@ async def main() -> None:
     state = await client.get_workflow_handle_for(SimulationAgentWorkflow.run, workflow_id).query(SimulationAgentWorkflow.get_state)
     name = state.exec_sandbox if kind == "exec" else state.tools_sandbox
     if not name:
-        raise SystemExit(f"the run holds no {kind} sandbox right now (generation {state.gen})")
+        raise SystemExit(f"the run holds no {kind} sandbox right now (generation {state.gen}). Sandboxes exist only while the agent works; "
+                         "they are released during a review, so run this again during the next round.")
     await backend().delete(name)
     print(f"deleted {name} (generation {state.gen}); the agent's next tool call will rebuild generation {state.gen + 1} from {len(state.layers)} recorded layer(s)")
 

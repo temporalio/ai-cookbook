@@ -5,7 +5,10 @@ agent scope per run per Worker process. The scope's propagation context is store
 (runs/<workflow-id>/relay/propagation.json), so another process, the gpu Worker or the agent Worker after a kill, continues
 the same trace: the same root id, with a nested "resumed" scope. Each process writes an ATIF trajectory (Relay's
 AtifExporter) and a JSONL of lifecycle events into that directory, snapshotted after every Activity, so a killed process
-leaves its part of the record behind. Switch off with NEMO_RELAY=0; every hook is then a pass-through.
+leaves its part of the record behind. Relay's subscribers are process-wide, so each snapshot keeps only the steps of
+its own run's scope tree, and a run with no Activity for NEMO_RELAY_IDLE_CLOSE_S seconds (default 300, for example
+during a review wait) is closed; its next Activity resumes the trace. Switch off with NEMO_RELAY=0; every hook is then a
+pass-through.
 """
 
 from __future__ import annotations
@@ -44,7 +47,10 @@ class _Run:
     sub_atif: str
     sub_events: str
     open_n: int  # export file names are unique per open, so a re-open never overwrites an earlier export
+    known: set[str]  # uuids of this run's scope tree: the run scope and every span under it
     started: float = field(default_factory=time.time)
+    last_used: float = field(default_factory=time.time)
+    in_flight: int = 0  # Activities and model calls of this run running in this process right now; never closed as idle
     activities: int = 0
     llm_calls: int = 0
     fallbacks: int = 0
@@ -105,11 +111,10 @@ def _jsonable(v: Any, depth: int = 0, limit: int = 200) -> Any:
     return str(v)[:limit]
 
 
-def _event_writer(path: Path, scope_uuid: str):
+def _event_writer(path: Path, known: set[str]):
     """A subscriber that writes this run's lifecycle events (the subscriber itself is process-wide: events are kept when
-    they belong to the run's scope tree)."""
+    they belong to the run's scope tree, which this also records in `known`)."""
     f = path.open("a", buffering=1)
-    known = {scope_uuid}
 
     def on_event(ev: Any) -> None:
         uuid, parent = getattr(ev, "uuid", None), getattr(ev, "parent_uuid", None)
@@ -147,9 +152,10 @@ def _open(key: str) -> _Run:
         ctx = r.capture_propagation_context()
         if not ctx_json:
             prop.write_text(ctx.to_json())
-    events_file, on_event = _event_writer(d / f"events-{_Cfg.identity}-{n}.jsonl", ctx.parent_uuid)
+    known = {ctx.parent_uuid}
+    events_file, on_event = _event_writer(d / f"events-{_Cfg.identity}-{n}.jsonl", known)
     r.subscribers.register(sub_events, on_event)
-    run = _Run(key, stack, handle, atif, events_file, d / f"events-{_Cfg.identity}-{n}.jsonl", bool(ctx_json), ctx.root_uuid, sub_atif, sub_events, n)
+    run = _Run(key, stack, handle, atif, events_file, d / f"events-{_Cfg.identity}-{n}.jsonl", bool(ctx_json), ctx.root_uuid, sub_atif, sub_events, n, known)
     _runs[key] = run
     return run
 
@@ -163,13 +169,79 @@ def _deregister(run: _Run) -> None:
             pass
 
 
+def _own(entry: dict[str, Any], known: set[str]) -> bool:
+    extra = entry.get("extra") or {}
+    return bool({extra.get("event_uuid"), extra.get("parent_event_uuid")} & known)
+
+
+def _run_trajectory(doc: dict[str, Any], known: set[str]) -> dict[str, Any]:
+    """The exporter sees every run in the process. Keep this run's model steps, and this run's tool calls and results
+    wherever the exporter attached them; renumber the steps and recompute the totals."""
+    steps: list[dict[str, Any]] = []
+    for step in doc.get("steps") or []:
+        ancestry = (step.get("extra") or {}).get("ancestry") or {}
+        own_step = bool({ancestry.get("parent_id"), ancestry.get("function_id")} & known)
+        calls = [c for c in step.get("tool_calls") or [] if _own(c, known)]
+        observation = step.get("observation") or {}
+        results = [res for res in observation.get("results") or [] if _own(res, known)]
+        if not own_step and not calls and not results:
+            continue
+        kept = dict(step) if own_step else {"source": "system", "message": "", "timestamp": step.get("timestamp")}
+        kept.pop("tool_calls", None)
+        kept.pop("observation", None)
+        if calls:
+            kept["tool_calls"] = calls
+        if results:
+            kept["observation"] = {**observation, "results": results}
+        steps.append(kept)
+    for i, step in enumerate(steps, 1):
+        step["step_id"] = i
+    metrics = [step.get("metrics") or {} for step in steps if step.get("source") == "agent"]
+    doc["steps"] = steps
+    doc["final_metrics"] = {"total_prompt_tokens": sum(m.get("prompt_tokens") or 0 for m in metrics),
+                            "total_completion_tokens": sum(m.get("completion_tokens") or 0 for m in metrics), "total_steps": len(steps)}
+    return doc
+
+
 def _snapshot(run: _Run) -> Path:
     p = relay_dir(run.key) / f"atif-{_Cfg.identity}-{run.open_n}.json"
-    p.write_text(run.atif.export_json())
+    tmp = p.with_name(f".{p.name}.part")
+    tmp.write_text(json.dumps(_run_trajectory(json.loads(run.atif.export_json()), run.known), indent=1))
+    tmp.replace(p)  # a Worker killed mid-write leaves the previous snapshot, never a truncated one
     return p
 
 
+async def _close_run(run: _Run, reason: str) -> None:
+    """Close the run's scope in this process: a `run_closed` mark, the scope popped, subscribers drained, the final
+    snapshot written. A later Activity of the same run in this process resumes the trace from propagation.json."""
+    _runs.pop(run.key, None)
+    run.closed = True
+    r = _r()
+    stats = {"reason": reason, "worker": _Cfg.identity, "resumed": run.resumed, "activities": run.activities, "llm_calls": run.llm_calls,
+             "fallbacks": run.fallbacks, "seconds": round(time.time() - run.started, 1)}
+    with r.use_scope_stack(run.stack):
+        r.scope.event("run_closed", handle=run.handle, data=stats)
+        r.scope.pop(run.handle, output=stats)
+    await r.subscribers.flush_async()  # subscriber delivery is asynchronous; drain before exporting
+    _snapshot(run)
+    _deregister(run)
+
+
+async def _close_idle(current: str) -> None:
+    """Close the scopes of runs that have had no Activity in this process for a while (a run waiting days for its
+    review holds nothing here), so a long-lived Worker keeps only its active runs open."""
+    limit = float(os.environ.get("NEMO_RELAY_IDLE_CLOSE_S", "300"))
+    now = time.time()
+    for run in [r for k, r in _runs.items() if k != current and r.in_flight == 0 and now - r.last_used > limit]:
+        try:
+            await _close_run(run, "idle")
+        except Exception:  # noqa: BLE001 — tracing never fails the Activity that happened to trigger the cleanup
+            pass
+
+
 def _after(run: _Run) -> None:
+    run.last_used = time.time()
+    run.in_flight = max(0, run.in_flight - 1)
     if run.closed:  # the Activity that closed the run is still inside its own tool span
         return
     try:
@@ -189,7 +261,9 @@ def traced(fn: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
         if not enabled() or not activity.in_activity():
             return await fn(*args, **kwargs)
         info = activity.info()
+        await _close_idle(info.workflow_id)
         run = _open(info.workflow_id)
+        run.in_flight += 1
         r = _r()
         with r.use_scope_stack(run.stack):
             if info.attempt > 1:
@@ -224,7 +298,9 @@ async def model_call(model_name: str, request: dict[str, Any], fn: ProviderFn) -
         out, _ = await fn({}, request)
         return out
     info = activity.info()
+    await _close_idle(info.workflow_id)
     run = _open(info.workflow_id)
+    run.in_flight += 1
     r = _r()
     holder: dict[str, Any] = {}
 
@@ -264,22 +340,12 @@ def mark_here(name: str, data: dict[str, Any] | None = None) -> None:
 
 
 async def close_here(*, reason: str) -> list[str]:
-    """Close this Worker's scope for the run: a `run_closed` mark, the scope popped, subscribers drained, the final ATIF
-    written. Returns every relay file of the run, from every process that took part."""
+    """Close this Worker's scope for the run and return every relay file of the run, from every process that took part."""
     if not enabled() or not activity.in_activity():
         return []
     key = activity.info().workflow_id
-    run = _runs.pop(key, None)
+    run = _runs.get(key)
     if run:
-        run.closed = True
-        r = _r()
-        stats = {"reason": reason, "worker": _Cfg.identity, "resumed": run.resumed, "activities": run.activities, "llm_calls": run.llm_calls,
-                 "fallbacks": run.fallbacks, "seconds": round(time.time() - run.started, 1)}
-        with r.use_scope_stack(run.stack):
-            r.scope.event("run_closed", handle=run.handle, data=stats)
-            r.scope.pop(run.handle, output=stats)
-        await r.subscribers.flush_async()  # subscriber delivery is asynchronous; drain before exporting
-        _snapshot(run)
-        _deregister(run)
+        await _close_run(run, reason)
     d = relay_dir(key)
-    return sorted(str(p) for p in d.iterdir() if p.is_file()) if d.exists() else []
+    return sorted(str(p) for p in d.iterdir() if p.is_file() and not p.name.startswith(".")) if d.exists() else []

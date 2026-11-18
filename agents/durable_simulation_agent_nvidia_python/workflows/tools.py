@@ -158,11 +158,12 @@ async def search_assets(rc: RunContextWrapper[AgentCtx], query: str) -> str:
     try:
         await workflow.wait_condition(lambda: ctx.grant_decision is not None, timeout=GRANT_WAIT)
     except asyncio.TimeoutError:
+        pass  # a decision that arrived with the deadline still counts
+    if ctx.grant_decision is None:
         ctx.pending_grant = None
         return json.dumps({"ok": True, "source": out.source, "denied": True, "operator": "no decision within the grant window", "placeable_ids": _ids(out.results),
                            "results": out.results[:8]})
     decision, ctx.grant_decision, ctx.pending_grant = ctx.grant_decision, None, None
-    assert decision is not None
 
     grant = Grant(host=USD_SEARCH_HOST, port=443, rule_name="usd_search", decision=decision.decision, approver=decision.approver,
                   at=workflow.now().isoformat(timespec="seconds"), applied=False)
@@ -251,16 +252,17 @@ async def check_lane(rc: RunContextWrapper[AgentCtx], lane: str) -> str:
 async def request_review(rc: RunContextWrapper[AgentCtx], summary: str) -> str:
     """Finish this round and hand the layout to a human reviewer. Call it after check_lane and render_preview on the final layout."""
     ctx = rc.context
-    missing = []
-    if not any(c.step > ctx.round_start_step for c in ctx.state.lane_checks):
-        missing.append("check_lane('L2')")
-    if not any(r.step > ctx.round_start_step for r in ctx.state.renders):
-        missing.append("render_preview('Station')")
-    if missing and ctx.state.layers:
-        ctx.review_refusal = "run " + " and ".join(missing) + " on the current layout first (they are not applies)."
-        return json.dumps({"ok": False, "type": "ChecksMissing", "msg": "Before review, " + ctx.review_refusal})
     if not ctx.state.layers:
         return json.dumps({"ok": False, "type": "NothingToReview", "msg": "Place the cell with apply_usd_code first, then request_review."})
+    step = ctx.state.step  # the checks must be of the layout the reviewer will see, not of an earlier step
+    missing = []
+    if not any(c.step == step for c in ctx.state.lane_checks):
+        missing.append("check_lane('L2')")
+    if not any(r.step == step for r in ctx.state.renders):
+        missing.append("render_preview('Station')")
+    if missing:
+        ctx.review_refusal = "run " + " and ".join(missing) + f" on the current layout (step {step}) first (they are not applies)."
+        return json.dumps({"ok": False, "type": "ChecksMissing", "msg": "Before review, " + ctx.review_refusal})
     ctx.review_summary = summary
     return "Review requested."
 

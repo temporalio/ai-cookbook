@@ -58,15 +58,23 @@ def _layer_paths(layers: list[LayerRef]) -> list[Path]:
     return paths
 
 
+def _atomic_copy(src: str | Path, dst: Path) -> None:
+    """Copy, then rename into place: a Worker killed mid-copy never leaves a truncated file that a retry would trust."""
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    tmp = dst.with_name(f".{dst.name}.part")
+    shutil.copyfile(src, tmp)
+    tmp.replace(dst)
+
+
 def _shared_paths(paths: list[Path]) -> list[str]:
     """The renderer reads layers from a directory it shares with this Worker (RENDERER_SHARED_DIR), by content hash."""
     shared = Path(os.environ.get("RENDERER_SHARED_DIR", runs_dir() / "_renderer")) / "layers"
-    shared.mkdir(parents=True, exist_ok=True)
     out = []
     for p in paths:
-        dst = shared / f"{sha256_file(p)}.usda"
-        if not dst.exists():
-            shutil.copyfile(p, dst)
+        sha = sha256_file(p)
+        dst = shared / f"{sha}.usda"
+        if not dst.exists() or sha256_file(dst) != sha:
+            _atomic_copy(p, dst)
         out.append(str(dst))
     return out
 
@@ -86,7 +94,7 @@ async def _job(op: str, params: dict[str, Any], key: str, hb: dict[str, Any], ti
 @relay.traced
 async def render_preview(inp: RenderInput) -> RenderRef:
     """A still of the current layer stack from a named camera of the site layer: Isaac Sim RTX through the renderer
-    service, or the CPU plan view. Idempotent by output path."""
+    service, or the CPU plan view. Idempotent by output path: every output is renamed into place only once complete."""
     cam = inp.camera.rsplit("/", 1)[-1]
     mode = PREVIEW["mode"] if renderer_url() else "plan"
     out = run_dir(inp.run_id) / "renders" / f"{inp.step:03d}-{cam}-{mode}.png"
@@ -99,8 +107,7 @@ async def render_preview(inp: RenderInput) -> RenderRef:
             key = _job_key("render_still", inp.layers, params)
             _phase(hb, "submit")
             result = await _job("render_still", {**params, "base_ref": BASE_REF, "layers": _shared_paths(paths), "job_key": key}, key, hb, timeout=1800)
-            out.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(result["output_path"], out)
+            _atomic_copy(result["output_path"], out)
         else:
             _phase(hb, "plan")
             render_plan(paths, site_layer=SITE_LAYER, catalog=CATALOG, out=out, asset_root=ASSET_ROOT, width=inp.width, height=inp.height,
@@ -123,8 +130,7 @@ async def simulate_lane(inp: SimulateInput) -> LaneCheck:
             result = await _job("simulate_lane", {**params, "base_ref": BASE_REF, "layers": _shared_paths(paths), "job_key": key}, key, hb, timeout=1800)
             if result.get("clip_path"):
                 clip = run_dir(inp.run_id) / "clips" / f"{inp.step:03d}-{inp.lane}.mp4"
-                clip.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copyfile(result["clip_path"], clip)
+                _atomic_copy(result["clip_path"], clip)
             drive = result.get("drive") or {}
             check = {"passed": bool(result["passed"]), "min_clearance_m": float(result.get("min_clearance_m") if result.get("min_clearance_m") is not None else 99.0),
                      "contacts": [str(c) for c in result.get("contacts", [])], "reached": drive.get("reached") if drive.get("ok") else None,
@@ -134,7 +140,9 @@ async def simulate_lane(inp: SimulateInput) -> LaneCheck:
             check = lane_check(paths, site_layer=SITE_LAYER, catalog=CATALOG, asset_root=ASSET_ROOT, lane=inp.lane, robot=inp.robot, min_clearance_m=inp.min_clearance_m)
     record = run_dir(inp.run_id) / "lane" / f"{inp.step:03d}-{inp.lane}.json"
     record.parent.mkdir(parents=True, exist_ok=True)
-    record.write_text(json.dumps({"step": inp.step, "lane": inp.lane, "robot": inp.robot, "min_clearance_m": inp.min_clearance_m, **check}, indent=2, sort_keys=True))
+    tmp = record.with_name(f".{record.name}.part")
+    tmp.write_text(json.dumps({"step": inp.step, "lane": inp.lane, "robot": inp.robot, "min_clearance_m": inp.min_clearance_m, **check}, indent=2, sort_keys=True))
+    tmp.replace(record)
     return LaneCheck(step=inp.step, lane=inp.lane, passed=check["passed"], min_clearance_m=check["min_clearance_m"], contacts=check["contacts"],
                      reached=check.get("reached"), clip_path=str(clip) if clip else None, method=check["method"])
 

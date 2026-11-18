@@ -45,16 +45,27 @@ async def main() -> None:
     ap.add_argument("--downtime", type=float, default=8.0)
     ap.add_argument("--timeout", type=float, default=600.0)
     args = ap.parse_args()
-    info = json.loads((runs_dir() / "_worker.json").read_text())
+    record = runs_dir() / "_worker.json"
+    if not record.exists():
+        raise SystemExit(f"no {record}: start the Worker with `uv run worker.py` first, and run this with the same RUNS_DIR")
+    info = json.loads(record.read_text())
+    missing = [k for k in info.get("secrets", []) if not os.environ.get(k)]
+    if missing:  # check before killing anything: the restarted Worker would not start without them
+        raise SystemExit(f"set {', '.join(missing)} in this shell first: the restarted Worker needs it, and worker.py does not write secrets to disk")
     client = await connect()
     handle = client.get_workflow_handle(args.workflow_id)
     t0 = time.time()
     print(f"[1] watching {args.workflow_id} for an in-flight {args.activity} ...", flush=True)
+    hinted = False
     while True:
         desc = await handle.describe()
         if desc.status != WorkflowExecutionStatus.RUNNING:
             raise SystemExit(f"workflow is {desc.status.name}; start a fresh run")
         hits = _in_flight(desc, args.activity)
+        if not hits and not hinted and await handle.query("pending_review"):
+            hinted = True
+            print(f"    a review is pending, so no model call will come until the next round: run `uv run review.py {args.workflow_id} revise --notes ...` "
+                  "in another terminal and this catches the first model call of round 2", flush=True)
         if hits:
             for p in reversed(_tree(info["pid"])):  # children first
                 with contextlib.suppress(ProcessLookupError):
@@ -67,8 +78,9 @@ async def main() -> None:
     print(f"[3] no worker alive for {args.downtime:.0f}s; the run is frozen, nothing lost", flush=True)
     await asyncio.sleep(args.downtime)
     log = (runs_dir() / "_worker.log").open("a")
-    proc = subprocess.Popen([sys.executable, str(RECIPE_DIR / "worker.py"), *info["argv"]], cwd=RECIPE_DIR, stdout=log, stderr=subprocess.STDOUT)
-    print(f"[4] worker back (pid {proc.pid}); waiting for attempt 2 ...", flush=True)
+    proc = subprocess.Popen([sys.executable, str(RECIPE_DIR / "worker.py"), *info["argv"]], cwd=RECIPE_DIR, stdout=log, stderr=subprocess.STDOUT,
+                            env={**os.environ, **info.get("env", {})})
+    print(f"[4] worker back (pid {proc.pid}, same settings, output in {runs_dir() / '_worker.log'}); waiting for attempt 2 ...", flush=True)
     seen = None
     while time.time() - t0 < args.timeout:
         desc = await handle.describe()

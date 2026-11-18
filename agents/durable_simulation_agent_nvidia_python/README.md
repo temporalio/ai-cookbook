@@ -14,7 +14,7 @@ the same tools, the same records, with CPU stand-ins where the demo uses a GPU.
 
 - **Temporal remembers.** The agent loop is a Workflow. Every model call, sandbox operation, render and lane check is an
   Activity with retries and heartbeats on one of two Task Queues. Human decisions are Workflow Updates with validators.
-  Kill the Worker mid model call and the run resumes from the Event History; nothing is re-run.
+  Kill the Worker mid model call and the run resumes from the Event History: only the interrupted model call runs again.
 - **NVIDIA OpenShell contains.** The code the model wrote runs in an *exec* sandbox whose policy has no network rules.
   The agent's networked tools run in a *tools* sandbox that reaches the network only through grants an operator approves
   (`openshell policy update … --wait`). Delete a sandbox mid-run and the next tool call rebuilds the next generation with
@@ -67,6 +67,9 @@ uv run worker.py                              # terminal 2: the agent Worker and
 uv run start_workflow.py                      # terminal 3: prints the Workflow Id
 ```
 
+Export the two variables in terminals 2 and 3: the operator scripts below start the Worker again after a kill, and that
+Worker needs the key.
+
 The brief asks for packing cell 2 near Dock 4: two packing stations, a conveyor, pallet staging, floor markings and a
 task light, at least 0.6 m from forklift lane L2 and out of the painted keep-clear zone. Play the operator in terminal 3,
 in the order the demo plays its beats:
@@ -79,6 +82,10 @@ uv run review.py <workflow-id> revise --notes "move the pallet staging 1 m furth
 uv run review.py <workflow-id> approve
 uv run bundle.py <workflow-id>                  # beat 5: history, gateway logs, Relay trajectories, layers -> runs/<workflow-id>/bundle/
 ```
+
+Beats 2 and 3 need the agent at work. With a fast model, round 1 can end seconds after the grant; then play them during
+round 2, after the revise. `kill_worker.py` says so when a review is pending and catches the next model call either way.
+It starts the Worker again in the background with the same settings and logs to `runs/_worker.log`.
 
 `uv run rehearsal.py` plays all of it unattended against a running Worker. Watch the run in the Temporal UI
 (`http://localhost:8233`): one Activity per model call, sandbox operation, render and lane check, on two Task Queues;
@@ -154,11 +161,12 @@ async def search_assets(rc: RunContextWrapper[AgentCtx], query: str) -> str:
     try:
         await workflow.wait_condition(lambda: ctx.grant_decision is not None, timeout=GRANT_WAIT)
     except asyncio.TimeoutError:
+        pass  # a decision that arrived with the deadline still counts
+    if ctx.grant_decision is None:
         ctx.pending_grant = None
         return json.dumps({"ok": True, "source": out.source, "denied": True, "operator": "no decision within the grant window", "placeable_ids": _ids(out.results),
                            "results": out.results[:8]})
     decision, ctx.grant_decision, ctx.pending_grant = ctx.grant_decision, None, None
-    assert decision is not None
 
     grant = Grant(host=USD_SEARCH_HOST, port=443, rule_name="usd_search", decision=decision.decision, approver=decision.approver,
                   at=workflow.now().isoformat(timespec="seconds"), applied=False)
@@ -217,9 +225,10 @@ async def apply_grant(self, name: str, grant: Grant) -> None:
 ## The layers, in code
 
 Each `apply_usd_code` call runs the model's Python through the helper API in the exec sandbox and leaves one sublayer for
-the step. The Activity copies the layer out, lints it (prims only under `/World/Agent`, an allowlist of prim types, no
-sublayers, no payloads, no scripting attributes, asset paths only under the asset root), judges it against the trusted
-site layer, and records its hash in the Workflow's state. The sandbox caches by step and code hash, so a retried Activity
+the step. The Activity copies the layer out and lints it before anything else opens it. The lint is an allowlist: prims
+only under `/World/Agent`, with the metadata, prim types and API schemas the helper API writes; no variants, payloads,
+inherits, value clips, sublayers or scripting attributes anywhere; asset paths only under the asset root. Then the
+Activity judges the layer against the trusted site layer and records its hash in the Workflow's state. The sandbox caches by step and code hash, so a retried Activity
 gets the same layer back.
 
 *File: workflows/tools.py*
@@ -273,7 +282,7 @@ async def _build(self, gen: int) -> None:
     try:
         ref = await workflow.execute_activity(
             sb.ensure_sandboxes, EnsureInput(run_id=base.run_id, workflow_id=wf_id, gen=gen, grants=base.grants, layers=base.layers),
-            summary=f"sandboxes: generation {gen}" + (f", {len(base.layers)} layers rehydrated" if base.layers else ""), **SANDBOX_OPTS)
+            summary=f"sandboxes: generation {gen}" + (f", {len(base.layers)} layers rehydrated" if base.layers else ""), **ENSURE_OPTS)
         if ref.layer_stack_hash != layer_stack_hash(base.layer_pairs()):
             raise RuntimeError(f"generation {gen} recomposed a different layer stack ({ref.layer_stack_hash[:12]} != {layer_stack_hash(base.layer_pairs())[:12]})")
     except BaseException:
@@ -312,9 +321,10 @@ async def _with_rebuild(ctx: AgentCtx, call: Callable[[], Awaitable[Any]]) -> An
 
 ## The trace, in code
 
-NeMo Relay observes the same run that Temporal makes durable. Each Worker process keeps one Relay agent scope per run;
-the first one stores the scope's propagation context with the run, and every later process, the gpu Worker or the agent
-Worker after a kill, continues the same trace from it. Every Activity is a tool span, with its attempt and a
+NeMo Relay observes the same run that Temporal makes durable. Each Worker process keeps one Relay agent scope per run
+while the run is active; the first one stores the scope's propagation context with the run, and every later process, the
+gpu Worker or the agent Worker after a kill, continues the same trace from it. Each run's trajectory keeps only its own
+spans, even when one Worker serves many runs. Every Activity is a tool span, with its attempt and a
 `temporal_retry` mark when Temporal retried it.
 
 *File: relay.py*
@@ -331,7 +341,9 @@ def traced(fn: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
         if not enabled() or not activity.in_activity():
             return await fn(*args, **kwargs)
         info = activity.info()
+        await _close_idle(info.workflow_id)
         run = _open(info.workflow_id)
+        run.in_flight += 1
         r = _r()
         with r.use_scope_stack(run.stack):
             if info.attempt > 1:
@@ -416,7 +428,10 @@ The tests use the fake backend, the CPU stand-ins and a scripted model (`tempora
 search, the validator rejecting a wrong host and a stale review id, the grant applied and recorded, a layer with a lane
 violation and the lane check that fails on it, a revision in a new generation rebuilt from the recorded layer with the
 same layer stack hash, the one-call fix, approval and the manifest, the four records on disk; a sandbox deleted
-mid-round; a cancellation that still releases the sandboxes; a retried apply that runs the code once. The lint, the
-judge, the search mapping and the site constants are tested on the host with usd-core; the Relay runtime is tested with
-two process identities resuming one trace and a faulted model call answered by the fallback; the gpu Activities are
-tested against a stub of the renderer's job API. A stub `openshell` CLI covers the adapter's error classification.
+mid-round; a cancellation that still releases the sandboxes; a retried apply that runs the code once; an unknown tool
+name that goes back to the model; a review refused until the checks cover the current layout. The lint, including the
+payloads, variants and asset paths it refuses, the judge, a re-placed name keeping only its new asset, the search
+mapping and the site constants are tested on the host with usd-core. The Relay runtime is tested with two process
+identities resuming one trace, two runs in one process keeping separate trajectories, an idle run closed and resumed,
+and a faulted model call answered by the fallback. The gpu Activities are tested against a stub of the renderer's job
+API. A stub `openshell` CLI covers the adapter's error classification and that a cancelled call stops the CLI.

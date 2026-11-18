@@ -1,10 +1,11 @@
 """Sdf-level lint of agent-authored layers, run on the TRUSTED side before Kit ever opens them.
 
 Kit evaluates code embedded in USD (OmniGraph script nodes, omni:scripting attributes) and resolves
-arbitrary asset paths. An agent layer may only: define prims under /World/Agent, use an allowlisted set
-of prim types / API schemas / shader ids, and reference assets inside the baked asset root. Pure
-path-prefix ``over`` prims (/World, /World/Agent) with no properties are allowed so the layer composes.
-No composition is performed here (Sdf only), so nothing in the layer can execute.
+arbitrary asset paths. An agent layer may only: define prims under /World/Agent with allowlisted metadata,
+prim types, API schemas and shader ids, and reference assets inside the baked asset root. Bare path-prefix
+``over`` prims (/World, /World/Agent) are allowed so the layer composes. No variants, payloads, inherits,
+specializes, value clips or sublayers anywhere. No composition is performed here (Sdf only), so nothing in
+the layer can execute.
 """
 
 from __future__ import annotations
@@ -26,6 +27,10 @@ ALLOWED_SHADER_IDS = {"UsdPreviewSurface", "UsdPrimvarReader_float2", "UsdPrimva
 FORBIDDEN_ATTR_PREFIXES = ("omni:scripting", "omni:graph", "node:", "inputs:script", "outputs:")
 FORBIDDEN_TYPE_PREFIXES = ("OmniGraph", "Omni", "Physics", "Camera", "Py", "Script")
 DEFAULT_LIMITS = {"max_bytes": 2_000_000, "max_prims": 2000}
+# Prim metadata the helper API writes (the rest is refused: payload, inheritPaths, specializes, variantSetNames,
+# variantSelection, clips, assetInfo, ...). Prefix overs carry nothing but their specifier.
+AGENT_INFO_KEYS = {"specifier", "typeName", "references", "active", "customData", "apiSchemas", "kind", "documentation", "hidden"}
+PREFIX_INFO_KEYS = {"specifier"}
 
 
 @dataclass
@@ -47,7 +52,20 @@ def _asset_path_ok(asset: str, asset_root: str) -> bool:
     return asset.startswith(asset_root.rstrip("/") + "/")
 
 
+def _asset_values(layer: Sdf.Layer, sp: Sdf.Path, prop: Sdf.AttributeSpec) -> list[str]:
+    """Every asset path an asset or asset[] attribute holds: its default and every time sample."""
+    values = [prop.default] + [layer.QueryTimeSample(sp, t) for t in layer.ListTimeSamplesForPath(sp)]
+    out: list[str] = []
+    for v in values:
+        if v is None:
+            continue
+        out += [item.path for item in ([v] if isinstance(v, Sdf.AssetPath) else list(v))]
+    return out
+
+
 def lint_layer(path: str | Path, *, asset_root: str = "/opt/assets", limits: dict | None = None) -> LintReport:
+    """An allowlist, not a denylist: agent layers may only carry what the helper API writes. Anything else, a payload,
+    a variant, an inherit, a value clip, a sublayer, is an error, wherever in the layer it appears."""
     limits = {**DEFAULT_LIMITS, **(limits or {})}
     p = Path(path)
     rep = LintReport(ok=True)
@@ -72,6 +90,10 @@ def lint_layer(path: str | Path, *, asset_root: str = "/opt/assets", limits: dic
 
     def visit(sp: Sdf.Path) -> None:
         nonlocal prims
+        if sp.ContainsPrimVariantSelection():
+            if sp.IsPrimVariantSelectionPath():
+                rep.errors.append(f"{sp}: variants are not allowed")
+            return  # everything inside a variant is reported once, at the variant
         if sp.IsPropertyPath():
             prop = layer.GetPropertyAtPath(sp)
             name = sp.name
@@ -81,21 +103,25 @@ def lint_layer(path: str | Path, *, asset_root: str = "/opt/assets", limits: dic
                 v = prop.default
                 if v not in ALLOWED_SHADER_IDS:
                     rep.errors.append(f"{sp}: shader id {v!r} not allowed")
-            if isinstance(prop, Sdf.AttributeSpec) and prop.typeName == Sdf.ValueTypeNames.Asset:
-                v = prop.default
-                if v is not None and not _asset_path_ok(str(v.path), asset_root):
-                    rep.errors.append(f"{sp}: asset path {v.path!r} outside {asset_root}")
+            if isinstance(prop, Sdf.AttributeSpec) and prop.typeName in (Sdf.ValueTypeNames.Asset, Sdf.ValueTypeNames.AssetArray):
+                for v in _asset_values(layer, sp, prop):
+                    if not _asset_path_ok(v, asset_root):
+                        rep.errors.append(f"{sp}: asset path {v!r} outside {asset_root}")
             return
         if not sp.IsPrimPath():
             return
         prims += 1
         spec = layer.GetPrimAtPath(sp)
+        keys = set(spec.ListInfoKeys())
         under_agent = sp.HasPrefix(AGENT_ROOT) and sp != AGENT_ROOT
         if not under_agent:
-            if sp in PREFIX_OVERS and spec.specifier == Sdf.SpecifierOver and not spec.properties and not spec.referenceList.GetAddedOrExplicitItems():
-                return  # pure path prefix
-            rep.errors.append(f"{sp}: prims are only allowed under {AGENT_ROOT} (found {spec.specifier})")
+            # /World and /World/Agent may appear only as bare `over` path prefixes: no metadata, no properties.
+            if sp in PREFIX_OVERS and spec.specifier == Sdf.SpecifierOver and keys <= PREFIX_INFO_KEYS and not spec.properties:
+                return
+            rep.errors.append(f"{sp}: prims are only allowed under {AGENT_ROOT}, and its prefixes only as bare overs")
             return
+        for k in sorted(keys - AGENT_INFO_KEYS):
+            rep.errors.append(f"{sp}: metadata {k!r} not allowed")
         t = spec.typeName
         if t.startswith(FORBIDDEN_TYPE_PREFIXES) or t not in ALLOWED_PRIM_TYPES:
             rep.errors.append(f"{sp}: prim type {t!r} not allowed")
@@ -103,13 +129,9 @@ def lint_layer(path: str | Path, *, asset_root: str = "/opt/assets", limits: dic
             base = api.split(":")[0]
             if base not in ALLOWED_API_SCHEMAS:
                 rep.errors.append(f"{sp}: API schema {api!r} not allowed")
-        if spec.payloadList.GetAddedOrExplicitItems():
-            rep.errors.append(f"{sp}: payloads are not allowed")
         for ref in spec.referenceList.GetAddedOrExplicitItems():
             if not _asset_path_ok(ref.assetPath, asset_root):
                 rep.errors.append(f"{sp}: reference {ref.assetPath!r} outside {asset_root}")
-        if spec.variantSelections:
-            rep.warnings.append(f"{sp}: variant selections present")
 
     layer.Traverse(Sdf.Path.absoluteRootPath, visit)
     if prims > limits["max_prims"]:

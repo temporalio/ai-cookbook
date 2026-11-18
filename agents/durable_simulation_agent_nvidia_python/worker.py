@@ -22,6 +22,11 @@ from common import GPU_TASK_QUEUE, TASK_QUEUE, connect
 from paths import runs_dir
 from workflows.simulation_agent_workflow import SimulationAgentWorkflow
 
+RESTART_ENV = ("SANDBOX_BACKEND", "TASK_QUEUE", "GPU_TASK_QUEUE", "TEMPORAL_ADDRESS", "TEMPORAL_NAMESPACE", "NIM_BASE_URL", "NIM_MODEL",
+               "NIM_FALLBACK_MODEL", "NEMO_RELAY", "NEMO_RELAY_IDLE_CLOSE_S", "FAULT_MODEL_CALLS", "OPENSHELL_BIN", "SANDBOX_IMAGE",
+               "SANDBOX_PYTHON", "RENDERER_URL", "RENDERER_SHARED_DIR", "RENDERER_BASE_REF", "ASSET_ROOT")
+SECRETS = ("NVIDIA_API_KEY", "TEMPORAL_API_KEY")
+
 
 async def main() -> None:
     which = sys.argv[1:] or ["agent", "gpu"]
@@ -37,7 +42,10 @@ async def main() -> None:
         workers.append(Worker(client, task_queue=GPU_TASK_QUEUE, activities=[gpu.render_preview, gpu.simulate_lane, gpu.close_trace]))
         print(f"gpu worker on task queue {GPU_TASK_QUEUE!r}; renderer: {gpu.renderer_url() or 'none (CPU plan views and geometry lane checks)'}")
     runs_dir().mkdir(parents=True, exist_ok=True)
-    (runs_dir() / "_worker.json").write_text(json.dumps({"pid": os.getpid(), "argv": sys.argv[1:]}))  # for kill_worker.py
+    # For kill_worker.py: how to start this Worker again with the same settings. Secrets stay off disk; the restart takes
+    # them from the shell that runs kill_worker.py.
+    env = {k: os.environ[k] for k in RESTART_ENV if k in os.environ} | {"RUNS_DIR": str(runs_dir())}
+    (runs_dir() / "_worker.json").write_text(json.dumps({"pid": os.getpid(), "argv": sys.argv[1:], "env": env, "secrets": [k for k in SECRETS if os.environ.get(k)]}))
     await asyncio.gather(*(w.run() for w in workers))
 
 

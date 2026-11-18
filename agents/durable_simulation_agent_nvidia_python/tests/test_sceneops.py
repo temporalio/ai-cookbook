@@ -137,3 +137,74 @@ def test_search_hits_map_to_catalog_ids_and_the_catalog_fills_in():
     assert out[1]["id"] is None, "an unmapped hit is evidence the search ran, not something to place"
     assert "pallet" in [o["id"] for o in out[2:]] and all(o["source"] == "catalog" for o in out[2:])
     assert Path(CATALOG).exists()
+
+
+def _layer(tmp_path: Path, name: str, body: str) -> Path:
+    p = tmp_path / name
+    p.write_text("#usda 1.0\n\n" + body)
+    return p
+
+
+def test_lint_refuses_payloads_variants_and_asset_paths_anywhere(tmp_path):
+    cases = {
+        "a payload on the /World prefix": ('over "World" (\n    prepend payload = @http://evil.example/x.usd@\n)\n{\n    over "Agent"\n    {\n'
+                                           '        def Xform "ok"\n        {\n        }\n    }\n}\n', "/World"),
+        "a reference inside a variant": ('over "World"\n{\n    over "Agent"\n    {\n        def Xform "v" (\n            variants = {\n                string look = "a"\n'
+                                         '            }\n            prepend variantSets = "look"\n        )\n        {\n            variantSet "look" = {\n'
+                                         '                "a" (\n                    prepend references = @/etc/evil.usda@\n                ) {\n                }\n'
+                                         '            }\n        }\n    }\n}\n', "variants are not allowed"),
+        "an inherit": ('over "World"\n{\n    over "Agent"\n    {\n        def Xform "i" (\n            inherits = </World/Site/Lanes/L2>\n        )\n'
+                       '        {\n        }\n    }\n}\n', "metadata 'inheritPaths' not allowed"),
+        "a time-sampled asset array outside the root": ('over "World"\n{\n    over "Agent"\n    {\n        def Xform "a"\n        {\n'
+                                                        '            asset[] files.timeSamples = {\n                1: [@/opt/assets/ok.usd@, @/etc/passwd@],\n'
+                                                        '            }\n        }\n    }\n}\n', "'/etc/passwd' outside /opt/assets"),
+    }
+    for i, (what, (body, needle)) in enumerate(cases.items()):
+        rep = lint_layer(_layer(tmp_path, f"case{i}.usda", body), asset_root="/opt/assets")
+        assert not rep.ok and any(needle in e for e in rep.errors), (what, rep.errors)
+
+
+def _author(tmp_path: Path, asset_root: Path, steps: list[str]) -> list[Path]:
+    """Author one layer per step the way sceneops.apply does: the new layer is the edit target over the older ones."""
+    from pxr import Sdf
+
+    from sceneops.helpers import SceneHelpers
+
+    paths: list[Path] = []
+    for i, code in enumerate(steps, 1):
+        path = tmp_path / f"{i:03d}.usda"
+        layer = Sdf.Layer.CreateNew(str(path))
+        stage = Usd.Stage.CreateInMemory()
+        stage.GetRootLayer().subLayerPaths = [str(path), *[str(p) for p in reversed(paths)], str(SITE_LAYER)]
+        stage.SetEditTarget(Usd.EditTarget(layer))
+        exec(code, {"h": SceneHelpers(stage, load_catalog(CATALOG), asset_root=str(asset_root))})  # noqa: S102 — test code
+        layer.Save()
+        paths.append(path)
+    return paths
+
+
+def test_a_re_placed_name_keeps_only_its_new_asset(tmp_path):
+    assets = tmp_path / "assets"
+    for rel, mesh in (("Isaac/Props/PackingTable/packing_table.usd", "PackingTableMesh"), ("Isaac/Props/Pallet/pallet.usd", "PalletMesh")):
+        f = assets / rel
+        f.parent.mkdir(parents=True)
+        f.write_text(f'#usda 1.0\n(\n    defaultPrim = "Root"\n)\n\ndef Xform "Root"\n{{\n    def Cube "{mesh}"\n    {{\n    }}\n}}\n')
+    layers = _author(tmp_path, assets, ["h.place_asset('packing_table', -3.0, 2.0, name='station_1')",
+                                        "h.place_asset('pallet', -3.0, 2.0, name='station_1')",
+                                        "h.add_floor_marking('station_2', [(-4.0, -4.0), (-4.0, 0.0)])\nh.place_asset('pallet', -2.0, -2.0, name='station_2')",
+                                        "h.add_floor_marking('station_2', [(-4.5, -4.0), (-4.5, 0.0)])"])
+
+    def compose(n: int) -> Usd.Stage:
+        stage = Usd.Stage.CreateInMemory()
+        stage.GetRootLayer().subLayerPaths = [str(p) for p in reversed(layers[:n])] + [str(SITE_LAYER)]
+        return stage
+
+    st = compose(2)
+    assert [c.GetName() for c in st.GetPrimAtPath("/World/Agent/station_1").GetChildren()] == ["PalletMesh"], "the older reference is gone"
+    st = compose(4)
+    marking = st.GetPrimAtPath("/World/Agent/station_2")
+    assert marking.GetTypeName() == "Mesh" and not marking.GetChildren() and marking.GetCustomDataByKey("agent:catalog_id") == ""
+    assert UsdGeom.Xformable(marking).GetOrderedXformOps() == [], "no transform inherited from the pallet it replaced"
+    verdict = judge_layers(layers, site_layer=SITE_LAYER, catalog=CATALOG, asset_root=str(assets))
+    assert [a["path"] for a in verdict["placed_assets"]] == ["/World/Agent/station_1"]
+    assert {p["path"]: p["kind"] for p in verdict["agent_prims"]}["/World/Agent/station_2"] == "floor_marking"

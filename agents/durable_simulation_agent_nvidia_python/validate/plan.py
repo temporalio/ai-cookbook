@@ -47,5 +47,7 @@ def render_plan(layer_paths: list[str | Path], *, site_layer: str | Path, catalo
         draw.text(px(prim["aabb"][0], prim["aabb"][3] + 0.1), prim["path"].rsplit("/", 1)[-1], fill=(20, 20, 20))
     draw.text((12, 10), title or "plan view (CPU): lanes grey, keep-clear red, build area green, agent assets blue", fill=(30, 30, 30))
     out.parent.mkdir(parents=True, exist_ok=True)
-    img.save(out, "PNG")
+    tmp = out.with_name(f".{out.name}.part")
+    img.save(tmp, "PNG")
+    tmp.replace(out)  # renamed into place only once complete: a retry that finds the file can trust it
     return out

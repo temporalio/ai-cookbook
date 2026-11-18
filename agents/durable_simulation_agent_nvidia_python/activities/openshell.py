@@ -12,10 +12,12 @@ must be asked for by name.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import os
 import re
 import shutil
+import signal
 import sys
 import tempfile
 import time
@@ -76,6 +78,12 @@ def backend():
     raise RuntimeError(f"SANDBOX_BACKEND={choice!r}: expected 'openshell' or 'fake'")
 
 
+def _kill_group(proc: asyncio.subprocess.Process) -> None:
+    """The CLI runs in its own session (start_new_session=True), so its process group id is its pid."""
+    with contextlib.suppress(ProcessLookupError, PermissionError):
+        os.killpg(proc.pid, signal.SIGKILL)
+
+
 def _meta_args(meta: dict[str, str]) -> list[str]:
     return [arg for k, v in meta.items() for arg in ("--meta", f"{k}={v}")]
 
@@ -96,8 +104,13 @@ class OpenShellCLI:
         try:
             out, err = await asyncio.wait_for(proc.communicate(stdin), timeout)
         except asyncio.TimeoutError:
-            proc.kill()
+            _kill_group(proc)
             raise SandboxError(f"openshell {' '.join(args[:3])} took longer than {timeout:.0f}s")
+        except asyncio.CancelledError:
+            # The Activity was cancelled: stop the CLI call too, or a `sandbox create` could finish after the Workflow
+            # has already released this generation by name.
+            _kill_group(proc)
+            raise
         return ExecResult(proc.returncode or 0, out.decode(errors="replace"), err.decode(errors="replace"))
 
     async def exists(self, name: str) -> bool:

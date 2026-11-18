@@ -3,7 +3,9 @@ sandbox; a sandbox that is really gone is."""
 
 from __future__ import annotations
 
+import asyncio
 import stat
+import subprocess
 import sys
 
 import pytest
@@ -27,6 +29,8 @@ case "$1 $2" in
     done
     if [ -e "$STATE/$name.deleted" ]; then echo "Error: sandbox $name not found" >&2; exit 1; fi
     exec "$@";;
+  "sandbox create")
+    echo $$ > "$STATE/create.pid"; exec sleep 30;;
   *) echo "stub: unsupported: $*" >&2; exit 2;;
 esac
 """
@@ -67,3 +71,23 @@ def test_the_apply_command_and_the_grant_policy(cli):
     text = osh.policy_file("tools", [g]).read_text()
     assert "usd_search:" in text and "host: search.example" in text and f"path: {sys.executable}" in text
     assert osh.policy_file("exec", [g]).name == "exec.policy.yaml", "the exec sandbox never gets network rules"
+
+
+async def test_a_cancelled_call_stops_the_cli(cli):
+    osh, state = cli
+    task = asyncio.create_task(osh._run("sandbox", "create", "--name", "slow-sandbox", timeout=60))
+    pid_file = state / "create.pid"
+    for _ in range(100):
+        if pid_file.exists() and pid_file.read_text().strip():
+            break
+        await asyncio.sleep(0.05)
+    pid = int(pid_file.read_text())
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    for _ in range(60):  # killed, then reaped by asyncio's child watcher
+        status = subprocess.run(["ps", "-o", "stat=", "-p", str(pid)], capture_output=True, text=True).stdout.strip()
+        if not status or status.startswith("Z"):
+            break
+        await asyncio.sleep(0.05)
+    assert not status or status.startswith("Z"), f"the CLI process {pid} is still running: {status}"

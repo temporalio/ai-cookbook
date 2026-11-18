@@ -23,7 +23,7 @@ from temporalio.workflow import ActivityCancellationType
 with workflow.unsafe.imports_passed_through():
     from agents import Agent, RunConfig, Runner
     from agents.agent import StopAtTools
-    from agents.exceptions import MaxTurnsExceeded
+    from agents.exceptions import MaxTurnsExceeded, ModelBehaviorError
     from agents.run_config import ToolExecutionConfig
 
     from activities import gpu
@@ -64,6 +64,8 @@ never overlapping each other, and inside the building.
 {CHEATSHEET}"""
 
 RELEASE_OPTS: dict[str, Any] = dict(SANDBOX_OPTS, cancellation_type=ActivityCancellationType.ABANDON)
+# A cancelled build reports back before the Workflow releases its sandboxes by name, so nothing it was creating survives.
+ENSURE_OPTS: dict[str, Any] = dict(SANDBOX_OPTS, cancellation_type=ActivityCancellationType.WAIT_CANCELLATION_COMPLETED)
 
 
 def _turn_prompt(inp: AgentInput, state: AgentState, notes: list[str]) -> str:
@@ -90,17 +92,19 @@ class SimulationAgentWorkflow:
         self.decisions: list[dict[str, Any]] = []
         self.pending_review_id: str | None = None
         self.decision: ReviewDecision | None = None
+        self.last_apply: dict[str, Any] = {}  # the latest judged layout; inspect_site shows it in every round
 
     @workflow.run
     async def run(self, inp: AgentInput) -> AgentResult:
         wf_id = workflow.info().workflow_id
         agent = Agent(name="SceneAuthor", instructions=INSTRUCTIONS, tools=TOOLS, model=inp.model, model_settings=nemotron_settings(),
                       tool_use_behavior=StopAtTools(stop_at_tool_names=["request_review"]))
-        run_config = RunConfig(tool_execution=ToolExecutionConfig(max_function_tool_concurrency=1))
+        # An unknown tool name goes back to the model as an error, instead of failing the Workflow Task over and over.
+        run_config = RunConfig(tool_execution=ToolExecutionConfig(max_function_tool_concurrency=1), tool_not_found_behavior="return_error_to_model")
         while True:
             self.round += 1
             self.ctx = AgentCtx(run_id=self.state.run_id, workflow_id=wf_id, state=self.state, brief=inp.brief, model=inp.model, gpu_task_queue=inp.gpu_task_queue,
-                                rebuild=self._rebuild, round_start_step=self.state.step)
+                                rebuild=self._rebuild, round_start_step=self.state.step, last_apply=self.last_apply)
             try:
                 summary = await self._round(agent, run_config, inp)
             except BaseException:
@@ -117,7 +121,8 @@ class SimulationAgentWorkflow:
             try:
                 await workflow.wait_condition(lambda: self.decision is not None, timeout=timedelta(hours=inp.review_timeout_hours), timeout_summary="review window")
             except asyncio.TimeoutError:
-                self.decision = ReviewDecision(review_id=self.pending_review_id, action="reject", notes="review window expired")
+                if self.decision is None:  # a decision that arrived with the deadline still counts
+                    self.decision = ReviewDecision(review_id=self.pending_review_id, action="reject", notes="review window expired")
             decision, self.decision, self.pending_review_id = self.decision, None, None
             assert decision is not None
             self.decisions.append({"round": self.round, "summary": summary, **decision.model_dump(), "at": workflow.now().isoformat(timespec="seconds")})
@@ -134,13 +139,18 @@ class SimulationAgentWorkflow:
         try:
             for _ in range(3):  # StopAtTools ends the run when request_review is called, even when the tool refused
                 self.ctx.review_refusal = None
-                await Runner.run(agent, prompt, context=self.ctx, max_turns=40, run_config=run_config)
+                try:
+                    await Runner.run(agent, prompt, context=self.ctx, max_turns=40, run_config=run_config)
+                except ModelBehaviorError as e:  # a malformed model turn: say so and give the agent another go
+                    prompt = _turn_prompt(inp, self.ctx.state, self.notes) + f"\nYour last turn was rejected ({str(e)[:200]}). Use only the listed tools."
+                    continue
                 if self.ctx.review_summary is not None or self.ctx.review_refusal is None:
                     break
                 prompt = _turn_prompt(inp, self.ctx.state, self.notes) + "\nYour request_review was refused: " + self.ctx.review_refusal + " Do that now, then request_review again."
         except MaxTurnsExceeded:
             self.ctx.review_summary = self.ctx.review_summary or "Turn budget exhausted; requesting review of the current layout."
         self.state = self.ctx.state
+        self.last_apply = self.ctx.last_apply
         return self.ctx.review_summary or "The agent ended its turn without requesting review."
 
     async def _finish(self, inp: AgentInput, status: str) -> AgentResult:
@@ -181,7 +191,7 @@ class SimulationAgentWorkflow:
         try:
             ref = await workflow.execute_activity(
                 sb.ensure_sandboxes, EnsureInput(run_id=base.run_id, workflow_id=wf_id, gen=gen, grants=base.grants, layers=base.layers),
-                summary=f"sandboxes: generation {gen}" + (f", {len(base.layers)} layers rehydrated" if base.layers else ""), **SANDBOX_OPTS)
+                summary=f"sandboxes: generation {gen}" + (f", {len(base.layers)} layers rehydrated" if base.layers else ""), **ENSURE_OPTS)
             if ref.layer_stack_hash != layer_stack_hash(base.layer_pairs()):
                 raise RuntimeError(f"generation {gen} recomposed a different layer stack ({ref.layer_stack_hash[:12]} != {layer_stack_hash(base.layer_pairs())[:12]})")
         except BaseException:

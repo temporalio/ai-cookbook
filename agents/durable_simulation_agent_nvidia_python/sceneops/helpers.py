@@ -99,6 +99,13 @@ class SceneHelpers:
             name = f"{base}_{i}"
         return name
 
+    @staticmethod
+    def _not_an_asset(prim: Usd.Prim, kind: str) -> None:
+        """A marking or light that replaces an older asset of the same name keeps none of it: no reference, no catalog id."""
+        prim.GetReferences().SetReferences([])
+        prim.SetCustomDataByKey("agent:catalog_id", "")
+        prim.SetCustomDataByKey("agent:kind", kind)
+
     def _named(self, name: str) -> str:
         """An explicit name replaces any existing agent prim of that name (re-placing is an edit, not a duplicate)."""
         path = f"{AGENT_ROOT}/{name}"
@@ -139,7 +146,8 @@ class SceneHelpers:
         path = f"{AGENT_ROOT}/{name}"
         xf = UsdGeom.Xform.Define(self.stage, path)
         prim = xf.GetPrim()
-        prim.GetReferences().AddReference(f"{self.asset_root}/{entry['usd']}")
+        # Explicit, not prepended: a name re-placed over an older layer's prim must not keep that layer's reference too.
+        prim.GetReferences().SetReferences([Sdf.Reference(f"{self.asset_root}/{entry['usd']}")])
         prim.SetActive(True)  # explicit: a re-placed name must override an older layer's `active = false`
         prim.SetCustomDataByKey("agent:catalog_id", entry["id"])
         api = UsdGeom.XformCommonAPI(xf)
@@ -199,7 +207,8 @@ class SceneHelpers:
         mesh.CreateFaceVertexIndicesAttr(idx)
         mesh.CreateDisplayColorAttr([Gf.Vec3f(*color)])
         mesh.GetPrim().SetActive(True)  # a same-name replacement must override this layer's own deactivation
-        mesh.GetPrim().SetCustomDataByKey("agent:kind", "floor_marking")
+        self._not_an_asset(mesh.GetPrim(), "floor_marking")
+        mesh.ClearXformOpOrder()  # the points are in world space: no transform inherited from an older prim of this name
         return path
 
     def add_light(self, name: str, x: float, y: float, z: float = 3.5, intensity: float = 20000.0,
@@ -211,7 +220,7 @@ class SceneHelpers:
         light.CreateColorAttr(Gf.Vec3f(*color))
         UsdGeom.XformCommonAPI(light).SetTranslate(Gf.Vec3d(float(x), float(y), float(z)))
         light.GetPrim().SetActive(True)
-        light.GetPrim().SetCustomDataByKey("agent:kind", "light")
+        self._not_an_asset(light.GetPrim(), "light")
         return path
 
     # ---------- geometry / validation ----------

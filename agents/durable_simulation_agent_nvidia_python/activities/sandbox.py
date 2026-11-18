@@ -277,5 +277,7 @@ async def write_manifest(inp: ManifestInput) -> str:
     }
     path = d / "manifest.json"
     d.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(doc, indent=2, sort_keys=True))
+    tmp = path.with_name(".manifest.json.part")
+    tmp.write_text(json.dumps(doc, indent=2, sort_keys=True))
+    tmp.replace(path)
     return str(path)

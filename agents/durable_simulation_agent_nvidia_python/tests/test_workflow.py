@@ -39,8 +39,8 @@ CODE_1 = ("s1 = h.place_asset('packing_table', -3.0, 2.0, 90, name='station_1')\
 CODE_2 = "moves = h.fix_all()\nprint(moves)\n"
 ROUND_1 = [("inspect_site", {}), ("search_assets", {"query": "packing table pallet conveyor"}), ("apply_usd_code", {"code": CODE_1, "rationale": "place the cell"}),
            ("check_lane", {"lane": "L2"}), ("render_preview", {"camera": "Station"}), ("request_review", {"summary": "Cell placed; the pallet is close to L2."})]
-ROUND_2 = [("apply_usd_code", {"code": CODE_2, "rationale": "clear the lane"}), ("check_lane", {"lane": "L2"}), ("render_preview", {"camera": "TopDown"}),
-           ("request_review", {"summary": "Lane clear."})]
+ROUND_2 = [("inspect_site", {}), ("apply_usd_code", {"code": CODE_2, "rationale": "clear the lane"}), ("check_lane", {"lane": "L2"}),
+           ("render_preview", {"camera": "TopDown"}), ("request_review", {"summary": "Lane clear."})]
 ACTIVITIES = [sb.ensure_sandboxes, sb.release_sandboxes, sb.sandbox_search, sb.sandbox_apply, sb.apply_grant, sb.write_manifest,
               gpu.render_preview, gpu.simulate_lane, gpu.close_trace]
 
@@ -78,6 +78,25 @@ async def completed_results(handle: WorkflowHandle, activity_type: str) -> list[
             if sched[a.scheduled_event_id] == activity_type:
                 out.append(json.loads(a.result.payloads[0].data))
     return out
+
+
+async def tool_outputs(handle: WorkflowHandle, tool: str) -> list[str]:
+    """What a tool returned to the model, in call order, read from the model Activities' inputs in the Event History."""
+    hist = await handle.fetch_history()
+    calls: dict[str, bool] = {}
+    outputs: dict[str, str] = {}
+    for e in hist.events:
+        if not e.HasField("activity_task_scheduled_event_attributes"):
+            continue
+        a = e.activity_task_scheduled_event_attributes
+        if a.activity_type.name != "invoke_model_activity":
+            continue
+        for item in json.loads(a.input.payloads[0].data).get("input") or []:
+            if isinstance(item, dict) and item.get("type") == "function_call" and item.get("name") == tool:
+                calls[item["call_id"]] = True
+            if isinstance(item, dict) and item.get("type") == "function_call_output" and item.get("call_id") in calls:
+                outputs[item["call_id"]] = item["output"]
+    return [outputs[c] for c in calls if c in outputs]
 
 
 @pytest.mark.timeout(120)
@@ -119,6 +138,10 @@ async def test_grant_violation_revise_rebuild_fix_approve_and_the_records(fake_e
                 ensures = await completed_results(handle, "ensure_sandboxes")
                 assert [(e["gen"], e["rehydrated_steps"]) for e in ensures] == [(1, []), (2, [1])]
                 assert ensures[1]["layer_stack_hash"] == layer_stack_hash([(1, st.layers[0].sha256)])
+
+                # inspect_site at the start of round 2 shows round 1's layout, not an empty scene
+                sites = [json.loads(o) for o in await tool_outputs(handle, "inspect_site")]
+                assert [len(s["placed_assets"]) for s in sites] == [0, 3] and sites[1]["layers_applied"] == [1]
 
                 assert await handle.execute_update(SimulationAgentWorkflow.review, ReviewDecision(review_id=rid2, action="approve", notes="")) == "approve"
                 result = await handle.result()
@@ -224,3 +247,40 @@ async def test_a_generation_that_cannot_be_rehydrated_leaves_no_sandbox_behind(f
                     await handle.result()
                 assert info.value.cause.cause.type == "LayerMissing"
     assert not any(p.is_dir() for p in (fake_env / "_fake_sandboxes").iterdir()), "the failed generation left no sandbox behind"
+
+
+async def run_one_round(fake_env, script: list[tuple[str, dict]]) -> tuple[WorkflowHandle, object]:
+    """Start a run with a scripted model, approve the grant, wait for the review; returns the handle and the state."""
+    async with await WorkflowEnvironment.start_time_skipping() as env:
+        async with AgentEnvironment(model=scripted_model(script), model_params=ModelActivityParameters(start_to_close_timeout=timedelta(seconds=30))) as agent_env:
+            client = agent_env.applied_on_client(env.client)
+            tq = f"test-{uuid.uuid4().hex[:6]}"
+            async with Worker(client, task_queue=tq, workflows=[SimulationAgentWorkflow], activities=ACTIVITIES):
+                handle = await start(client, tq, hours=1)
+                rid = await until_review(handle, [])
+                state = await handle.query(SimulationAgentWorkflow.get_state)
+                outputs = {name: await tool_outputs(handle, name) for name in ("fix_all",)}
+                hist = await handle.fetch_history()
+                outputs["model_inputs"] = [e.activity_task_scheduled_event_attributes.input.payloads[0].data.decode() for e in hist.events
+                                           if e.HasField("activity_task_scheduled_event_attributes")
+                                           and e.activity_task_scheduled_event_attributes.activity_type.name == "invoke_model_activity"]
+                await handle.execute_update(SimulationAgentWorkflow.review, ReviewDecision(review_id=rid, action="approve", notes=""))
+                await handle.result()
+    return outputs, state
+
+
+@pytest.mark.timeout(120)
+async def test_an_unknown_tool_name_goes_back_to_the_model(fake_env):
+    outputs, state = await run_one_round(fake_env, [("fix_all", {}), *ROUND_1])
+    assert outputs["fix_all"] == ["Tool 'fix_all' not found."], "the model saw the error and the run went on"
+    assert [layer.step for layer in state.layers] == [1]
+
+
+@pytest.mark.timeout(120)
+async def test_review_needs_checks_of_the_current_layout(fake_env):
+    script = [*ROUND_1[:5], ("apply_usd_code", {"code": CODE_2, "rationale": "clear the lane"}), ("request_review", {"summary": "too early"}),
+              ("check_lane", {"lane": "L2"}), ("render_preview", {"camera": "Station"}), ("request_review", {"summary": "Lane clear."})]
+    outputs, state = await run_one_round(fake_env, script)
+    # request_review ends the agent's run; the refusal comes back in the Workflow's next prompt
+    assert any("Your request_review was refused" in i and "on the current layout (step 2)" in i for i in outputs["model_inputs"]), "step 1's checks do not cover step 2"
+    assert [c.step for c in state.lane_checks] == [1, 2] and [r.step for r in state.renders] == [1, 2]

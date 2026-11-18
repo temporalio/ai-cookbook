@@ -98,3 +98,34 @@ async def test_a_provider_fault_is_answered_by_the_fallback_and_recorded(fake_en
     assert [s["model_name"] for s in llm] == ["nvidia/fallback", "nvidia/primary"], "the trajectory names the model that answered"
     assert llm[0]["extra"]["llm_response"]["fallback"] is True and llm[0]["extra"]["llm_response"]["primary"] == "nvidia/primary"
     assert llm[1]["extra"]["llm_response"]["fallback"] is False
+
+
+def _results(d, worker: str) -> list[dict]:
+    atif = json.loads(next(d.glob(f"atif-{worker}-*.json")).read_text())
+    return [res["extra"]["tool_result"] for s in atif["steps"] for res in (s.get("observation") or {}).get("results", [])]
+
+
+async def test_two_runs_in_one_process_keep_separate_trajectories(fake_env):
+    relay.configure(identity="w4")
+    await _env("wf-A", "ping").run(ping, {"run": "A"})
+    await _env("wf-B", "ping").run(ping, {"run": "B"})
+    await _env("wf-A", "ping").run(ping, {"run": "A2"})
+    await _env("wf-A", "finish").run(finish, "done")
+    await _env("wf-B", "finish").run(finish, "done")
+    assert [r["run"] for r in _results(fake_env / "wf-A" / "relay", "w4")] == ["A", "A2"]
+    assert [r["run"] for r in _results(fake_env / "wf-B" / "relay", "w4")] == ["B"]
+
+
+async def test_an_idle_run_is_closed_and_its_next_activity_resumes_the_trace(fake_env, monkeypatch):
+    monkeypatch.setenv("NEMO_RELAY_IDLE_CLOSE_S", "0")
+    relay.configure(identity="w5")
+    await _env("wf-idle", "ping").run(ping, {"n": 1})
+    await _env("wf-other", "ping").run(ping, {"n": 2})  # closes wf-idle: nothing of it is running here
+    assert "wf-idle" not in relay._runs
+    d = fake_env / "wf-idle" / "relay"
+    events = [json.loads(line) for line in next(d.glob("events-w5-*.jsonl")).read_text().splitlines()]
+    assert next(e for e in events if e.get("name") == "run_closed")["data"]["reason"] == "idle"
+    await _env("wf-idle", "ping").run(ping, {"n": 3})
+    run = relay._runs["wf-idle"]
+    assert run.resumed and run.root_uuid == json.loads((d / "propagation.json").read_text())["root_uuid"]
+    assert len(list(d.glob("atif-w5-*.json"))) == 2, "the resumed scope writes its own trajectory next to the first"
