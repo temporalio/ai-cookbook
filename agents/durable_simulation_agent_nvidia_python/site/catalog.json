@@ -1,0 +1,1334 @@
+{
+ "asset_root_note": "usd paths are relative to ISAACSIM_ASSET_ROOT = https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.1/ (Isaac 6.1 tree) or the baked /opt/assets copy. size_m = raw stage extents as composed into a metersPerUnit=1 stage (usd-core, textures skipped).",
+ "generated_by": "assets/collect_catalog.py",
+ "isaac_asset_version": "6.1",
+ "notes": [
+  "local_bbox = [xmin, ymin, xmax, ymax] in the asset's own frame (usd-core); footprints = local_bbox rotated by yaw + translate",
+  "z = pivot height used by place_asset: floor items sit on z=0 (bottom = 0); mounted items (lamp 9.0 = ceiling, signs/extinguisher) at wall/ceiling heights"
+ ],
+ "assets": [
+  {
+   "id": "packing_table",
+   "name": "Packing table (crates on top)",
+   "tags": [
+    "packing",
+    "station",
+    "table",
+    "workbench"
+   ],
+   "usd": "Isaac/Props/PackingTable/packing_table.usd",
+   "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.1/Isaac/Props/PackingTable/packing_table.usd",
+   "size_m": [
+    2.474,
+    0.782,
+    1.083
+   ],
+   "z": 0.0,
+   "measured": {
+    "size_m": [
+     2.474,
+     0.782,
+     1.083
+    ],
+    "z_min_m": 0.0,
+    "up_axis": "Z",
+    "file_meters_per_unit": 0.01,
+    "default_prim": "/Root",
+    "prims": 35,
+    "empty": false
+   },
+   "path_verified": true,
+   "local_bbox": [
+    -1.237,
+    -0.401,
+    1.237,
+    0.381
+   ],
+   "local_z": [
+    0.0,
+    1.083
+   ]
+  },
+  {
+   "id": "conveyor_belt",
+   "name": "Conveyor belt, straight 4 m",
+   "tags": [
+    "conveyor",
+    "belt",
+    "roller"
+   ],
+   "usd": "Isaac/Props/Conveyors/ConveyorBelt_A29.usd",
+   "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.1/Isaac/Props/Conveyors/ConveyorBelt_A29.usd",
+   "size_m": [
+    4.001,
+    1.151,
+    3.051
+   ],
+   "z": 0.0,
+   "measured": {
+    "size_m": [
+     4.001,
+     1.151,
+     3.051
+    ],
+    "z_min_m": 0.0,
+    "up_axis": "Z",
+    "file_meters_per_unit": 1.0,
+    "default_prim": "/World",
+    "prims": 41,
+    "empty": false
+   },
+   "path_verified": true,
+   "local_bbox": [
+    -0.001,
+    -0.575,
+    4.0,
+    0.575
+   ],
+   "local_z": [
+    0.0,
+    3.051
+   ]
+  },
+  {
+   "id": "pallet",
+   "name": "Wooden pallet (empty)",
+   "tags": [
+    "pallet",
+    "staging",
+    "empty"
+   ],
+   "usd": "Isaac/Props/Pallet/pallet.usd",
+   "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.1/Isaac/Props/Pallet/pallet.usd",
+   "size_m": [
+    1.213,
+    0.802,
+    0.143
+   ],
+   "z": 0.0,
+   "measured": {
+    "size_m": [
+     1.213,
+     0.802,
+     0.143
+    ],
+    "z_min_m": 0.0,
+    "up_axis": "Z",
+    "file_meters_per_unit": 1.0,
+    "default_prim": "/Root",
+    "prims": 6,
+    "empty": false
+   },
+   "path_verified": true,
+   "local_bbox": [
+    -0.605,
+    -0.4,
+    0.608,
+    0.402
+   ],
+   "local_z": [
+    0.0,
+    0.143
+   ]
+  },
+  {
+   "id": "pallet_boxes",
+   "name": "Pallet loaded with boxes",
+   "tags": [
+    "pallet",
+    "boxes",
+    "cardboard",
+    "staging",
+    "loaded"
+   ],
+   "usd": "Isaac/Props/Pallet/o3dyn_pallet.usd",
+   "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.1/Isaac/Props/Pallet/o3dyn_pallet.usd",
+   "size_m": [
+    1.203,
+    0.803,
+    0.587
+   ],
+   "z": 0.0,
+   "measured": {
+    "size_m": [
+     1.203,
+     0.803,
+     0.587
+    ],
+    "z_min_m": 0.002,
+    "up_axis": "Z",
+    "file_meters_per_unit": 1.0,
+    "default_prim": "/pallet_loaded",
+    "prims": 31,
+    "empty": false
+   },
+   "path_verified": true,
+   "local_bbox": [
+    -0.602,
+    -0.401,
+    0.602,
+    0.401
+   ],
+   "local_z": [
+    0.002,
+    0.589
+   ]
+  },
+  {
+   "id": "forklift",
+   "name": "Forklift (static prop)",
+   "tags": [
+    "forklift",
+    "vehicle"
+   ],
+   "usd": "Isaac/Props/Forklift/forklift.usd",
+   "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.1/Isaac/Props/Forklift/forklift.usd",
+   "size_m": [
+    1.214,
+    3.495,
+    2.155
+   ],
+   "z": 0.0,
+   "measured": {
+    "size_m": [
+     1.214,
+     3.495,
+     2.155
+    ],
+    "z_min_m": -0.002,
+    "up_axis": "Z",
+    "file_meters_per_unit": 1.0,
+    "default_prim": "/Root",
+    "prims": 20,
+    "empty": false
+   },
+   "path_verified": true,
+   "local_bbox": [
+    -0.607,
+    -1.747,
+    0.607,
+    1.747
+   ],
+   "local_z": [
+    -0.002,
+    2.153
+   ]
+  },
+  {
+   "id": "klt_bin",
+   "name": "Small KLT bin",
+   "tags": [
+    "bin",
+    "tote",
+    "small"
+   ],
+   "usd": "Isaac/Props/KLT_Bin/small_KLT.usd",
+   "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.1/Isaac/Props/KLT_Bin/small_KLT.usd",
+   "size_m": [
+    0.198,
+    0.297,
+    0.146
+   ],
+   "z": 0.073,
+   "measured": {
+    "size_m": [
+     0.198,
+     0.297,
+     0.146
+    ],
+    "z_min_m": -0.073,
+    "up_axis": "Z",
+    "file_meters_per_unit": 1.0,
+    "default_prim": "/SmallKLT",
+    "prims": 24,
+    "empty": false
+   },
+   "path_verified": true,
+   "local_bbox": [
+    -0.099,
+    -0.148,
+    0.099,
+    0.148
+   ],
+   "local_z": [
+    -0.073,
+    0.073
+   ]
+  },
+  {
+   "id": "dolly",
+   "name": "Dolly / hand cart",
+   "tags": [
+    "dolly",
+    "hand truck",
+    "cart"
+   ],
+   "usd": "Isaac/Props/Dolly/dolly_physics.usd",
+   "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.1/Isaac/Props/Dolly/dolly_physics.usd",
+   "size_m": [
+    0.865,
+    1.242,
+    0.495
+   ],
+   "z": 0.021,
+   "measured": {
+    "size_m": [
+     0.865,
+     1.242,
+     0.495
+    ],
+    "z_min_m": -0.021,
+    "up_axis": "Z",
+    "file_meters_per_unit": 1.0,
+    "default_prim": "/Root",
+    "prims": 49,
+    "empty": false
+   },
+   "path_verified": true,
+   "local_bbox": [
+    -0.432,
+    -0.622,
+    0.432,
+    0.62
+   ],
+   "local_z": [
+    -0.021,
+    0.474
+   ]
+  },
+  {
+   "id": "cardboard_box_a",
+   "name": "Cardboard box A",
+   "tags": [
+    "box",
+    "cardboard",
+    "parcel"
+   ],
+   "usd": "Isaac/Environments/Simple_Warehouse/Props/SM_CardBoxA_01.usd",
+   "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.1/Isaac/Environments/Simple_Warehouse/Props/SM_CardBoxA_01.usd",
+   "size_m": [
+    0.7,
+    0.5,
+    0.5
+   ],
+   "z": 0.0,
+   "measured": {
+    "size_m": [
+     0.7,
+     0.5,
+     0.5
+    ],
+    "z_min_m": 0.0,
+    "up_axis": "Z",
+    "file_meters_per_unit": 1.0,
+    "default_prim": "/Root",
+    "prims": 5,
+    "empty": false
+   },
+   "path_verified": true,
+   "local_bbox": [
+    -0.35,
+    -0.25,
+    0.35,
+    0.25
+   ],
+   "local_z": [
+    0.0,
+    0.5
+   ]
+  },
+  {
+   "id": "cardboard_box_b",
+   "name": "Cardboard box B",
+   "tags": [
+    "box",
+    "cardboard",
+    "parcel"
+   ],
+   "usd": "Isaac/Environments/Simple_Warehouse/Props/SM_CardBoxB_01.usd",
+   "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.1/Isaac/Environments/Simple_Warehouse/Props/SM_CardBoxB_01.usd",
+   "size_m": [
+    0.5,
+    0.5,
+    0.5
+   ],
+   "z": 0.0,
+   "measured": {
+    "size_m": [
+     0.5,
+     0.5,
+     0.5
+    ],
+    "z_min_m": 0.0,
+    "up_axis": "Z",
+    "file_meters_per_unit": 1.0,
+    "default_prim": "/Root",
+    "prims": 5,
+    "empty": false
+   },
+   "path_verified": true,
+   "local_bbox": [
+    -0.25,
+    -0.25,
+    0.25,
+    0.25
+   ],
+   "local_z": [
+    0.0,
+    0.5
+   ]
+  },
+  {
+   "id": "cardboard_box_c",
+   "name": "Cardboard box C (large)",
+   "tags": [
+    "box",
+    "cardboard",
+    "large"
+   ],
+   "usd": "Isaac/Environments/Simple_Warehouse/Props/SM_CardBoxC_01.usd",
+   "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.1/Isaac/Environments/Simple_Warehouse/Props/SM_CardBoxC_01.usd",
+   "size_m": [
+    0.5,
+    0.5,
+    0.25
+   ],
+   "z": 0.0,
+   "measured": {
+    "size_m": [
+     0.5,
+     0.5,
+     0.25
+    ],
+    "z_min_m": -0.0,
+    "up_axis": "Z",
+    "file_meters_per_unit": 1.0,
+    "default_prim": "/Root",
+    "prims": 5,
+    "empty": false
+   },
+   "path_verified": true,
+   "local_bbox": [
+    -0.25,
+    -0.25,
+    0.25,
+    0.25
+   ],
+   "local_z": [
+    -0.0,
+    0.25
+   ]
+  },
+  {
+   "id": "cardboard_box_d",
+   "name": "Cardboard box D (small)",
+   "tags": [
+    "box",
+    "cardboard",
+    "small"
+   ],
+   "usd": "Isaac/Environments/Simple_Warehouse/Props/SM_CardBoxD_01.usd",
+   "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.1/Isaac/Environments/Simple_Warehouse/Props/SM_CardBoxD_01.usd",
+   "size_m": [
+    0.38,
+    0.25,
+    0.149
+   ],
+   "z": 0.0,
+   "measured": {
+    "size_m": [
+     0.38,
+     0.25,
+     0.149
+    ],
+    "z_min_m": -0.0,
+    "up_axis": "Z",
+    "file_meters_per_unit": 1.0,
+    "default_prim": "/Root",
+    "prims": 5,
+    "empty": false
+   },
+   "path_verified": true,
+   "local_bbox": [
+    -0.19,
+    -0.125,
+    0.19,
+    0.125
+   ],
+   "local_z": [
+    -0.0,
+    0.149
+   ]
+  },
+  {
+   "id": "crate_plastic_a",
+   "name": "Plastic crate A",
+   "tags": [
+    "crate",
+    "plastic",
+    "tote"
+   ],
+   "usd": "Isaac/Environments/Simple_Warehouse/Props/SM_CratePlastic_A_01.usd",
+   "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.1/Isaac/Environments/Simple_Warehouse/Props/SM_CratePlastic_A_01.usd",
+   "size_m": [
+    0.616,
+    0.499,
+    0.435
+   ],
+   "z": 0.0,
+   "measured": {
+    "size_m": [
+     0.616,
+     0.499,
+     0.435
+    ],
+    "z_min_m": -0.0,
+    "up_axis": "Z",
+    "file_meters_per_unit": 1.0,
+    "default_prim": "/Root",
+    "prims": 5,
+    "empty": false
+   },
+   "path_verified": true,
+   "local_bbox": [
+    -0.308,
+    -0.24,
+    0.308,
+    0.259
+   ],
+   "local_z": [
+    -0.0,
+    0.435
+   ]
+  },
+  {
+   "id": "crate_plastic_b",
+   "name": "Plastic crate B",
+   "tags": [
+    "crate",
+    "plastic",
+    "tote"
+   ],
+   "usd": "Isaac/Environments/Simple_Warehouse/Props/SM_CratePlastic_B_01.usd",
+   "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.1/Isaac/Environments/Simple_Warehouse/Props/SM_CratePlastic_B_01.usd",
+   "size_m": [
+    0.437,
+    0.53,
+    0.282
+   ],
+   "z": 0.0,
+   "measured": {
+    "size_m": [
+     0.437,
+     0.53,
+     0.282
+    ],
+    "z_min_m": -0.0,
+    "up_axis": "Z",
+    "file_meters_per_unit": 1.0,
+    "default_prim": "/Root",
+    "prims": 5,
+    "empty": false
+   },
+   "path_verified": true,
+   "local_bbox": [
+    -0.218,
+    -0.267,
+    0.218,
+    0.263
+   ],
+   "local_z": [
+    -0.0,
+    0.282
+   ]
+  },
+  {
+   "id": "palette_wh",
+   "name": "Warehouse pallet (SM_PaletteA)",
+   "tags": [
+    "pallet",
+    "palette",
+    "wood"
+   ],
+   "usd": "Isaac/Environments/Simple_Warehouse/Props/SM_PaletteA_01.usd",
+   "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.1/Isaac/Environments/Simple_Warehouse/Props/SM_PaletteA_01.usd",
+   "size_m": [
+    1.213,
+    1.003,
+    0.211
+   ],
+   "z": 0.0,
+   "measured": {
+    "size_m": [
+     1.213,
+     1.003,
+     0.211
+    ],
+    "z_min_m": 0.0,
+    "up_axis": "Z",
+    "file_meters_per_unit": 1.0,
+    "default_prim": "/Root",
+    "prims": 5,
+    "empty": false
+   },
+   "path_verified": true,
+   "local_bbox": [
+    -0.605,
+    -0.5,
+    0.608,
+    0.503
+   ],
+   "local_z": [
+    0.0,
+    0.211
+   ]
+  },
+  {
+   "id": "rack_frame",
+   "name": "Pallet rack frame",
+   "tags": [
+    "rack",
+    "shelving",
+    "storage",
+    "frame"
+   ],
+   "usd": "Isaac/Environments/Simple_Warehouse/Props/SM_RackFrame_03.usd",
+   "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.1/Isaac/Environments/Simple_Warehouse/Props/SM_RackFrame_03.usd",
+   "size_m": [
+    0.127,
+    1.0,
+    3.0
+   ],
+   "z": 0.0,
+   "measured": {
+    "size_m": [
+     0.127,
+     1.0,
+     3.0
+    ],
+    "z_min_m": -0.0,
+    "up_axis": "Z",
+    "file_meters_per_unit": 1.0,
+    "default_prim": "/Root",
+    "prims": 9,
+    "empty": false
+   },
+   "path_verified": true,
+   "local_bbox": [
+    -0.063,
+    -0.5,
+    0.063,
+    0.5
+   ],
+   "local_z": [
+    -0.0,
+    3.0
+   ]
+  },
+  {
+   "id": "rack_shelf",
+   "name": "Rack shelf",
+   "tags": [
+    "rack",
+    "shelf",
+    "storage"
+   ],
+   "usd": "Isaac/Environments/Simple_Warehouse/Props/SM_RackShelf_01.usd",
+   "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.1/Isaac/Environments/Simple_Warehouse/Props/SM_RackShelf_01.usd",
+   "size_m": [
+    4.0,
+    1.077,
+    0.37
+   ],
+   "z": 0.345,
+   "measured": {
+    "size_m": [
+     4.0,
+     1.077,
+     0.37
+    ],
+    "z_min_m": -0.345,
+    "up_axis": "Z",
+    "file_meters_per_unit": 1.0,
+    "default_prim": "/Root",
+    "prims": 12,
+    "empty": false
+   },
+   "path_verified": true,
+   "local_bbox": [
+    -2.0,
+    -0.538,
+    2.0,
+    0.538
+   ],
+   "local_z": [
+    -0.345,
+    0.025
+   ]
+  },
+  {
+   "id": "rack_pile",
+   "name": "Rack with stacked goods",
+   "tags": [
+    "rack",
+    "pile",
+    "storage",
+    "stocked"
+   ],
+   "usd": "Isaac/Environments/Simple_Warehouse/Props/SM_RackPile_03.usd",
+   "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.1/Isaac/Environments/Simple_Warehouse/Props/SM_RackPile_03.usd",
+   "size_m": [
+    0.624,
+    0.986,
+    0.289
+   ],
+   "z": 0.0,
+   "measured": {
+    "size_m": [
+     0.624,
+     0.986,
+     0.289
+    ],
+    "z_min_m": 0.0,
+    "up_axis": "Z",
+    "file_meters_per_unit": 1.0,
+    "default_prim": "/Root",
+    "prims": 5,
+    "empty": false
+   },
+   "path_verified": true,
+   "local_bbox": [
+    -0.293,
+    -0.508,
+    0.331,
+    0.478
+   ],
+   "local_z": [
+    0.0,
+    0.289
+   ]
+  },
+  {
+   "id": "pushcart",
+   "name": "Push cart",
+   "tags": [
+    "cart",
+    "pushcart",
+    "utility"
+   ],
+   "usd": "Isaac/Environments/Simple_Warehouse/Props/SM_PushcartA_02.usd",
+   "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.1/Isaac/Environments/Simple_Warehouse/Props/SM_PushcartA_02.usd",
+   "size_m": [
+    0.936,
+    1.648,
+    0.377
+   ],
+   "z": 0.0,
+   "measured": {
+    "size_m": [
+     0.936,
+     1.648,
+     0.377
+    ],
+    "z_min_m": 0.0,
+    "up_axis": "Z",
+    "file_meters_per_unit": 1.0,
+    "default_prim": "/Root",
+    "prims": 5,
+    "empty": false
+   },
+   "path_verified": true,
+   "local_bbox": [
+    -0.468,
+    -0.824,
+    0.468,
+    0.824
+   ],
+   "local_z": [
+    0.0,
+    0.377
+   ]
+  },
+  {
+   "id": "barrel_plastic_a",
+   "name": "Plastic barrel A",
+   "tags": [
+    "barrel",
+    "drum",
+    "plastic"
+   ],
+   "usd": "Isaac/Environments/Simple_Warehouse/Props/SM_BarelPlastic_A_01.usd",
+   "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.1/Isaac/Environments/Simple_Warehouse/Props/SM_BarelPlastic_A_01.usd",
+   "size_m": [
+    0.6,
+    0.708,
+    0.901
+   ],
+   "z": 0.0,
+   "measured": {
+    "size_m": [
+     0.6,
+     0.708,
+     0.901
+    ],
+    "z_min_m": -0.0,
+    "up_axis": "Z",
+    "file_meters_per_unit": 1.0,
+    "default_prim": "/Root",
+    "prims": 5,
+    "empty": false
+   },
+   "path_verified": true,
+   "local_bbox": [
+    -0.3,
+    -0.354,
+    0.3,
+    0.354
+   ],
+   "local_z": [
+    -0.0,
+    0.901
+   ]
+  },
+  {
+   "id": "barrel_plastic_b",
+   "name": "Plastic barrel B",
+   "tags": [
+    "barrel",
+    "drum",
+    "plastic"
+   ],
+   "usd": "Isaac/Environments/Simple_Warehouse/Props/SM_BarelPlastic_B_01.usd",
+   "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.1/Isaac/Environments/Simple_Warehouse/Props/SM_BarelPlastic_B_01.usd",
+   "size_m": [
+    0.6,
+    0.708,
+    0.588
+   ],
+   "z": 0.0,
+   "measured": {
+    "size_m": [
+     0.6,
+     0.708,
+     0.588
+    ],
+    "z_min_m": -0.0,
+    "up_axis": "Z",
+    "file_meters_per_unit": 1.0,
+    "default_prim": "/Root",
+    "prims": 5,
+    "empty": false
+   },
+   "path_verified": true,
+   "local_bbox": [
+    -0.3,
+    -0.354,
+    0.3,
+    0.354
+   ],
+   "local_z": [
+    -0.0,
+    0.588
+   ]
+  },
+  {
+   "id": "floor_decal_keepclear",
+   "name": "Floor decal: KEEP CLEAR",
+   "tags": [
+    "decal",
+    "floor",
+    "marking",
+    "keep clear",
+    "safety"
+   ],
+   "usd": "Isaac/Environments/Simple_Warehouse/Props/SM_FloorDecal_Keepclear.usd",
+   "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.1/Isaac/Environments/Simple_Warehouse/Props/SM_FloorDecal_Keepclear.usd",
+   "size_m": [
+    0.166,
+    0.963,
+    0.0
+   ],
+   "z": 0.0,
+   "measured": {
+    "size_m": [
+     0.166,
+     0.963,
+     0.0
+    ],
+    "z_min_m": -0.0,
+    "up_axis": "Z",
+    "file_meters_per_unit": 1.0,
+    "default_prim": "/Root",
+    "prims": 5,
+    "empty": false
+   },
+   "path_verified": true,
+   "local_bbox": [
+    -0.083,
+    -0.481,
+    0.083,
+    0.481
+   ],
+   "local_z": [
+    -0.0,
+    -0.0
+   ]
+  },
+  {
+   "id": "floor_decal_stripe_4m",
+   "name": "Floor stripe decal 4 m",
+   "tags": [
+    "decal",
+    "floor",
+    "marking",
+    "stripe",
+    "lane"
+   ],
+   "usd": "Isaac/Environments/Simple_Warehouse/Props/SM_FloorDecal_StripeFull_4m.usd",
+   "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.1/Isaac/Environments/Simple_Warehouse/Props/SM_FloorDecal_StripeFull_4m.usd",
+   "size_m": [
+    4.0,
+    0.159,
+    0.0
+   ],
+   "z": 0.0,
+   "measured": {
+    "size_m": [
+     4.0,
+     0.159,
+     0.0
+    ],
+    "z_min_m": -0.0,
+    "up_axis": "Z",
+    "file_meters_per_unit": 1.0,
+    "default_prim": "/Root",
+    "prims": 5,
+    "empty": false
+   },
+   "path_verified": true,
+   "local_bbox": [
+    0.0,
+    -0.079,
+    4.0,
+    0.079
+   ],
+   "local_z": [
+    -0.0,
+    -0.0
+   ]
+  },
+  {
+   "id": "floor_decal_red_2x1",
+   "name": "Floor decal red 2x1",
+   "tags": [
+    "decal",
+    "floor",
+    "marking",
+    "red",
+    "zone"
+   ],
+   "usd": "Isaac/Environments/Simple_Warehouse/Props/SM_FloorDecal_QuadRed2x1.usd",
+   "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.1/Isaac/Environments/Simple_Warehouse/Props/SM_FloorDecal_QuadRed2x1.usd",
+   "size_m": [
+    1.077,
+    2.154,
+    0.0
+   ],
+   "z": 0.0,
+   "measured": {
+    "size_m": [
+     1.077,
+     2.154,
+     0.0
+    ],
+    "z_min_m": -0.0,
+    "up_axis": "Z",
+    "file_meters_per_unit": 1.0,
+    "default_prim": "/Root",
+    "prims": 5,
+    "empty": false
+   },
+   "path_verified": true,
+   "local_bbox": [
+    -1.077,
+    -1.077,
+    -0.0,
+    1.077
+   ],
+   "local_z": [
+    -0.0,
+    -0.0
+   ]
+  },
+  {
+   "id": "floor_decal_red_1x1",
+   "name": "Floor decal red 1x1",
+   "tags": [
+    "decal",
+    "floor",
+    "marking",
+    "red"
+   ],
+   "usd": "Isaac/Environments/Simple_Warehouse/Props/SM_FloorDecal_RecRed1X1.usd",
+   "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.1/Isaac/Environments/Simple_Warehouse/Props/SM_FloorDecal_RecRed1X1.usd",
+   "size_m": [
+    1.079,
+    1.159,
+    0.0
+   ],
+   "z": 0.0,
+   "measured": {
+    "size_m": [
+     1.079,
+     1.159,
+     0.0
+    ],
+    "z_min_m": -0.0,
+    "up_axis": "Z",
+    "file_meters_per_unit": 1.0,
+    "default_prim": "/Root",
+    "prims": 5,
+    "empty": false
+   },
+   "path_verified": true,
+   "local_bbox": [
+    -1.079,
+    -0.579,
+    0.0,
+    0.579
+   ],
+   "local_z": [
+    -0.0,
+    -0.0
+   ]
+  },
+  {
+   "id": "sign_a",
+   "name": "Wall/post sign A",
+   "tags": [
+    "sign",
+    "label"
+   ],
+   "usd": "Isaac/Environments/Simple_Warehouse/Props/SM_SignA_02.usd",
+   "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.1/Isaac/Environments/Simple_Warehouse/Props/SM_SignA_02.usd",
+   "size_m": [
+    0.0,
+    0.295,
+    0.21
+   ],
+   "z": 1.6,
+   "measured": {
+    "size_m": [
+     0.0,
+     0.295,
+     0.21
+    ],
+    "z_min_m": -0.105,
+    "up_axis": "Z",
+    "file_meters_per_unit": 1.0,
+    "default_prim": "/Root",
+    "prims": 5,
+    "empty": false
+   },
+   "path_verified": true,
+   "local_bbox": [
+    0.0,
+    -0.147,
+    0.0,
+    0.147
+   ],
+   "local_z": [
+    -0.105,
+    0.105
+   ]
+  },
+  {
+   "id": "aisle_sign",
+   "name": "Hanging aisle sign",
+   "tags": [
+    "sign",
+    "aisle",
+    "hanging"
+   ],
+   "usd": "Isaac/Environments/Simple_Warehouse/Props/S_AisleSign.usd",
+   "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.1/Isaac/Environments/Simple_Warehouse/Props/S_AisleSign.usd",
+   "size_m": [
+    0.394,
+    0.004,
+    0.787
+   ],
+   "z": 2.8,
+   "measured": {
+    "size_m": [
+     0.394,
+     0.004,
+     0.787
+    ],
+    "z_min_m": -0.394,
+    "up_axis": "Z",
+    "file_meters_per_unit": 1.0,
+    "default_prim": "/Root",
+    "prims": 5,
+    "empty": false
+   },
+   "path_verified": true,
+   "local_bbox": [
+    -0.197,
+    -0.004,
+    0.197,
+    0.0
+   ],
+   "local_z": [
+    -0.394,
+    0.394
+   ]
+  },
+  {
+   "id": "traffic_cone",
+   "name": "Traffic cone",
+   "tags": [
+    "cone",
+    "safety",
+    "marker",
+    "barrier"
+   ],
+   "usd": "Isaac/Environments/Simple_Warehouse/Props/S_TrafficCone.usd",
+   "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.1/Isaac/Environments/Simple_Warehouse/Props/S_TrafficCone.usd",
+   "size_m": [
+    0.336,
+    0.334,
+    0.463
+   ],
+   "z": 0.0,
+   "measured": {
+    "size_m": [
+     0.336,
+     0.334,
+     0.463
+    ],
+    "z_min_m": 0.0,
+    "up_axis": "Z",
+    "file_meters_per_unit": 1.0,
+    "default_prim": "/Root",
+    "prims": 5,
+    "empty": false
+   },
+   "path_verified": true,
+   "local_bbox": [
+    -0.168,
+    -0.167,
+    0.168,
+    0.167
+   ],
+   "local_z": [
+    0.0,
+    0.463
+   ]
+  },
+  {
+   "id": "wet_floor_sign",
+   "name": "Wet floor sign",
+   "tags": [
+    "sign",
+    "safety",
+    "floor"
+   ],
+   "usd": "Isaac/Environments/Simple_Warehouse/Props/S_WetFloorSign.usd",
+   "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.1/Isaac/Environments/Simple_Warehouse/Props/S_WetFloorSign.usd",
+   "size_m": [
+    0.267,
+    0.232,
+    0.644
+   ],
+   "z": 0.0,
+   "measured": {
+    "size_m": [
+     0.267,
+     0.232,
+     0.644
+    ],
+    "z_min_m": 0.0,
+    "up_axis": "Z",
+    "file_meters_per_unit": 1.0,
+    "default_prim": "/Root",
+    "prims": 5,
+    "empty": false
+   },
+   "path_verified": true,
+   "local_bbox": [
+    -0.133,
+    -0.116,
+    0.133,
+    0.116
+   ],
+   "local_z": [
+    0.0,
+    0.645
+   ]
+  },
+  {
+   "id": "fire_extinguisher",
+   "name": "Fire extinguisher",
+   "tags": [
+    "safety",
+    "fire",
+    "extinguisher"
+   ],
+   "usd": "Isaac/Environments/Simple_Warehouse/Props/SM_FireExtinguisher_02.usd",
+   "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.1/Isaac/Environments/Simple_Warehouse/Props/SM_FireExtinguisher_02.usd",
+   "size_m": [
+    0.183,
+    0.296,
+    0.674
+   ],
+   "z": 1.5,
+   "measured": {
+    "size_m": [
+     0.183,
+     0.296,
+     0.674
+    ],
+    "z_min_m": -0.48,
+    "up_axis": "Z",
+    "file_meters_per_unit": 1.0,
+    "default_prim": "/Root",
+    "prims": 5,
+    "empty": false
+   },
+   "path_verified": true,
+   "local_bbox": [
+    -0.0,
+    -0.148,
+    0.183,
+    0.147
+   ],
+   "local_z": [
+    -0.48,
+    0.194
+   ]
+  },
+  {
+   "id": "emergency_board",
+   "name": "Emergency board",
+   "tags": [
+    "safety",
+    "board",
+    "emergency"
+   ],
+   "usd": "Isaac/Environments/Simple_Warehouse/Props/SM_EmergencyBoardFull_01.usd",
+   "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.1/Isaac/Environments/Simple_Warehouse/Props/SM_EmergencyBoardFull_01.usd",
+   "size_m": [
+    0.194,
+    0.643,
+    1.169
+   ],
+   "z": 1.5,
+   "measured": {
+    "size_m": [
+     0.194,
+     0.643,
+     1.169
+    ],
+    "z_min_m": -0.585,
+    "up_axis": "Z",
+    "file_meters_per_unit": 1.0,
+    "default_prim": "/Root",
+    "prims": 12,
+    "empty": false
+   },
+   "path_verified": true,
+   "local_bbox": [
+    0.0,
+    -0.313,
+    0.194,
+    0.33
+   ],
+   "local_z": [
+    -0.585,
+    0.585
+   ]
+  },
+  {
+   "id": "lamp_ceiling",
+   "name": "Ceiling lamp fixture",
+   "tags": [
+    "lamp",
+    "light",
+    "ceiling",
+    "fixture"
+   ],
+   "usd": "Isaac/Environments/Simple_Warehouse/Props/SM_LampCeilingA_04.usd",
+   "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.1/Isaac/Environments/Simple_Warehouse/Props/SM_LampCeilingA_04.usd",
+   "size_m": [
+    2.0,
+    0.8,
+    3.185
+   ],
+   "z": 9.0,
+   "measured": {
+    "size_m": [
+     2.0,
+     0.8,
+     3.185
+    ],
+    "z_min_m": -3.169,
+    "up_axis": "Z",
+    "file_meters_per_unit": 1.0,
+    "default_prim": "/Root",
+    "prims": 10,
+    "empty": false
+   },
+   "path_verified": true,
+   "local_bbox": [
+    -1.0,
+    -0.148,
+    1.0,
+    0.653
+   ],
+   "local_z": [
+    -3.169,
+    0.016
+   ]
+  },
+  {
+   "id": "bucket_plastic",
+   "name": "Plastic bucket",
+   "tags": [
+    "bucket",
+    "plastic"
+   ],
+   "usd": "Isaac/Environments/Simple_Warehouse/Props/SM_BucketPlastic_B.usd",
+   "source_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.1/Isaac/Environments/Simple_Warehouse/Props/SM_BucketPlastic_B.usd",
+   "size_m": [
+    0.611,
+    0.726,
+    0.62
+   ],
+   "z": 0.0,
+   "measured": {
+    "size_m": [
+     0.611,
+     0.726,
+     0.62
+    ],
+    "z_min_m": 0.0,
+    "up_axis": "Z",
+    "file_meters_per_unit": 1.0,
+    "default_prim": "/Root",
+    "prims": 5,
+    "empty": false
+   },
+   "path_verified": true,
+   "local_bbox": [
+    -0.305,
+    -0.363,
+    0.305,
+    0.363
+   ],
+   "local_z": [
+    0.0,
+    0.62
+   ]
+  }
+ ]
+}
