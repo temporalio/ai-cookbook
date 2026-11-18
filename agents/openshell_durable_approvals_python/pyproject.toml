@@ -1,0 +1,33 @@
+[project]
+name = "openshell-durable-approvals-python"
+version = "0.1.0"
+description = "Durable human approvals for sandboxed agents: NVIDIA OpenShell sandboxes, Nemotron on NVIDIA NIM, and Temporal"
+authors = [{ name = "Temporal Technologies Inc", email = "sdk@temporal.io" }]
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "temporalio>=1.36,<2",
+    "temporalio-openai-agents>=2.0.0,<3",
+    "openai-agents>=0.22,<0.25",
+    "openai>=3,<4",
+    "pydantic>=2.10",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-timeout>=2.4.0",
+    "pytest-asyncio>=0.26.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+asyncio_mode = "auto"
+
+[tool.uv]
+# This table replaces the repo-root uv.toml for this recipe, so it repeats the two-week cooldown. The Temporal packages
+# are exempted up to the GA release of temporalio-openai-agents 2.0.0 (2026-11-17), which needs temporalio 1.36.
+# Drop this table once both releases are older than two weeks (after 2026-12-01).
+exclude-newer = "2 weeks"
+exclude-newer-package = { temporalio = "2026-11-18T00:00:00Z", temporalio-openai-agents = "2026-11-18T00:00:00Z" }

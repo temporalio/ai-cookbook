@@ -1,6 +1,12 @@
 import asyncio
 import logging
 
+# ADK 2.x imports its tracing module lazily on the first agent run. If that
+# first import happens inside the Workflow sandbox, the module's
+# `time.monotonic()` call is restricted and the first Workflow Task fails
+# (it then succeeds on retry). Importing it here, outside the sandbox, avoids
+# that failed task.
+import google.adk.telemetry.node_tracing  # noqa: F401
 from temporalio.client import Client
 from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.envconfig import ClientConfig

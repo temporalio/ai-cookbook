@@ -6,21 +6,22 @@ priority: 750
 
 # Durable agent with MCP and Activity-backed tools using the Strands Agents SDK
 
-This recipe builds a durable AI agent using the [Strands Agents SDK Integration for Temporal](https://github.com/temporalio/ai-integrations/tree/main/python/strands_agents). The `StrandsPlugin` makes every model call, tool call, and MCP interaction run as a durable Temporal Activity. The Workflow creates an agent and invokes it.
+This recipe builds a durable AI agent using the [Strands Agents SDK Integration for Temporal](https://github.com/temporalio/ai-integrations/tree/main/python/strands_agents), published as the `temporalio-strands-agents` package. The `StrandsPlugin` makes every model call, tool call, and MCP interaction run as a durable Temporal Activity. The Workflow creates an agent and invokes it.
 
 The agent acts as an AWS assistant with two kinds of tools:
 
 - **An MCP tool**: the [AWS Documentation MCP server](https://github.com/awslabs/mcp/tree/main/src/aws-documentation-mcp-server), run locally with `uvx`, lets the agent search and read AWS documentation.
 - **A non-deterministic, Activity-backed tool**: `get_recent_aws_announcements` fetches the live AWS "What's New" RSS feed. Because it makes a network call, it is a Temporal Activity wrapped with `activity_as_tool`, which gives it Durable Execution, retries, and timeouts.
 
-It uses the Strands default Bedrock model. As of `strands-agents` 1.42.0 that model is Claude Sonnet 4.6, resolved through the `global.anthropic.claude-sonnet-4-6` inference profile.
+It uses the Strands default Bedrock model. As of `strands-agents` 1.63.0 that model is Claude Sonnet 4.6, resolved through the `global.anthropic.claude-sonnet-4-6` inference profile.
 
 ## Prerequisites
 
 1. **AWS Bedrock access**: Request access to Claude Sonnet 4.6 in the [Bedrock console](https://console.aws.amazon.com/bedrock/). To use a different model, pass a configured `BedrockModel` to `StrandsPlugin`.
 2. **AWS credentials and region**: See [Strands' Amazon Bedrock guide](https://strandsagents.com/docs/user-guide/sdk/model-providers/amazon-bedrock/) for credential setup and model configuration. Strands falls back to `us-west-2` when `AWS_REGION` is unset, so set the region where you have model access.
-3. **`uvx`**: Required to run the AWS Documentation MCP server (ships with [`uv`](https://docs.astral.sh/uv/)).
-4. **A running Temporal dev server**: `temporal server start-dev`.
+3. **Python 3.11 or later**: Required by `temporalio-strands-agents`.
+4. **`uvx`**: Required to run the AWS Documentation MCP server (ships with [`uv`](https://docs.astral.sh/uv/)).
+5. **A running Temporal dev server**: `temporal server start-dev`.
 
 ## Create the Activity-backed tool
 
@@ -129,7 +130,7 @@ class AWSAssistantWorkflow:
 
 ## Create the Worker
 
-The Worker registers the `StrandsPlugin` on the client. The plugin installs the Pydantic Data Converter, registers the model and MCP Activities, and uses the default `BedrockModel()` because no `models` are configured. MCP servers are registered by name through `mcp_clients`, each as a factory that launches the server (here, the AWS Documentation MCP server over stdio with `uvx`).
+The Worker registers the `StrandsPlugin` on the client. The plugin installs the Pydantic Data Converter, registers the model and MCP Activities, and uses the default `BedrockModel()` because no `models` are configured. MCP servers are registered by name through `mcp_clients`. Each entry is a factory that returns a new `mcp.Client` (from the MCP Python SDK 2) every time the Worker opens a connection, here launching the AWS Documentation MCP server over stdio with `uvx`. MCP support needs the package's `mcp` extra, which the recipe installs with `temporalio-strands-agents[mcp]`.
 
 *File: worker.py*
 
@@ -137,8 +138,8 @@ The Worker registers the `StrandsPlugin` on the client. The plugin installs the 
 ```python
 import asyncio
 
+import mcp
 from mcp import StdioServerParameters, stdio_client
-from strands.tools.mcp import MCPClient
 from temporalio.client import Client
 from temporalio.envconfig import ClientConfig
 from temporalio.strands_agents import StrandsPlugin
@@ -150,10 +151,14 @@ from workflows.aws_assistant_workflow import AWSAssistantWorkflow
 TASK_QUEUE = "strands-aws-assistant-task-queue"
 
 
-def make_aws_docs_client() -> MCPClient:
-    """Factory for the AWS Documentation MCP server, run locally via uvx."""
-    return MCPClient(
-        lambda: stdio_client(
+def make_aws_docs_client() -> mcp.Client:
+    """Factory for the AWS Documentation MCP server, run locally via uvx.
+
+    The worker calls this each time it opens a connection, so it returns a new
+    `mcp.Client` and transport on every call.
+    """
+    return mcp.Client(
+        stdio_client(
             StdioServerParameters(
                 command="uvx",
                 args=["awslabs.aws-documentation-mcp-server@latest"],
@@ -301,6 +306,7 @@ To authenticate with mTLS certificates instead of an API key, see [environment c
 ## Learn more
 
 - [Temporal Strands Agents Plugin](https://github.com/temporalio/ai-integrations/tree/main/python/strands_agents)
+- [Strands Agents integration guide](https://docs.temporal.io/develop/python/integrations/strands-agents)
 - [Strands' Amazon Bedrock guide](https://strandsagents.com/docs/user-guide/sdk/model-providers/amazon-bedrock/)
 - [Temporal Strands Agents Samples (samples-python)](https://github.com/temporalio/samples-python/tree/main/strands_plugin)
 - [Strands Agents Documentation](https://strandsagents.com/docs/)

@@ -1,0 +1,18 @@
+# OpenShell policy v1 for the EXEC sandbox: it runs the code the model wrote and has no network rules at all.
+# A sandbox without network rules gets no baseline filesystem paths, so the system paths are listed explicitly.
+version: 1
+filesystem_policy:
+  include_workdir: true            # /sandbox, read-write: the agent's working directory
+  read_only:
+    - /usr
+    - /lib
+    - /etc
+    - /proc
+    - /dev/urandom
+    - /var/log
+  read_write:
+    - /tmp
+    - /dev/null
+landlock:
+  compatibility: hard_requirement  # fail closed
+network_policies: {}

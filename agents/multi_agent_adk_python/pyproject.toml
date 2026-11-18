@@ -3,11 +3,12 @@ name = "multi-agent-adk-python"
 version = "0.1.0"
 description = "Multi-agent orchestration with Google ADK and Temporal — parallel + sequential agents inside a workflow"
 readme = "README.md"
-requires-python = ">=3.10,<3.14"
+requires-python = ">=3.11,<3.14"
 dependencies = [
-    "temporalio-google-adk>=0.0.1,<1",
-    "google-adk>=2.8.0,<3",
-    "google-genai>=2.21.0,<3",
+    "temporalio>=1.36.0,<2",
+    "temporalio-google-adk>=1.0.0,<2",
+    "google-adk>=2.12,<3",
+    "google-genai>=2.21,<3",
     "pydantic>=2.10.0",
 ]
 
@@ -28,3 +29,10 @@ dev = [
 [tool.pytest.ini_options]
 pythonpath = ["."]
 asyncio_mode = "auto"
+
+[tool.uv]
+# This table replaces the repo-root uv.toml for this recipe, so it repeats the two-week cooldown. The Temporal packages
+# are exempted up to the temporalio-google-adk 1.0.0 GA release (2026-11-17), which needs temporalio 1.36.
+# Drop this table once these releases are older than two weeks (after 2026-12-01).
+exclude-newer = "2 weeks"
+exclude-newer-package = { temporalio = "2026-11-18T00:00:00Z", temporalio-google-adk = "2026-11-18T00:00:00Z" }

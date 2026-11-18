@@ -8,7 +8,8 @@ priority: 750
 
 This recipe builds a **multi-agent dispatch pipeline** using
 [Google ADK](https://adk.dev/) and the
-[Google ADK integration for Temporal](https://github.com/temporalio/ai-integrations/tree/main/python/google_adk).
+[Google ADK integration for Temporal](https://docs.temporal.io/develop/python/integrations/google-adk)
+(`temporalio-google-adk`).
 Two agents reason in parallel, a third synthesizes their output and submits a
 structured decision — and every LLM call and every I/O tool call is a durable
 Temporal Activity. (The final decision write is a plain in-workflow tool —
@@ -83,7 +84,7 @@ This recipe highlights:
 
 ## Prerequisites
 
-- Python 3.10 to 3.13
+- Python 3.11 to 3.13
 - [`uv`](https://docs.astral.sh/uv/) for dependency management
 - A running Temporal Dev Server (`temporal server start-dev`)
 - A Google API key with access to Gemini (`GOOGLE_API_KEY`)
@@ -196,7 +197,7 @@ backing infrastructure.
 registers that activity (`invoke_model`) on your worker for you.
 
 *File: workflows/assignment_workflow.py*
-<!--SNIPSTART workflows/assignment_workflow.py {"startPattern": "^def _fleet_agent\\(\\) -> Agent:$", "endPattern": "^    \\)$", "selectedLines": ["1-10", "30-32"]}-->
+<!--SNIPSTART workflows/assignment_workflow.py {"startPattern": "^def _fleet_agent\\(\\) -> Agent:$", "endPattern": "^    \\)$", "selectedLines": ["1-11", "31-33"]}-->
 ```python
 def _fleet_agent() -> Agent:
     return Agent(
@@ -208,11 +209,11 @@ def _fleet_agent() -> Agent:
                 summary="Fleet Agent — LLM reasoning",
                 retry_policy=_LLM_RETRY,
             ),
-        ...
         ),
+        ...
         tools=[_fleet_status_tool, _route_info_tool],
         output_key="fleet_assessment",
-        ...
+    )
 ```
 <!--SNIPEND-->
 
@@ -241,8 +242,8 @@ application error, timeout), the wrapper catches the `ActivityError`
 and returns it to the LLM as a string so the agent can adapt instead of
 crashing the pipeline. (The retry attempts still appear in workflow
 history.) Programming bugs — e.g. argument-binding errors — are not
-caught and propagate normally. Upstream `activity_as_tool`
-already handles multi-arg activities and local non-workflow ADK runs.
+caught and propagate normally. Upstream `activity_as_tool` already handles
+multi-arg activities and local non-workflow ADK runs.
 
 ### Compose the pipeline
 
