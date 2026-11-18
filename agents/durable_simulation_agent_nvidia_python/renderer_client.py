@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
 from typing import Any, Awaitable, Callable
 
@@ -44,39 +45,42 @@ class RendererClient:
         return r.json()
 
     async def cancel(self, key: str) -> None:
-        await self._client.delete(f"/jobs/{key}")
+        """Best-effort cancellation if the renderer is still reachable."""
+        with contextlib.suppress(httpx.HTTPError):
+            await self._client.delete(f"/jobs/{key}")
 
     async def run(self, key: str, op: str, params: dict[str, Any], *, on_progress: Callable[[dict[str, Any]], Awaitable[None] | None] | None = None,
-                  poll: float = 1.0, timeout: float = 1800.0, cancelled: Callable[[], bool] | None = None) -> dict[str, Any]:
+                  poll: float = 1.0, timeout: float = 1800.0) -> dict[str, Any]:
         """Submit (or attach) and wait for completion. A 404 mid-poll means the service restarted → resubmit once."""
-        job, attached = await self.submit(key, op, params)
-        if on_progress:
-            res = on_progress({"phase": "attached" if attached else "submitted", "adopters": job.get("adopters", 0)})
-            if asyncio.iscoroutine(res):
-                await res
-        deadline = asyncio.get_running_loop().time() + timeout
-        resubmitted = False
-        while True:
-            if cancelled and cancelled():
-                await self.cancel(key)
-                raise RendererError("cancelled", retryable=False)
-            job = await self.get(key)
-            if job is None:
-                if resubmitted:
-                    raise RendererError("job vanished twice (renderer restarting?)")
-                resubmitted = True
-                job, _ = await self.submit(key, op, params)
-            status = job["status"]
+        try:
+            job, attached = await self.submit(key, op, params)
             if on_progress:
-                res = on_progress({**job.get("progress", {}), "status": status})
+                res = on_progress({"phase": "attached" if attached else "submitted", "adopters": job.get("adopters", 0)})
                 if asyncio.iscoroutine(res):
                     await res
-            if status == "done":
-                return job["result"]
-            if status in ("failed", "cancelled"):
-                err = job.get("error") or {}
-                raise RendererError(f"{op} {status}: {err.get('type')}: {err.get('msg')}", retryable=bool(err.get("retryable", True)), error=err)
-            if asyncio.get_running_loop().time() > deadline:
-                await self.cancel(key)
-                raise RendererError(f"{op} timed out after {timeout}s")
-            await asyncio.sleep(poll)
+            deadline = asyncio.get_running_loop().time() + timeout
+            resubmitted = False
+            while True:
+                job = await self.get(key)
+                if job is None:
+                    if resubmitted:
+                        raise RendererError("job vanished twice (renderer restarting?)")
+                    resubmitted = True
+                    job, _ = await self.submit(key, op, params)
+                status = job["status"]
+                if on_progress:
+                    res = on_progress({**job.get("progress", {}), "status": status})
+                    if asyncio.iscoroutine(res):
+                        await res
+                if status == "done":
+                    return job["result"]
+                if status in ("failed", "cancelled"):
+                    err = job.get("error") or {}
+                    raise RendererError(f"{op} {status}: {err.get('type')}: {err.get('msg')}", retryable=bool(err.get("retryable", True)), error=err)
+                if asyncio.get_running_loop().time() > deadline:
+                    await self.cancel(key)
+                    raise RendererError(f"{op} timed out after {timeout}s")
+                await asyncio.sleep(poll)
+        except asyncio.CancelledError:
+            await asyncio.shield(self.cancel(key))
+            raise

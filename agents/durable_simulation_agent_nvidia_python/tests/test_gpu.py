@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import json
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -37,10 +38,45 @@ async def test_cpu_plan_view_and_geometry_lane_check(fake_env, layer):
     ref = await env.run(gpu.render_preview, RenderInput(run_id="wf-gpu", step=1, layers=[layer], camera="Station", width=640, height=360))
     assert ref.mode == "plan" and ref.path.endswith("001-Station-plan.png") and ref.sha256 == sha256_file(ref.path)
     again = await env.run(gpu.render_preview, RenderInput(run_id="wf-gpu", step=1, layers=[layer], camera="Station", width=640, height=360))
-    assert again.sha256 == ref.sha256, "idempotent by output path"
+    assert again.sha256 == ref.sha256, "identical inputs draw the same plan"
     chk = await env.run(gpu.simulate_lane, SimulateInput(run_id="wf-gpu", step=1, layers=[layer], lane="L2", robot="carter", min_clearance_m=0.6))
     assert chk.passed is False and chk.contacts == ["/World/Agent/staging_1"] and chk.method == "geometry" and chk.clip_path is None
     assert json.loads((fake_env / "wf-gpu" / "lane" / "001-L2.json").read_text())["contacts"] == ["/World/Agent/staging_1"]
+
+
+async def test_a_preview_is_regenerated_for_new_layers_at_the_same_step(fake_env, layer):
+    env = ActivityEnvironment()
+    inp = RenderInput(run_id="wf-gpu", step=1, layers=[layer], camera="Station", width=640, height=360)
+    first = await env.run(gpu.render_preview, inp)
+    fake = FakeSandboxes()
+    updated = await fake.apply("g-exec", 1, CODE.replace("-3.0, 2.0", "-4.0, 2.0"), {}, 0.6)
+    assert updated.envelope["ok"]
+    new_path = fake_env / "updated.usda"
+    await fake.download_layer("g-exec", 1, new_path)
+    new_layer = layer.model_copy(update={"path": str(new_path), "sha256": sha256_file(new_path), "bytes": new_path.stat().st_size})
+    second = await env.run(gpu.render_preview, inp.model_copy(update={"layers": [new_layer]}))
+    assert first.path == second.path and first.sha256 != second.sha256 == sha256_file(second.path)
+
+
+def test_shared_layer_writers_use_distinct_temporary_files(tmp_path, monkeypatch):
+    src, dst = tmp_path / "source", tmp_path / "shared" / "layer.usda"
+    src.write_text("layer content")
+    actual_copy = gpu.shutil.copyfile
+    simultaneous = threading.Barrier(2)
+    staged = []
+
+    def copy(source, target):
+        staged.append(target)
+        simultaneous.wait(timeout=3)
+        return actual_copy(source, target)
+
+    monkeypatch.setattr(gpu.shutil, "copyfile", copy)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        writes = [pool.submit(gpu._atomic_copy, src, dst) for _ in range(2)]
+        for write in writes:
+            write.result(timeout=5)
+    assert len(set(staged)) == 2
+    assert dst.read_bytes() == src.read_bytes() and list(dst.parent.iterdir()) == [dst]
 
 
 async def test_renderer_jobs_when_a_renderer_is_configured(fake_env, layer, monkeypatch):

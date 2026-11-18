@@ -248,12 +248,11 @@ class SimulationAgentWorkflow:
     def _validate_review(self, decision: ReviewDecision) -> None:
         if self.pending_review_id is None or decision.review_id != self.pending_review_id or self.decision is not None:
             raise ValueError(f"no matching review pending (pending {self.pending_review_id!r}, got {decision.review_id!r})")
-        st = self._current()
-        checked = st.layers and any(c.step == st.step for c in st.lane_checks) and any(r.step == st.step for r in st.renders)
-        if decision.action == "approve" and not checked:
-            # The round can end without a checked layout (no layers, a refused review, the turn budget): a person can still
-            # revise or reject it, but approving needs a lane check and a preview of the layout being approved.
-            raise ValueError(f"nothing checked to approve at step {st.step}: revise or reject")
+        if decision.action == "approve":
+            st = self._current()
+            lane = st.current_lane_check("L2")
+            if not st.layers or not any(r.step == st.step for r in st.renders) or lane is None or not lane.passed:
+                raise ValueError(f"approval at step {st.step} requires layers, a preview and a passing L2 check: revise or reject")
 
     @workflow.query
     def pending_grant(self) -> dict[str, Any] | None:

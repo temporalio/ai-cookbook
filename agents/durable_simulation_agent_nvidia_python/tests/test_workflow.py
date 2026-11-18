@@ -24,7 +24,7 @@ from temporalio.worker import Worker
 
 from activities import gpu
 from activities import sandbox as sb
-from activities.openshell import FakeSandboxes
+from activities.openshell import FakeSandboxes, SandboxTimeout
 from models import AgentInput, GrantDecision, ReviewDecision
 from sceneops.hashing import layer_stack_hash, sha256_file
 from tests.conftest import scripted_model
@@ -184,9 +184,9 @@ async def test_a_deleted_sandbox_is_rebuilt_with_the_grant_mid_round(fake_env, m
                 logs = fake_env / handle.id / "logs"
                 assert "1 granted host(s): search.simready.omniverse.nvidia.com" in (logs / "g2-tools.log").read_text()
                 assert (logs / "g1-tools.log").exists(), "the retired generation's gateway log was kept"
-                assert await handle.execute_update(SimulationAgentWorkflow.review, ReviewDecision(review_id=rid, action="approve", notes="")) == "approve"
+                assert await handle.execute_update(SimulationAgentWorkflow.review, ReviewDecision(review_id=rid, action="reject", notes="L2 failed")) == "reject"
                 result = await handle.result()
-    assert result.status == "approved" and result.gen == 2 and result.rounds == 1
+    assert result.status == "rejected" and result.gen == 2 and result.rounds == 1
 
 
 @pytest.mark.timeout(120)
@@ -228,7 +228,7 @@ async def test_a_transient_sandbox_error_is_retried_and_the_apply_runs_once(fake
                 assert FakeSandboxes().apply_calls() == 2, "attempt 2 ran the code; attempt 1 failed before it could"
                 applies = await completed_results(handle, "sandbox_apply")
                 assert len(applies) == 1 and applies[0]["ok"] and applies[0]["cached"] is False
-                assert await handle.execute_update(SimulationAgentWorkflow.review, ReviewDecision(review_id=rid, action="approve", notes="")) == "approve"
+                assert await handle.execute_update(SimulationAgentWorkflow.review, ReviewDecision(review_id=rid, action="reject", notes="L2 failed")) == "reject"
                 await handle.result()
 
 
@@ -249,8 +249,8 @@ async def test_a_generation_that_cannot_be_rehydrated_leaves_no_sandbox_behind(f
     assert not any(p.is_dir() for p in (fake_env / "_fake_sandboxes").iterdir()), "the failed generation left no sandbox behind"
 
 
-async def run_one_round(fake_env, script: list[tuple[str, dict]]) -> tuple[WorkflowHandle, object]:
-    """Start a run with a scripted model, approve the grant, wait for the review; returns the handle and the state."""
+async def run_one_round(fake_env, script: list[tuple[str, dict]], *, approvable: bool = True) -> tuple[dict, object]:
+    """Start a run with a scripted model, approve the grant, and test the review decision."""
     async with await WorkflowEnvironment.start_time_skipping() as env:
         async with AgentEnvironment(model=scripted_model(script), model_params=ModelActivityParameters(start_to_close_timeout=timedelta(seconds=30))) as agent_env:
             client = agent_env.applied_on_client(env.client)
@@ -259,19 +259,26 @@ async def run_one_round(fake_env, script: list[tuple[str, dict]]) -> tuple[Workf
                 handle = await start(client, tq, hours=1)
                 rid = await until_review(handle, [])
                 state = await handle.query(SimulationAgentWorkflow.get_state)
-                outputs = {name: await tool_outputs(handle, name) for name in ("fix_all",)}
+                outputs = {name: await tool_outputs(handle, name) for name in ("fix_all", "apply_usd_code")}
                 hist = await handle.fetch_history()
                 outputs["model_inputs"] = [e.activity_task_scheduled_event_attributes.input.payloads[0].data.decode() for e in hist.events
                                            if e.HasField("activity_task_scheduled_event_attributes")
                                            and e.activity_task_scheduled_event_attributes.activity_type.name == "invoke_model_activity"]
-                await handle.execute_update(SimulationAgentWorkflow.review, ReviewDecision(review_id=rid, action="approve", notes=""))
+                approve = ReviewDecision(review_id=rid, action="approve", notes="")
+                if approvable:
+                    await handle.execute_update(SimulationAgentWorkflow.review, approve)
+                else:
+                    with pytest.raises(WorkflowUpdateFailedError) as rejected:
+                        await handle.execute_update(SimulationAgentWorkflow.review, approve)
+                    assert "passing L2 check" in str(rejected.value.cause)
+                    await handle.execute_update(SimulationAgentWorkflow.review, ReviewDecision(review_id=rid, action="reject", notes="L2 unchecked or failed"))
                 await handle.result()
     return outputs, state
 
 
 @pytest.mark.timeout(120)
 async def test_an_unknown_tool_name_goes_back_to_the_model(fake_env):
-    outputs, state = await run_one_round(fake_env, [("fix_all", {}), *ROUND_1])
+    outputs, state = await run_one_round(fake_env, [("fix_all", {}), *ROUND_1], approvable=False)
     assert outputs["fix_all"] == ["Tool 'fix_all' not found."], "the model saw the error and the run went on"
     assert [layer.step for layer in state.layers] == [1]
 
@@ -284,6 +291,35 @@ async def test_review_needs_checks_of_the_current_layout(fake_env):
     # request_review ends the agent's run; the refusal comes back in the Workflow's next prompt
     assert any("Your request_review was refused" in i and "on the current layout (step 2)" in i for i in outputs["model_inputs"]), "step 1's checks do not cover step 2"
     assert [c.step for c in state.lane_checks] == [1, 2] and [r.step for r in state.renders] == [1, 2]
+
+
+@pytest.mark.timeout(120)
+async def test_a_passing_check_on_another_lane_does_not_allow_approval(fake_env):
+    script = [*ROUND_1[:3], ("check_lane", {"lane": "L1"}), *ROUND_1[4:], ROUND_1[-1], ROUND_1[-1]]
+    outputs, state = await run_one_round(fake_env, script, approvable=False)
+    assert [(c.lane, c.passed) for c in state.lane_checks] == [("L1", True)]
+    assert any("Your request_review was refused: run check_lane('L2')" in prompt for prompt in outputs["model_inputs"])
+
+
+@pytest.mark.timeout(120)
+async def test_an_apply_timeout_rebuilds_without_repeating_the_code(fake_env, monkeypatch):
+    actual_apply = FakeSandboxes.apply
+    attempts: list[tuple[str, str]] = []
+    clear_layout = CODE_1.replace("1.7, -3.0", "-0.5, -3.0")
+
+    async def apply(self, name, step, code, meta, min_clearance_m):
+        attempts.append((name, code))
+        if code == CODE_1:
+            raise SandboxTimeout("sceneops.apply hit its deadline")
+        return await actual_apply(self, name, step, code, meta, min_clearance_m)
+
+    monkeypatch.setattr(FakeSandboxes, "apply", apply)
+    script = [ROUND_1[2], ("apply_usd_code", {"code": clear_layout, "rationale": "try a clear site"}), *ROUND_1[3:]]
+    outputs, state = await run_one_round(fake_env, script)
+    results = [json.loads(output) for output in outputs["apply_usd_code"]]
+    assert len(attempts) == 2 and attempts[0][0] != attempts[1][0]
+    assert [code for _, code in attempts] == [CODE_1, clear_layout]
+    assert results[0]["type"] == "SandboxCodeTimeout" and results[1]["ok"] and state.gen == 2
 
 
 @pytest.mark.timeout(120)

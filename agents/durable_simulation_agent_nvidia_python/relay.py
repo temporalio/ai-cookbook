@@ -13,13 +13,17 @@ pass-through.
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import json
+import logging
 import os
 import socket
 import time
 from dataclasses import dataclass, field
 from functools import wraps
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any, Awaitable, Callable
 
 from temporalio import activity
@@ -28,6 +32,7 @@ from paths import run_dir
 
 RUNTIME = "nemo-relay"
 AGENT_NAME, AGENT_VERSION = "simulation agent", "0.1"
+logger = logging.getLogger(__name__)
 
 
 class _Cfg:
@@ -48,6 +53,7 @@ class _Run:
     sub_events: str
     open_n: int  # export file names are unique per open, so a re-open never overwrites an earlier export
     known: set[str]  # uuids of this run's scope tree: the run scope and every span under it
+    snapshot_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
     started: float = field(default_factory=time.time)
     last_used: float = field(default_factory=time.time)
     in_flight: int = 0  # Activities and model calls of this run running in this process right now; never closed as idle
@@ -138,24 +144,42 @@ def _open(key: str) -> _Run:
     d = relay_dir(key)
     d.mkdir(parents=True, exist_ok=True)
     prop = d / "propagation.json"
-    ctx_json = prop.read_text() if prop.exists() else None
-    stack = r.create_scope_stack_from_propagation(r.PropagationContext.from_json(ctx_json)) if ctx_json else r.create_scope_stack()
+    propagation = None
+    try:
+        propagation = r.PropagationContext.from_json(prop.read_text())
+    except FileNotFoundError:
+        pass
+    except ValueError:
+        logger.warning("Starting a new Relay trace after an invalid propagation context at %s", prop)
+    stack = r.create_scope_stack_from_propagation(propagation) if propagation is not None else r.create_scope_stack()
     _opened["n"] += 1
     n = _opened["n"]
     sub_atif, sub_events = f"atif:{key}:{_Cfg.identity}:{n}", f"events:{key}:{_Cfg.identity}:{n}"
-    with r.use_scope_stack(stack):
-        atif = r.AtifExporter(f"{key}/{_Cfg.identity}", AGENT_NAME, AGENT_VERSION, model_name=os.environ.get("NIM_MODEL"))
-        atif.register(sub_atif)
-        handle = r.scope.push(f"run:{key}" + (" (resumed)" if ctx_json else ""), r.ScopeType.Agent,
-                              data={"run_id": key, "worker": _Cfg.identity, "resumed": bool(ctx_json),
-                                    "temporal_namespace": activity.info().workflow_namespace if activity.in_activity() else None})
-        ctx = r.capture_propagation_context()
-        if not ctx_json:
-            prop.write_text(ctx.to_json())
-    known = {ctx.parent_uuid}
-    events_file, on_event = _event_writer(d / f"events-{_Cfg.identity}-{n}.jsonl", known)
-    r.subscribers.register(sub_events, on_event)
-    run = _Run(key, stack, handle, atif, events_file, d / f"events-{_Cfg.identity}-{n}.jsonl", bool(ctx_json), ctx.root_uuid, sub_atif, sub_events, n, known)
+    resumed = propagation is not None
+    atif = r.AtifExporter(f"{key}/{_Cfg.identity}", AGENT_NAME, AGENT_VERSION, model_name=os.environ.get("NIM_MODEL"))
+    atif.register(sub_atif)
+    events_file = None
+    try:
+        with r.use_scope_stack(stack):
+            handle = r.scope.push(f"run:{key}" + (" (resumed)" if resumed else ""), r.ScopeType.Agent,
+                                  data={"run_id": key, "worker": _Cfg.identity, "resumed": resumed,
+                                        "temporal_namespace": activity.info().workflow_namespace if activity.in_activity() else None})
+            ctx = r.capture_propagation_context()
+        if not resumed:
+            with TemporaryDirectory(prefix=".propagation-", dir=d) as staging:
+                tmp = Path(staging) / prop.name
+                tmp.write_text(ctx.to_json())
+                tmp.replace(prop)
+        known = {ctx.parent_uuid}
+        events_path = d / f"events-{_Cfg.identity}-{n}.jsonl"
+        events_file, on_event = _event_writer(events_path, known)
+        r.subscribers.register(sub_events, on_event)
+    except Exception:
+        atif.deregister(sub_atif)
+        if events_file is not None:
+            events_file.close()
+        raise
+    run = _Run(key, stack, handle, atif, events_file, events_path, resumed, ctx.root_uuid, sub_atif, sub_events, n, known)
     _runs[key] = run
     return run
 
@@ -203,12 +227,14 @@ def _run_trajectory(doc: dict[str, Any], known: set[str]) -> dict[str, Any]:
     return doc
 
 
-def _snapshot(run: _Run) -> Path:
+async def _snapshot(run: _Run) -> None:
     p = relay_dir(run.key) / f"atif-{_Cfg.identity}-{run.open_n}.json"
-    tmp = p.with_name(f".{p.name}.part")
-    tmp.write_text(json.dumps(_run_trajectory(json.loads(run.atif.export_json()), run.known), indent=1))
-    tmp.replace(p)  # a Worker killed mid-write leaves the previous snapshot, never a truncated one
-    return p
+    async with run.snapshot_lock:
+        # The process-wide exporter can wait for another run's LLM span. Keep the event loop free to finish that call.
+        raw = await asyncio.to_thread(run.atif.export_json)
+        tmp = p.with_name(f".{p.name}.part")
+        tmp.write_text(json.dumps(_run_trajectory(json.loads(raw), run.known), indent=1))
+        tmp.replace(p)
 
 
 def _detach(run: _Run, reason: str) -> None:
@@ -226,11 +252,15 @@ def _detach(run: _Run, reason: str) -> None:
 
 async def _finish(runs: list[_Run]) -> None:
     """The asynchronous half: drain the subscribers once, then write each detached run's final snapshot."""
-    await _r().subscribers.flush_async()  # subscriber delivery is asynchronous; drain before exporting
-    for run in runs:
-        try:
-            _snapshot(run)
-        finally:
+    try:
+        await _r().subscribers.flush_async()
+        for run in runs:
+            try:
+                await _snapshot(run)
+            except Exception:  # noqa: BLE001
+                logger.warning("Could not export final Relay snapshot for %s", run.key, exc_info=True)
+    finally:
+        for run in runs:
             _deregister(run)
 
 
@@ -256,15 +286,25 @@ async def _close_idle(current: str) -> None:
             pass
 
 
-def _after(run: _Run) -> None:
-    run.last_used = time.time()
-    run.in_flight = max(0, run.in_flight - 1)
-    if run.closed:  # the Activity that closed the run is still inside its own tool span
-        return
+async def _after(run: _Run) -> None:
     try:
-        _snapshot(run)
+        if not run.closed and not asyncio.current_task().cancelling():
+            await _snapshot(run)
     except Exception:  # noqa: BLE001
-        pass
+        logger.warning("Could not export Relay snapshot for %s", run.key, exc_info=True)
+    finally:
+        run.last_used = time.time()
+        run.in_flight -= 1
+
+
+async def _start(info: activity.Info) -> tuple[_Run, Any]:
+    await _close_idle(info.workflow_id)
+    run = _open(info.workflow_id)
+    r = _r()
+    if info.attempt > 1:
+        with r.use_scope_stack(run.stack):
+            r.scope.event("temporal_retry", handle=run.handle, data={"activity": info.activity_type, "attempt": info.attempt})
+    return run, r
 
 
 # @@@SNIPSTART traced
@@ -278,27 +318,27 @@ def traced(fn: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
         if not enabled() or not activity.in_activity():
             return await fn(*args, **kwargs)
         info = activity.info()
-        await _close_idle(info.workflow_id)
-        run = _open(info.workflow_id)
+        try:
+            run, r = await _start(info)
+            with r.use_scope_stack(run.stack):
+                th = r.tools.call(info.activity_type, {"activity_id": info.activity_id, "attempt": info.attempt, "input": _jsonable(args[0] if args else None)}, handle=run.handle)
+        except Exception:  # noqa: BLE001 — a trace setup failure must not prevent the Activity from running
+            logger.warning("Could not start Relay tracing for %s", info.workflow_id, exc_info=True)
+            return await fn(*args, **kwargs)
         run.in_flight += 1
-        r = _r()
-        with r.use_scope_stack(run.stack):
-            if info.attempt > 1:
-                r.scope.event("temporal_retry", handle=run.handle, data={"activity": info.activity_type, "attempt": info.attempt})
-            th = r.tools.call(info.activity_type, {"activity_id": info.activity_id, "attempt": info.attempt, "input": _jsonable(args[0] if args else None)}, handle=run.handle)
         try:
             out = await fn(*args, **kwargs)
         except BaseException as e:
-            with r.use_scope_stack(run.stack):
+            with contextlib.suppress(Exception), r.use_scope_stack(run.stack):
                 r.tools.call_end(th, r.ToolExecutionResult({"error": f"{type(e).__name__}: {str(e)[:200]}"}, {"status": "error"}))
-            run.activities += 1
-            _after(run)
             raise
-        with r.use_scope_stack(run.stack):
-            r.tools.call_end(th, r.ToolExecutionResult(_jsonable(out)))
-        run.activities += 1
-        _after(run)
-        return out
+        else:
+            with contextlib.suppress(Exception), r.use_scope_stack(run.stack):
+                r.tools.call_end(th, r.ToolExecutionResult(_jsonable(out)))
+            return out
+        finally:
+            run.activities += 1
+            await _after(run)
 
     return wrapper
 # @@@SNIPEND
@@ -315,10 +355,14 @@ async def model_call(model_name: str, request: dict[str, Any], fn: ProviderFn) -
         out, _ = await fn({}, request)
         return out
     info = activity.info()
-    await _close_idle(info.workflow_id)
-    run = _open(info.workflow_id)
+    try:
+        run, r = await _start(info)
+        req = r.LLMRequest({"model": model_name, "worker": _Cfg.identity, "attempt": str(info.attempt)}, request)
+    except Exception:  # noqa: BLE001 — fall back before the provider has run
+        logger.warning("Could not start Relay model tracing for %s", info.workflow_id, exc_info=True)
+        out, _ = await fn({}, request)
+        return out
     run.in_flight += 1
-    r = _r()
     holder: dict[str, Any] = {}
 
     async def provider(req: Any) -> Any:
@@ -326,22 +370,15 @@ async def model_call(model_name: str, request: dict[str, Any], fn: ProviderFn) -
         holder["out"] = out
         return summary
 
-    with r.use_scope_stack(run.stack):
-        if info.attempt > 1:  # the plugin's model Activity is retried by Temporal after a Worker kill
-            r.scope.event("temporal_retry", handle=run.handle, data={"activity": info.activity_type, "attempt": info.attempt})
     try:
         with r.use_scope_stack(run.stack):
-            summary = await r.llm.execute("nim", r.LLMRequest({"model": model_name, "worker": _Cfg.identity, "attempt": str(info.attempt)}, request), provider,
-                                          handle=run.handle, model_name=model_name)
-    except BaseException:
+            summary = await r.llm.execute("nim", req, provider, handle=run.handle, model_name=model_name)
+        if isinstance(summary, dict) and summary.get("fallback"):
+            run.fallbacks += 1
+        return holder.get("out")
+    finally:
         run.llm_calls += 1
-        _after(run)
-        raise
-    run.llm_calls += 1
-    if isinstance(summary, dict) and summary.get("fallback"):
-        run.fallbacks += 1
-    _after(run)
-    return holder.get("out")
+        await _after(run)
 
 
 def mark_here(name: str, data: dict[str, Any] | None = None) -> None:
@@ -352,7 +389,7 @@ def mark_here(name: str, data: dict[str, Any] | None = None) -> None:
     if not run:
         return
     r = _r()
-    with r.use_scope_stack(run.stack):
+    with contextlib.suppress(Exception), r.use_scope_stack(run.stack):
         r.scope.event(name, handle=run.handle, data=_jsonable(data or {}))
 
 
@@ -363,6 +400,9 @@ async def close_here(*, reason: str) -> list[str]:
     key = activity.info().workflow_id
     run = _runs.get(key)
     if run:
-        await _close_run(run, reason)
+        try:
+            await _close_run(run, reason)
+        except Exception:  # noqa: BLE001
+            logger.warning("Could not close Relay scope for %s", key, exc_info=True)
     d = relay_dir(key)
     return sorted(str(p) for p in d.iterdir() if p.is_file() and not p.name.startswith(".")) if d.exists() else []

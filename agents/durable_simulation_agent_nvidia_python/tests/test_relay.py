@@ -3,10 +3,12 @@ from the stored propagation context, and the model proxy's fallback recorded as 
 
 from __future__ import annotations
 
+import asyncio
 import dataclasses
 import json
 from typing import Any
 
+import pytest
 from agents.models.interface import Model
 from temporalio import activity
 from temporalio.testing import ActivityEnvironment
@@ -114,6 +116,56 @@ async def test_two_runs_in_one_process_keep_separate_trajectories(fake_env):
     await _env("wf-B", "finish").run(finish, "done")
     assert [r["run"] for r in _results(fake_env / "wf-A" / "relay", "w4")] == ["A", "A2"]
     assert [r["run"] for r in _results(fake_env / "wf-B" / "relay", "w4")] == ["B"]
+
+
+@pytest.mark.timeout(10, method="thread")
+async def test_a_snapshot_does_not_block_another_runs_model_call(fake_env):
+    relay.configure(identity="concurrent")
+    provider_started, complete_provider, tool_called = asyncio.Event(), asyncio.Event(), asyncio.Event()
+
+    async def provider(headers, request):
+        provider_started.set()
+        await complete_provider.wait()
+        return "response", {"output": "response"}
+
+    @relay.traced
+    async def tool():
+        tool_called.set()
+        return {"run": "A"}
+
+    model = asyncio.create_task(_env("wf-B", "model").run(relay.model_call, "test-model", {}, provider))
+    await provider_started.wait()
+    snapshot = asyncio.create_task(_env("wf-A", "ping").run(tool))
+    await tool_called.wait()
+    complete_provider.set()
+    assert await asyncio.gather(snapshot, model) == [{"run": "A"}, "response"]
+    assert _results(fake_env / "wf-A" / "relay", "concurrent") == [{"run": "A"}]
+    assert _results(fake_env / "wf-B" / "relay", "concurrent") == []
+
+
+async def test_truncated_propagation_is_replaced(fake_env):
+    path = fake_env / "wf-damaged" / "relay" / "propagation.json"
+    path.parent.mkdir(parents=True)
+    path.write_text('{"root_uuid":')
+    assert await _env("wf-damaged", "ping").run(ping, {"n": 1}) == {"ok": True, "n": 1}
+    assert json.loads(path.read_text())["root_uuid"] == relay._runs["wf-damaged"].root_uuid
+    assert not relay._runs["wf-damaged"].resumed
+
+
+async def test_relay_setup_failure_does_not_repeat_or_fail_the_call(fake_env, monkeypatch):
+    def unavailable(*args):
+        raise OSError("Relay storage unavailable")
+
+    calls = []
+
+    async def provider(headers, request):
+        calls.append(request)
+        return "response", {}
+
+    monkeypatch.setattr(relay, "_event_writer", unavailable)
+    assert await _env("wf-a", "ping").run(ping, {"n": 1}) == {"ok": True, "n": 1}
+    assert await _env("wf-b", "model").run(relay.model_call, "test-model", {"n": 2}, provider) == "response"
+    assert calls == [{"n": 2}]
 
 
 async def test_an_idle_run_is_closed_and_its_next_activity_resumes_the_trace(fake_env, monkeypatch):

@@ -200,10 +200,15 @@ async def apply_usd_code(rc: RunContextWrapper[AgentCtx], code: str, rationale: 
         return json.dumps({"ok": False, "type": "NotACatalogId", "msg": "h.place_asset takes catalog ids only (for example 'packing_table'), never file paths or URLs. "
                            "Use the ids returned by search_assets."})
     step = ctx.state.step + 1
-    out = await _with_rebuild(ctx, lambda: workflow.execute_activity(
-        sb.sandbox_apply, ApplyInput(run_id=ctx.run_id, workflow_id=ctx.workflow_id, exec_sandbox=ctx.state.exec_sandbox or "", step=step, code=code,
-                                     rationale=rationale, model=ctx.model, prior_layers=ctx.state.layers, min_clearance_m=MIN_CLEARANCE_M),
-        summary=f"step {step}: {rationale[:36]}", **SANDBOX_OPTS))
+    try:
+        out = await _with_rebuild(ctx, lambda: workflow.execute_activity(
+            sb.sandbox_apply, ApplyInput(run_id=ctx.run_id, workflow_id=ctx.workflow_id, exec_sandbox=ctx.state.exec_sandbox or "", step=step, code=code,
+                                         rationale=rationale, model=ctx.model, prior_layers=ctx.state.layers, min_clearance_m=MIN_CLEARANCE_M),
+            summary=f"step {step}: {rationale[:36]}", **SANDBOX_OPTS))
+    except ActivityError as e:
+        if _cause_type(e) == "SandboxCodeTimeout":
+            await ctx.rebuild()  # retire the exec sandbox in case the remote command is still running
+        raise
     if out.ok and out.layer is not None:
         ctx.state = ctx.state.with_layer(out.layer)  # the layer is the checkpoint: a rebuilt sandbox starts from every layer recorded here
         ctx.last_apply = {"placed_assets": out.placed_assets, "agent_prims": out.agent_prims, "violations": out.violations, "asset_overlaps": out.asset_overlaps}
@@ -258,7 +263,7 @@ async def request_review(rc: RunContextWrapper[AgentCtx], summary: str) -> str:
         return json.dumps({"ok": False, "type": "NothingToReview", "msg": "Before review, " + ctx.review_refusal})
     step = ctx.state.step  # the checks must be of the layout the reviewer will see, not of an earlier step
     missing = []
-    if not any(c.step == step for c in ctx.state.lane_checks):
+    if ctx.state.current_lane_check("L2") is None:
         missing.append("check_lane('L2')")
     if not any(r.step == step for r in ctx.state.renders):
         missing.append("render_preview('Station')")

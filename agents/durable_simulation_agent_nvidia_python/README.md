@@ -4,50 +4,15 @@ tags: [agents, python, nvidia]
 priority: 500
 -->
 
-# Durable, controlled simulation agents with NVIDIA OpenShell, Omniverse and NeMo Relay
+# Durable simulation agents with NVIDIA OpenShell
 
-A simulation agent runs for hours, burns GPU time, executes code a model wrote, and needs a person to approve things
-along the way. The hard parts are not the model calls. They are state, retries, human gates, trust boundaries and
-provenance. This recipe is the reference demo Temporal built with NVIDIA: the same agent loop, the same tools, the same
-records. It runs on a laptop with CPU stand-ins for the GPU parts, and it includes the Isaac Sim service for when you
-have a GPU.
+A Temporal Workflow runs a Nemotron agent that lays out a warehouse cell in OpenUSD. The model's Python runs in an
+OpenShell sandbox without network access. A second sandbox searches for assets after an operator approves access
+with a Workflow Update.
 
-- **Temporal remembers.** The agent loop is a Workflow. Every model call, sandbox operation, render and lane check is an
-  Activity with retries and heartbeats on one of two Task Queues. Human decisions are Workflow Updates with validators.
-  Kill the Worker mid model call and the run resumes from the Event History: only the interrupted model call runs again.
-- **NVIDIA OpenShell contains.** The code the model wrote runs in an *exec* sandbox whose policy has no network rules.
-  The agent's networked tools run in a *tools* sandbox that reaches the network only through grants an operator approves
-  (`openshell policy update … --wait`). Delete a sandbox mid-run and the next tool call rebuilds the next generation with
-  every recorded grant and every recorded layer.
-- **NVIDIA Omniverse simulates and judges.** The agent authors the warehouse cell as one OpenUSD sublayer per step,
-  through a small helper API inside the exec sandbox. Every layer is linted before anything else opens it and judged
-  against the trusted site layer. With the recipe's renderer service on a GPU host, Isaac Sim renders previews and
-  drives a Nova Carter AMR through the lane; without it, a plan view and a geometry check stand in.
-- **NVIDIA Nemotron thinks, NeMo Relay records.** Nemotron answers through NVIDIA NIM. Every Activity and every model
-  call is a span in a NeMo Relay trajectory that continues across a Worker restart, with marks for the retry and for the
-  fallback model that answered when the primary failed.
-
-At the end, one run leaves four records joined by the Workflow Id: the Event History, the sandboxes' gateway logs, the
-Relay trajectories, and the OpenUSD layers with their stack hash. `bundle.py` collects them.
-
-## Layout
-
-| File | What it does |
-|---|---|
-| `workflows/simulation_agent_workflow.py` | The agent loop: sandboxes per round, the agent's turns, the `grant` and `review` Updates and their validators, the review wait, the manifest |
-| `workflows/tools.py` | The agent's tools: `inspect_site`, `search_assets` (the approval flow), `apply_usd_code`, `render_preview`, `check_lane`, `request_review` |
-| `activities/sandbox.py` | Build a sandbox generation with the recorded grants and layers, search, apply a step, apply a grant live, export logs, delete, write the manifest |
-| `activities/gpu.py` | The `gpu` Task Queue: previews and lane checks, as Isaac Sim jobs or as CPU stand-ins |
-| `activities/openshell.py` | The OpenShell CLI adapter and the fake backend |
-| `activities/policies/*.yaml` | OpenShell policies: the exec sandbox has no network rules; grants are appended to the tools policy on rebuild |
-| `sceneops/` | What runs inside the sandboxes: the helper API the model's code uses, the apply entrypoint, the search entrypoint |
-| `validate/` | The host side: the Sdf lint, the trusted judge and lane check, the plan view |
-| `site/` | The trusted site layer (docks, lanes, keep-clear volumes, cameras) and the asset catalog with measured footprints |
-| `relay.py`, `provider.py` | NeMo Relay: one scope per run per Worker, Activities as tool spans, the model pipeline with fallback |
-| `worker.py`, `start_workflow.py` | The Workers and a run |
-| `grant.py`, `review.py`, `delete_sandbox.py`, `kill_worker.py`, `bundle.py`, `rehearsal.py` | The operator: decide a grant, decide a review, two chaos beats, collect the records, play every beat unattended |
-| `sandbox-image/` | The sandbox image for real OpenShell: Python, usd-core, sceneops and the site |
-| `renderer/` | The Isaac Sim service for a GPU host: a job API, the Isaac Sim backend, its image, and an asset mirror |
+The Worker validates each layer, then renders a preview and checks lane clearance. Use the CPU stand-ins on a laptop
+or Isaac Sim on a GPU host. Temporal records the decisions and retries interrupted Activities. NeMo Relay traces the
+run across Worker restarts. Use `bundle.py` to collect the Event History, sandbox logs, trajectories, and layers.
 
 ## Prerequisites
 
@@ -85,6 +50,8 @@ uv run review.py <workflow-id> approve
 uv run bundle.py <workflow-id>                  # beat 5: history, gateway logs, Relay trajectories, layers -> runs/<workflow-id>/bundle/
 ```
 
+Approval requires a preview and a passing L2 check for the current layout. Revise or reject a layout that fails the check.
+
 Beats 2 and 3 need the agent at work. With a fast model, round 1 can end seconds after the grant; then play them during
 round 2, after the revise. `kill_worker.py` says so when a review is pending and catches the next model call either way.
 It kills the Worker that is running the call, found by the identity Temporal reports for it, and starts that Worker again
@@ -97,7 +64,9 @@ the `grant` and `review` Updates in the Event History; the review wait as a Time
 
 To make the fallback model answer, set `FAULT_MODEL_CALLS=3` on the Worker: the third primary model call fails and the
 trajectory records a `model_fallback` mark. The count is per Worker process. The defaults are Nemotron 3.5 Lightning
-with Nemotron 3.5 Super VL as the fallback; set `NIM_MODEL` and `NIM_FALLBACK_MODEL` for other pairs.
+with Nemotron 3.5 Super VL as the fallback. Set `NIM_MODEL` and `NIM_FALLBACK_MODEL` for other pairs.
+NIM sometimes returns HTTP 404 for a listed model, so a primary 404 also tries the fallback. If you set a retired model
+ID, check the Worker log and Relay trace for repeated `model_fallback` marks. A 404 from the fallback fails the model Activity.
 
 ### Real OpenShell sandboxes
 
@@ -122,19 +91,23 @@ through it with PhysX. On the GPU host, mirror the assets the renderer opens, bu
 the gpu Worker next to it; the same tool calls become Isaac Sim jobs:
 
 ```bash
+sudo install -d -o "$(id -u)" -g "$(id -g)" /opt/isaac-assets /srv/renderer/layers
+sudo install -d -o 1234 -g 1234 /srv/renderer/out
 uv run renderer/mirror_assets.py --dest /opt/isaac-assets      # the warehouse, the Nova Carter, every catalog asset: about 4.6 GB
 docker login nvcr.io                                           # user $oauthtoken, password: your NGC API key
 docker build -f renderer/Dockerfile -t durable-simulation-agent-renderer:0.1 .
-docker run -d --name renderer --gpus all --network host --user root \
+docker run -d --name renderer --gpus all --network host --user 1234:1234 \
   -v /opt/isaac-assets/Assets/Isaac/6.1:/opt/assets:ro -v /srv/renderer:/srv/renderer \
   durable-simulation-agent-renderer:0.1                        # first start compiles shaders: give it a few minutes
 curl -s localhost:8799/healthz                                 # {"backend": "kit", "ready": true, ...}
 RENDERER_URL=http://127.0.0.1:8799 RENDERER_SHARED_DIR=/srv/renderer uv run worker.py gpu   # the agent Worker runs anywhere
 ```
 
-The gpu Worker lints each layer and copies it into the shared directory by content hash; the renderer lints it again
-before Kit opens it, and writes its outputs back under the same directory. To try the job API without a GPU:
-`uv run python -m renderer.run_service --backend fake --out /tmp/renderer-out`.
+The job API listens on loopback. The GPU Worker verifies and lints each layer before copying it into the shared
+directory by content hash. The renderer checks the layer again and writes its outputs under the same directory.
+If you set `RENDERER_BASE_REF`, use the same asset-root-relative path on the GPU Worker and the renderer.
+
+To try the job API without a GPU, run `uv run python -m renderer.run_service --backend fake --out /tmp/renderer-out`.
 
 Without `RENDERER_URL`, `render_preview` draws a plan view of the composed layers and `check_lane` measures every
 footprint against the lane volume. The Workflow sees the same `RenderRef` and `LaneCheck` either way.
@@ -146,6 +119,25 @@ Workflow Id releases them, keeping their gateway logs, but until then they hold 
 Layers, renders, lane checks and gateway logs are files under `RUNS_DIR` (default `runs/`) on the Worker host that ran
 the Activity. With Workers on more than one host, point `RUNS_DIR` at storage every Worker can reach; otherwise a
 rebuild or a render on another host fails with `LayerMissing`.
+
+## Layout
+
+| File | What it does |
+|---|---|
+| `workflows/simulation_agent_workflow.py` | The agent loop: sandboxes per round, the agent's turns, the `grant` and `review` Updates and their validators, the review wait, the manifest |
+| `workflows/tools.py` | The agent's tools: `inspect_site`, `search_assets` (the approval flow), `apply_usd_code`, `render_preview`, `check_lane`, `request_review` |
+| `activities/sandbox.py` | Build a sandbox generation with the recorded grants and layers, search, apply a step, apply a grant live, export logs, delete, write the manifest |
+| `activities/gpu.py` | The `gpu` Task Queue: previews and lane checks, as Isaac Sim jobs or as CPU stand-ins |
+| `activities/openshell.py` | The OpenShell CLI adapter and the fake backend |
+| `activities/policies/*.yaml` | OpenShell policies: the exec sandbox has no network rules; grants are appended to the tools policy on rebuild |
+| `sceneops/` | What runs inside the sandboxes: the helper API the model's code uses, the apply entrypoint, the search entrypoint |
+| `validate/` | The host side: the Sdf lint, the trusted judge and lane check, the plan view |
+| `site/` | The trusted site layer (docks, lanes, keep-clear volumes, cameras) and the asset catalog with measured footprints |
+| `relay.py`, `provider.py` | NeMo Relay: one scope per run per Worker, Activities as tool spans, the model pipeline with fallback |
+| `worker.py`, `start_workflow.py` | The Workers and a run |
+| `grant.py`, `review.py`, `delete_sandbox.py`, `kill_worker.py`, `bundle.py`, `rehearsal.py` | The operator: decide a grant, decide a review, two chaos beats, collect the records, play every beat unattended |
+| `sandbox-image/` | The sandbox image for real OpenShell: Python, usd-core, sceneops and the site |
+| `renderer/` | The Isaac Sim service for a GPU host: a job API, the Isaac Sim backend, its image, and an asset mirror |
 
 ## The approval, in code
 
@@ -242,15 +234,13 @@ async def apply_grant(self, name: str, grant: Grant) -> None:
 
 ## The layers, in code
 
-Each `apply_usd_code` call runs the model's Python through the helper API in the exec sandbox and leaves one sublayer for
-the step. The Activity copies the layer out and lints it before anything else opens it. The lint is an allowlist: only
-direct children of `/World/Agent`, with the metadata, prim types and API schemas the helper API writes; no variants,
-payloads, inherits, value clips, sublayers or scripting attributes anywhere; references only to the catalog's own asset
-files. A path under the asset root is not enough, because the root also holds assets that carry OmniGraph nodes; the
-catalog's assets carry none, and `renderer/mirror_assets.py` audits that whenever it mirrors them. Then the Activity
-judges the layer against the trusted site layer, measuring every asset and piece of geometry under its full transform,
-and records the layer's hash in the Workflow's state. The sandbox caches by step and code hash, so a retried Activity
-gets the same layer back.
+Each `apply_usd_code` call runs Python in the exec sandbox and writes one sublayer. The Activity lints the layer
+before composing it for the judge. The lint accepts static prims directly under `/World/Agent`. Catalog references
+must define an Xform. The judge computes geometry bounds and applies the full transforms to catalog assets.
+The Activity records the layer hash in the Workflow's state.
+
+The sandbox caches completed applies by step and code hash. If the code times out, the Workflow reports the timeout
+and rebuilds the sandbox from the recorded layers.
 
 *File: workflows/tools.py*
 
@@ -270,10 +260,15 @@ async def apply_usd_code(rc: RunContextWrapper[AgentCtx], code: str, rationale: 
         return json.dumps({"ok": False, "type": "NotACatalogId", "msg": "h.place_asset takes catalog ids only (for example 'packing_table'), never file paths or URLs. "
                            "Use the ids returned by search_assets."})
     step = ctx.state.step + 1
-    out = await _with_rebuild(ctx, lambda: workflow.execute_activity(
-        sb.sandbox_apply, ApplyInput(run_id=ctx.run_id, workflow_id=ctx.workflow_id, exec_sandbox=ctx.state.exec_sandbox or "", step=step, code=code,
-                                     rationale=rationale, model=ctx.model, prior_layers=ctx.state.layers, min_clearance_m=MIN_CLEARANCE_M),
-        summary=f"step {step}: {rationale[:36]}", **SANDBOX_OPTS))
+    try:
+        out = await _with_rebuild(ctx, lambda: workflow.execute_activity(
+            sb.sandbox_apply, ApplyInput(run_id=ctx.run_id, workflow_id=ctx.workflow_id, exec_sandbox=ctx.state.exec_sandbox or "", step=step, code=code,
+                                         rationale=rationale, model=ctx.model, prior_layers=ctx.state.layers, min_clearance_m=MIN_CLEARANCE_M),
+            summary=f"step {step}: {rationale[:36]}", **SANDBOX_OPTS))
+    except ActivityError as e:
+        if _cause_type(e) == "SandboxCodeTimeout":
+            await ctx.rebuild()  # retire the exec sandbox in case the remote command is still running
+        raise
     if out.ok and out.layer is not None:
         ctx.state = ctx.state.with_layer(out.layer)  # the layer is the checkpoint: a rebuilt sandbox starts from every layer recorded here
         ctx.last_apply = {"placed_assets": out.placed_assets, "agent_prims": out.agent_prims, "violations": out.violations, "asset_overlaps": out.asset_overlaps}
@@ -363,27 +358,27 @@ def traced(fn: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
         if not enabled() or not activity.in_activity():
             return await fn(*args, **kwargs)
         info = activity.info()
-        await _close_idle(info.workflow_id)
-        run = _open(info.workflow_id)
+        try:
+            run, r = await _start(info)
+            with r.use_scope_stack(run.stack):
+                th = r.tools.call(info.activity_type, {"activity_id": info.activity_id, "attempt": info.attempt, "input": _jsonable(args[0] if args else None)}, handle=run.handle)
+        except Exception:  # noqa: BLE001 — a trace setup failure must not prevent the Activity from running
+            logger.warning("Could not start Relay tracing for %s", info.workflow_id, exc_info=True)
+            return await fn(*args, **kwargs)
         run.in_flight += 1
-        r = _r()
-        with r.use_scope_stack(run.stack):
-            if info.attempt > 1:
-                r.scope.event("temporal_retry", handle=run.handle, data={"activity": info.activity_type, "attempt": info.attempt})
-            th = r.tools.call(info.activity_type, {"activity_id": info.activity_id, "attempt": info.attempt, "input": _jsonable(args[0] if args else None)}, handle=run.handle)
         try:
             out = await fn(*args, **kwargs)
         except BaseException as e:
-            with r.use_scope_stack(run.stack):
+            with contextlib.suppress(Exception), r.use_scope_stack(run.stack):
                 r.tools.call_end(th, r.ToolExecutionResult({"error": f"{type(e).__name__}: {str(e)[:200]}"}, {"status": "error"}))
-            run.activities += 1
-            _after(run)
             raise
-        with r.use_scope_stack(run.stack):
-            r.tools.call_end(th, r.ToolExecutionResult(_jsonable(out)))
-        run.activities += 1
-        _after(run)
-        return out
+        else:
+            with contextlib.suppress(Exception), r.use_scope_stack(run.stack):
+                r.tools.call_end(th, r.ToolExecutionResult(_jsonable(out)))
+            return out
+        finally:
+            run.activities += 1
+            await _after(run)
 
     return wrapper
 ```
@@ -443,17 +438,7 @@ class RelayModel(Model):
 uv run pytest tests/
 ```
 
-The tests use the fake backend, the CPU stand-ins and a scripted model (`temporalio.openai_agents.testing`): the denied
-search, the validator rejecting a wrong host and a stale review id, the grant applied and recorded, a layer with a lane
-violation and the lane check that fails on it, a revision in a new generation rebuilt from the recorded layer with the
-same layer stack hash, the one-call fix, approval and the manifest, the four records on disk; a sandbox deleted
-mid-round; a cancellation that still releases the sandboxes; a retried apply that runs the code once; an unknown tool
-name that goes back to the model; a review refused until the checks cover the current layout, and an unchecked layout
-that can be revised or rejected but not approved. The lint, including the payloads, variants, nested prims and
-non-catalog references it refuses, the judge with a scaled crate, an untagged asset and hand-built geometry in a lane, a
-re-placed name keeping only its new asset, a damaged apply cache, the search mapping and the site constants are tested
-on the host with usd-core. The sandbox Activities are tested for a later execution retiring an earlier one's leftovers
-without inheriting its grant, and for a release that deletes both sandboxes when a log or a delete fails. The Relay runtime is tested with two process
-identities resuming one trace, two runs in one process keeping separate trajectories, an idle run closed and resumed,
-and a faulted model call answered by the fallback. The gpu Activities are tested against the renderer's job service with
-a fake backend, including a transient failure that is retried and run again. A stub `openshell` CLI covers the adapter's error classification and that a cancelled call stops the CLI.
+The tests use a scripted model, fake sandboxes, and CPU rendering. They cover approval Updates, sandbox rebuilds,
+apply timeouts, layer lint and the CPU judge. Relay tests cover overlapping runs, trace recovery, and model fallback.
+The renderer tests use a local job service with a fake backend to check cancellation, retries, and render inputs.
+A stub OpenShell CLI checks error classification and cancellation.

@@ -96,6 +96,9 @@ class AgentState(Strict):
     def with_lane_check(self, check: LaneCheck) -> "AgentState":
         return self.model_copy(update={"lane_checks": [*self.lane_checks, check]})
 
+    def current_lane_check(self, lane: str) -> LaneCheck | None:
+        return next((check for check in reversed(self.lane_checks) if check.step == self.step and check.lane == lane), None)
+
     def with_sandboxes(self, gen: int, exec_sandbox: str | None, tools_sandbox: str | None) -> "AgentState":
         return self.model_copy(update={"gen": gen, "exec_sandbox": exec_sandbox, "tools_sandbox": tools_sandbox})
 

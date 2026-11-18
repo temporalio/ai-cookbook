@@ -28,6 +28,7 @@ ALLOWED_PRIM_TYPES = {
 ALLOWED_API_SCHEMAS = {"MaterialBindingAPI", "PhysicsCollisionAPI", "CollectionAPI"}
 ALLOWED_SHADER_IDS = {"UsdPreviewSurface", "UsdPrimvarReader_float2", "UsdPrimvarReader_float3"}
 FORBIDDEN_ATTR_PREFIXES = ("omni:scripting", "omni:graph", "node:", "inputs:script", "outputs:")
+FORBIDDEN_PROPERTIES = {"extent", "extentsHint", "purpose"}
 FORBIDDEN_TYPE_PREFIXES = ("OmniGraph", "Omni", "Physics", "Camera", "Py", "Script")
 DEFAULT_LIMITS = {"max_bytes": 2_000_000, "max_prims": 2000}
 # Prim metadata the helper API writes (the rest is refused: payload, inheritPaths, specializes, variantSetNames,
@@ -55,15 +56,14 @@ def _asset_path_ok(asset: str, asset_root: str) -> bool:
     return asset.startswith(asset_root.rstrip("/") + "/")
 
 
-def _asset_values(layer: Sdf.Layer, sp: Sdf.Path, prop: Sdf.AttributeSpec) -> list[str]:
-    """Every asset path an asset or asset[] attribute holds: its default and every time sample."""
-    values = [prop.default] + [layer.QueryTimeSample(sp, t) for t in layer.ListTimeSamplesForPath(sp)]
-    out: list[str] = []
-    for v in values:
-        if v is None:
-            continue
-        out += [item.path for item in ([v] if isinstance(v, Sdf.AssetPath) else list(v))]
-    return out
+def _asset_values(prop: Sdf.AttributeSpec) -> list[str]:
+    """Asset paths in a static attribute. A value block authors no path."""
+    value = prop.default
+    if value is None or isinstance(value, Sdf.ValueBlock):
+        return []
+    if isinstance(value, Sdf.AssetPath):
+        return [value.path]
+    return [item.path for item in value]
 
 
 def catalog_references(catalog: dict[str, dict[str, Any]] | str | Path, asset_root: str) -> set[str]:
@@ -108,14 +108,18 @@ def lint_layer(path: str | Path, *, catalog: dict[str, dict[str, Any]] | str | P
         if sp.IsPropertyPath():
             prop = layer.GetPropertyAtPath(sp)
             name = sp.name
-            if name.startswith(FORBIDDEN_ATTR_PREFIXES):
+            if name in FORBIDDEN_PROPERTIES or name.startswith(FORBIDDEN_ATTR_PREFIXES):
                 rep.errors.append(f"{sp}: forbidden property")
-            if isinstance(prop, Sdf.AttributeSpec) and name == "info:id":
-                v = prop.default
-                if v not in ALLOWED_SHADER_IDS:
-                    rep.errors.append(f"{sp}: shader id {v!r} not allowed")
-            if isinstance(prop, Sdf.AttributeSpec) and prop.typeName in (Sdf.ValueTypeNames.Asset, Sdf.ValueTypeNames.AssetArray):
-                for v in _asset_values(layer, sp, prop):
+            if not isinstance(prop, Sdf.AttributeSpec):
+                return
+            if layer.GetNumTimeSamplesForPath(sp) or "spline" in prop.ListInfoKeys():
+                rep.errors.append(f"{sp}: time samples and splines are not allowed")
+            if name == "info:id":
+                shader_id = prop.default
+                if not isinstance(shader_id, str) or shader_id not in ALLOWED_SHADER_IDS:
+                    rep.errors.append(f"{sp}: shader id {shader_id!r} not allowed")
+            if prop.typeName in (Sdf.ValueTypeNames.Asset, Sdf.ValueTypeNames.AssetArray):
+                for v in _asset_values(prop):
                     if not _asset_path_ok(v, asset_root):
                         rep.errors.append(f"{sp}: asset path {v!r} outside {asset_root}")
             return
@@ -145,7 +149,10 @@ def lint_layer(path: str | Path, *, catalog: dict[str, dict[str, Any]] | str | P
             base = api.split(":")[0]
             if base not in ALLOWED_API_SCHEMAS:
                 rep.errors.append(f"{sp}: API schema {api!r} not allowed")
-        for ref in spec.referenceList.GetAddedOrExplicitItems():
+        references = spec.referenceList.GetAddedOrExplicitItems()
+        if references and (spec.specifier != Sdf.SpecifierDef or t != "Xform"):
+            rep.errors.append(f"{sp}: an asset reference requires a defined Xform")
+        for ref in references:
             if not ref.assetPath:
                 rep.errors.append(f"{sp}: internal references are not allowed")
             elif ref.assetPath not in allowed_refs:

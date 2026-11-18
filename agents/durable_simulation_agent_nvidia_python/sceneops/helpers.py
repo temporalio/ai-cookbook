@@ -213,6 +213,9 @@ class SceneHelpers:
         prim = xf.GetPrim()
         # Explicit, not prepended: a name re-placed over an older layer's prim must not keep that layer's reference too.
         prim.GetReferences().SetReferences([Sdf.Reference(f"{self.asset_root}/{entry['usd']}")])
+        # USD can reuse the older definition and author an over for the replacement. Give each new reference its own definition.
+        spec = self.stage.GetEditTarget().GetPrimSpecForScenePath(prim.GetPath())
+        spec.specifier, spec.typeName = Sdf.SpecifierDef, "Xform"
         prim.SetActive(True)  # explicit: a re-placed name must override an older layer's `active = false`
         prim.SetCustomDataByKey("agent:catalog_id", entry["id"])
         api = UsdGeom.XformCommonAPI(xf)

@@ -15,7 +15,7 @@ from temporalio import activity
 from temporalio.exceptions import ApplicationError
 
 import relay
-from activities.openshell import ExecResult, SandboxLost, backend
+from activities.openshell import ExecResult, SandboxLost, SandboxTimeout, backend
 from models import (
     ApplyInput,
     ApplyOutput,
@@ -225,14 +225,20 @@ async def sandbox_apply(inp: ApplyInput) -> ApplyOutput:
     async with heartbeating() as hb:
         _phase(hb, f"apply:{inp.step}")
         try:
-            env = _envelope(await sb.apply(inp.exec_sandbox, inp.step, inp.code, meta, inp.min_clearance_m), "apply")
-            if not env.get("ok"):
-                return rejected(env.get("error") or {"type": "ApplyFailed"}, {"stdout_tail": env.get("stdout_tail", "")}, env.get("warnings", []))
-            data = env["data"]
-            layers_dir = run_dir(inp.run_id) / "layers"
-            layers_dir.mkdir(parents=True, exist_ok=True)
-            final, tmp = layers_dir / f"{inp.step:03d}.usda", layers_dir / f".{inp.step:03d}.part.usda"  # keep a .usda suffix: Sdf infers the format
-            _phase(hb, "download")
+            result = await sb.apply(inp.exec_sandbox, inp.step, inp.code, meta, inp.min_clearance_m)
+        except SandboxTimeout as e:
+            raise ApplicationError(str(e), type="SandboxCodeTimeout", non_retryable=True) from e
+        except SandboxLost as e:
+            raise _lost(e, "apply")
+        env = _envelope(result, "apply")
+        if not env.get("ok"):
+            return rejected(env.get("error") or {"type": "ApplyFailed"}, {"stdout_tail": env.get("stdout_tail", "")}, env.get("warnings", []))
+        data = env["data"]
+        layers_dir = run_dir(inp.run_id) / "layers"
+        layers_dir.mkdir(parents=True, exist_ok=True)
+        final, tmp = layers_dir / f"{inp.step:03d}.usda", layers_dir / f".{inp.step:03d}.part.usda"  # keep a .usda suffix: Sdf infers the format
+        _phase(hb, "download")
+        try:
             await sb.download_layer(inp.exec_sandbox, inp.step, tmp)
         except SandboxLost as e:
             raise _lost(e, "apply")

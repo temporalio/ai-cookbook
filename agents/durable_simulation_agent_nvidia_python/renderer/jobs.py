@@ -6,6 +6,7 @@ Pure Python, no Kit imports, so it is tested on a laptop. One job runs at a time
 from __future__ import annotations
 
 import json
+import re
 import threading
 import time
 from collections import OrderedDict
@@ -14,6 +15,8 @@ from pathlib import Path
 from typing import Any, Callable, Protocol
 
 QUEUED, RUNNING, DONE, FAILED, CANCELLED = "queued", "running", "done", "failed", "cancelled"
+JOB_KEY = re.compile(r"[0-9a-f]{64}")
+OPERATIONS = {"render_still", "simulate_lane"}
 
 
 @dataclass
@@ -41,6 +44,10 @@ class CancelledJob(Exception):
     pass
 
 
+class InvalidJob(ValueError):
+    """A job that will fail again with the same inputs."""
+
+
 class Backend(Protocol):
     def run(self, job: Job, progress: Callable[[dict[str, Any]], None], cancelled: Callable[[], bool]) -> dict[str, Any]: ...
 
@@ -55,18 +62,23 @@ class JobRegistry:
             for p in sorted(cache_dir.glob("*.json")):
                 try:
                     d = json.loads(p.read_text())
-                    if d.get("status") == DONE:
+                    if d.get("status") == DONE and p.stem == d["key"] and JOB_KEY.fullmatch(p.stem):
                         self._jobs[d["key"]] = Job(**{k: d[k] for k in Job.__dataclass_fields__ if k in d})
                 except Exception:  # noqa: BLE001
                     p.unlink(missing_ok=True)
 
     # ---- submission / attach ----
     def submit(self, key: str, op: str, params: dict[str, Any]) -> tuple[Job, bool]:
-        """Returns (job, created). A queued, running or finished job with this key is attached (created=False); a failed or
-        cancelled one runs again, so a retried Activity gets a new attempt instead of the cached failure."""
+        """Attach to a usable job, or queue a new attempt. The single runner finishes a cancelling attempt before starting its replacement."""
+        if not isinstance(key, str) or not JOB_KEY.fullmatch(key):
+            raise InvalidJob("job key must consist of 64 lowercase hexadecimal characters")
+        if not isinstance(op, str) or op not in OPERATIONS:
+            raise InvalidJob(f"unknown op {op!r}")
+        if not isinstance(params, dict):
+            raise InvalidJob("job params must be an object")
         with self._lock:
             job = self._jobs.get(key)
-            if job is not None and job.status not in (FAILED, CANCELLED):
+            if job is not None and not job.cancel_requested and job.status not in (FAILED, CANCELLED):
                 job.adopters += 1
                 return job, False
             job = Job(key=key, op=op, params=params)
@@ -119,6 +131,8 @@ class JobRegistry:
         try:
             result = backend.run(job, progress, lambda: job.cancel_requested)
             with self._lock:
+                if job.cancel_requested:
+                    raise CancelledJob()
                 job.status, job.result, job.finished_at = DONE, result, time.time()
                 job.progress = {**job.progress, "phase": "done", "pct": 100}
             self._persist(job)
@@ -129,7 +143,8 @@ class JobRegistry:
         except Exception as e:  # noqa: BLE001
             with self._lock:
                 job.status, job.finished_at = FAILED, time.time()
-                job.error = {"type": getattr(e, "error_type", type(e).__name__), "msg": str(e), "retryable": getattr(e, "retryable", True)}
+                job.error = {"type": getattr(e, "error_type", type(e).__name__), "msg": str(e),
+                             "retryable": getattr(e, "retryable", not isinstance(e, (ValueError, KeyError, TypeError)))}
         return True
 
     def _persist(self, job: Job) -> None:

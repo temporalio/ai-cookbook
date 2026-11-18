@@ -1,6 +1,6 @@
 """The renderer's HTTP API over the job registry. Standard library only: it runs in Isaac Sim's own Python.
 
-POST /jobs {key, op, params} -> 202 (created) | 409 (attached: existing status+result)
+POST /jobs {key, op, params} -> 202 (created) | 409 (attached: existing status+result) | 400 (invalid)
 GET  /jobs/<key>            -> 200 job | 404
 DELETE /jobs/<key>          -> 202 cancelling | 409 already finished | 404
 GET  /healthz               -> {ready, queue_depth, backend}
@@ -44,14 +44,15 @@ def make_handler(registry: JobRegistry, info: dict[str, Any]):
             if self.path != "/jobs":
                 self._send(404, {"error": {"type": "NotFound"}})
                 return
-            n = int(self.headers.get("Content-Length", "0"))
             try:
+                n = int(self.headers.get("Content-Length", "0"))
+                if n < 0:
+                    raise ValueError("invalid Content-Length")
                 body = json.loads(self.rfile.read(n) or b"{}")
-                key, op, params = body["key"], body["op"], body.get("params", {})
-            except (KeyError, ValueError) as e:
+                job, created = registry.submit(body["key"], body["op"], body.get("params", {}))
+            except (KeyError, TypeError, ValueError) as e:
                 self._send(400, {"error": {"type": "InvalidParams", "msg": str(e)}})
                 return
-            job, created = registry.submit(key, op, params)
             self._send(202 if created else 409, {**job.public(), "attached": not created})
 
         def do_DELETE(self) -> None:

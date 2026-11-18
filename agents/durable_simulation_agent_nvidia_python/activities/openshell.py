@@ -43,6 +43,10 @@ class SandboxError(Exception):
     pass
 
 
+class SandboxTimeout(SandboxError):
+    """The sandbox command or its CLI call exceeded its deadline."""
+
+
 @dataclass
 class ExecResult:
     exit_code: int
@@ -105,7 +109,7 @@ class OpenShellCLI:
             out, err = await asyncio.wait_for(proc.communicate(stdin), timeout)
         except asyncio.TimeoutError:
             _kill_group(proc)
-            raise SandboxError(f"openshell {' '.join(args[:3])} took longer than {timeout:.0f}s")
+            raise SandboxTimeout(f"openshell {' '.join(args[:3])} took longer than {timeout:.0f}s")
         except asyncio.CancelledError:
             # The Activity was cancelled: stop the CLI call too, or a `sandbox create` could finish after the Workflow
             # has already released this generation by name.
@@ -187,10 +191,10 @@ class OpenShellCLI:
 
     async def exec(self, name: str, argv: Sequence[str], *, stdin: bytes | None = None, timeout: float = 120) -> ExecResult:
         r = await self._run("sandbox", "exec", "-n", name, "--timeout", str(int(timeout)), "--no-login-shell", "--", *argv, stdin=stdin, timeout=timeout + 15)
+        if r.exit_code == 124:
+            raise SandboxTimeout(f"command in {name} hit its {timeout:.0f}s timeout")
         if r.exit_code != 0 and await self._gone(name, r):
             raise SandboxLost(f"sandbox {name}: {r.stderr.strip()[:200]}")
-        if r.exit_code == 124:
-            raise SandboxError(f"command in {name} hit its {timeout:.0f}s timeout")
         return r
 
     async def apply(self, name: str, step: int, code: str, meta: dict[str, str], min_clearance_m: float) -> ExecResult:
@@ -291,12 +295,16 @@ class FakeSandboxes:
     async def _sceneops(self, name: str, module: str, argv: list[str], *, stdin: bytes | None, timeout: float = 120) -> ExecResult:
         work = self._dir(name) / "work"
         proc = await asyncio.create_subprocess_exec(sys.executable, "-I", "-c", _BOOTSTRAP, str(RECIPE_DIR), module, *argv, cwd=work,
-                                                    stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE)
+                                                    stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+                                                    start_new_session=True)
         try:
             out, err = await asyncio.wait_for(proc.communicate(stdin), timeout)
         except asyncio.TimeoutError:
-            proc.kill()
-            raise SandboxError(f"{module} hit its {timeout:.0f}s timeout")
+            _kill_group(proc)
+            raise SandboxTimeout(f"{module} hit its {timeout:.0f}s timeout")
+        except asyncio.CancelledError:
+            _kill_group(proc)
+            raise
         return ExecResult(proc.returncode or 0, out.decode(errors="replace"), err.decode(errors="replace"))
 
     def apply_calls(self) -> int:

@@ -12,6 +12,7 @@ def run_kit_service(registry, *, host: str, port: int, out: Path) -> None:
 
     app = SimulationApp({"headless": True, "renderer": "RealTimePathTracing", "width": 1920, "height": 1080})
     sys.path.insert(0, os.environ.get("RENDERER_HOME", "/opt/renderer"))
+    from renderer.jobs import InvalidJob
     from renderer.kit_backend import KitBackend
     from renderer.server import serve
     from validate.lint import lint_layer
@@ -22,7 +23,7 @@ def run_kit_service(registry, *, host: str, port: int, out: Path) -> None:
     def lint(path: str) -> None:  # the gpu Worker linted every layer already; Kit still never opens one that fails
         report = lint_layer(path, catalog=catalog, asset_root=asset_root)
         if not report.ok:
-            raise RuntimeError(f"lint rejected {path}: {report.errors[:3]}")
+            raise InvalidJob(f"lint rejected {path}: {report.errors[:3]}")
 
     backend = KitBackend(app, out, lint=lint)
     srv = serve(registry, host=host, port=port, info={"backend": "kit"})

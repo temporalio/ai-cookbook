@@ -5,6 +5,7 @@ stack hash, and the Workflow's site constants match the site layer."""
 from __future__ import annotations
 
 from pathlib import Path
+from textwrap import indent
 
 import pytest
 from pxr import Gf, Usd, UsdGeom
@@ -134,15 +135,20 @@ def test_search_hits_map_to_catalog_ids_and_the_catalog_fills_in():
     hits = [{"url": S3_ROOT + "Isaac/Props/PackingTable/packing_table.usd", "score": 0.91}, {"url": S3_ROOT + "Somewhere/unknown_thing.usd", "score": 0.5}]
     out = merge_hits(hits, catalog, "pallet staging")
     assert out[0]["id"] == "packing_table" and out[0]["source"] == "usd_search" and out[0]["size_m"] == catalog["packing_table"]["size_m"]
-    assert out[1]["id"] is None, "an unmapped hit is evidence the search ran, not something to place"
-    assert "pallet" in [o["id"] for o in out[2:]] and all(o["source"] == "catalog" for o in out[2:])
-    assert Path(CATALOG).exists()
+    assert out[1]["source"] == "catalog" and "pallet" in [o["id"] for o in out[1:]]
+    assert merge_hits(hits, catalog, "unmatched term")[1]["id"] is None
+    unmapped_hits = [{"url": S3_ROOT + f"Unlisted/asset_{i}.usd"} for i in range(8)]
+    assert "pallet" in [r["id"] for r in merge_hits(unmapped_hits, catalog, "pallet")]
 
 
 def _layer(tmp_path: Path, name: str, body: str) -> Path:
     p = tmp_path / name
     p.write_text("#usda 1.0\n\n" + body)
     return p
+
+
+def _agent_layer(tmp_path: Path, body: str) -> Path:
+    return _layer(tmp_path, "agent.usda", 'over "World"\n{\n    over "Agent"\n    {\n' + indent(body, "        ") + '\n    }\n}\n')
 
 
 def test_lint_refuses_payloads_variants_and_asset_paths_anywhere(tmp_path):
@@ -157,7 +163,7 @@ def test_lint_refuses_payloads_variants_and_asset_paths_anywhere(tmp_path):
                        '        {\n        }\n    }\n}\n', "metadata 'inheritPaths' not allowed"),
         "a time-sampled asset array outside the root": ('over "World"\n{\n    over "Agent"\n    {\n        def Xform "a"\n        {\n'
                                                         '            asset[] files.timeSamples = {\n                1: [@/opt/assets/ok.usd@, @/etc/passwd@],\n'
-                                                        '            }\n        }\n    }\n}\n', "'/etc/passwd' outside /opt/assets"),
+                                                        '            }\n        }\n    }\n}\n', "time samples and splines are not allowed"),
     }
     for i, (what, (body, needle)) in enumerate(cases.items()):
         rep = lint_layer(_layer(tmp_path, f"case{i}.usda", body), catalog=CATALOG, asset_root="/opt/assets")
@@ -194,6 +200,7 @@ def test_a_re_placed_name_keeps_only_its_new_asset(tmp_path):
                                         "h.place_asset('pallet', -3.0, 2.0, name='station_1')",
                                         "h.add_floor_marking('station_2', [(-4.0, -4.0), (-4.0, 0.0)])\nh.place_asset('pallet', -2.0, -2.0, name='station_2')",
                                         "h.add_floor_marking('station_2', [(-4.5, -4.0), (-4.5, 0.0)])"])
+    assert all(lint_layer(layer, catalog=CATALOG, asset_root=str(assets)).ok for layer in layers)
 
     def compose(n: int) -> Usd.Stage:
         stage = Usd.Stage.CreateInMemory()
@@ -247,6 +254,31 @@ def test_lint_allows_only_catalog_references_on_direct_children(tmp_path):
     assert not internal.ok and "internal references are not allowed" in internal.errors[0]
     nested = lint('        def Xform "group"\n        {\n            def Cube "hidden"\n            {\n            }\n        }\n')
     assert not nested.ok and "only direct children" in nested.errors[0]
+
+
+@pytest.mark.parametrize("prim", ["over", "def", "def Cube"])
+def test_catalog_reference_requires_a_defining_xform(tmp_path, prim):
+    asset = load_catalog(CATALOG)["pallet"]["usd"]
+    layer = _agent_layer(tmp_path, f'{prim} "Pallet" (\n    references = @/opt/assets/{asset}@\n)\n{{\n}}')
+    report = lint_layer(layer, catalog=CATALOG)
+    assert not report.ok and any("requires a defined Xform" in e for e in report.errors)
+
+
+@pytest.mark.parametrize(("attr", "reason"), [
+    ("double size.timeSamples = {0: 1, 1: 2}", "time samples"),
+    ("float3[] extent = [(-1, -1, -1), (1, 1, 1)]", "forbidden property"),
+    ('uniform token purpose = "proxy"', "forbidden property"),
+    ("asset[] source.timeSamples = {1: None}", "time samples"),
+])
+def test_agent_geometry_uses_static_computed_bounds(tmp_path, attr, reason):
+    layer = _agent_layer(tmp_path, f'def Cube "Cube"\n{{\n    {attr}\n}}')
+    report = lint_layer(layer, catalog=CATALOG)
+    assert not report.ok and any(reason in e for e in report.errors)
+
+
+def test_lint_accepts_value_blocked_asset_defaults(tmp_path):
+    layer = _agent_layer(tmp_path, 'def Xform "Asset"\n{\n    asset file = None\n    asset[] files = None\n}')
+    assert lint_layer(layer, catalog=CATALOG).ok
 
 
 async def test_a_damaged_cache_record_or_layer_file_is_redone_not_fatal(fake):

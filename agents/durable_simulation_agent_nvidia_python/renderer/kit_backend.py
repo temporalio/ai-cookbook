@@ -14,16 +14,19 @@ import time
 from pathlib import Path
 from typing import Any, Callable
 
-from renderer.jobs import CancelledJob, Job
+from renderer import DEFAULT_BASE_REF
+from renderer.jobs import CancelledJob, InvalidJob, Job
 
 SITE_LAYER = os.environ.get("RENDERER_SITE_LAYER", "/opt/renderer/site/000_site.usda")  # the trusted copy, baked into the image
 ASSET_ROOT = os.environ.get("ISAACSIM_ASSET_ROOT", "/opt/assets")
+BASE_REF = os.environ.get("RENDERER_BASE_REF", DEFAULT_BASE_REF)
 
 
 class KitBackend:
     def __init__(self, app: Any, out: Path, lint: Callable[[str], None] | None = None) -> None:
         self.app = app
         self.out = out
+        self.layers_dir = (Path(os.environ.get("RENDERER_SHARED_DIR", out.parent)) / "layers").resolve()
         self.lint = lint
         self._stack_hash: str | None = None
         import carb.settings  # noqa: F401 — inside Kit only
@@ -35,42 +38,60 @@ class KitBackend:
         rep.orchestrator.set_capture_on_play(False)  # Isaac Sim 6.1's base app turns capture-on-play on
 
     # ---------------------------------------------------------------- stage
-    def ensure_stage(self, base_ref: str, layer_paths: list[str], progress: Callable[[dict[str, Any]], None]) -> str:
+    def ensure_stage(self, base_ref: str, layer_paths: list[str], progress: Callable[[dict[str, Any]], None], cancelled: Callable[[], bool]) -> str:
         import hashlib
 
         from pxr import Sdf, Usd  # noqa: F401
 
-        h = hashlib.sha256(("\n".join(layer_paths) + "\n" + base_ref).encode()).hexdigest()
+        if cancelled():
+            raise CancelledJob()
+        if base_ref != BASE_REF:
+            raise InvalidJob("base_ref does not match the renderer's configured base scene")
+        asset_root = Path(ASSET_ROOT).resolve()
+        base = (asset_root / BASE_REF).resolve()
+        if not base.is_relative_to(asset_root) or not base.is_file():
+            raise InvalidJob("the configured base scene must be a file inside the asset root")
+        if not isinstance(layer_paths, list) or any(not isinstance(p, str) for p in layer_paths):
+            raise InvalidJob("layers must be a list of paths")
+        layers = [Path(p).resolve() for p in layer_paths]
+        if any(p.parent != self.layers_dir or p.suffix != ".usda" or not p.is_file() for p in layers):
+            raise InvalidJob("layers must be .usda files in the shared layers directory")
+        h = hashlib.sha256("\n".join(str(p) for p in [*layers, base]).encode()).hexdigest()
         if h == self._stack_hash and self.omni_usd.get_context().get_stage() is not None:
             return h
         progress({"phase": "stage_load"})
-        for p in layer_paths:
+        for p in layers:
+            if cancelled():
+                raise CancelledJob()
             if self.lint:
-                self.lint(p)
+                self.lint(str(p))
         root_path = str(self.out / "stage" / f"{h[:16]}.usda")
         Path(root_path).parent.mkdir(parents=True, exist_ok=True)
         root = Sdf.Layer.FindOrOpen(root_path) or Sdf.Layer.CreateNew(root_path)
         root.Clear()
         # newest step first, then the site layer, then the base warehouse as the weakest sublayer
-        root.subLayerPaths = [*reversed(layer_paths), SITE_LAYER, f"{ASSET_ROOT}/{base_ref}"]
+        root.subLayerPaths = [*(str(p) for p in reversed(layers)), SITE_LAYER, str(base)]
         # stage metadata resolves across the root layer stack; pin it so the agent's layers cannot flip units/up-axis
         root.pseudoRoot.SetInfo("metersPerUnit", 1.0)
         root.pseudoRoot.SetInfo("upAxis", "Z")
         root.defaultPrim = "World"
         root.Save()
         ctx = self.omni_usd.get_context()
+        self._stack_hash = None
         ctx.open_stage(root_path)
-        self._pump_until_loaded()
+        self._pump_until_loaded(cancelled)
         for _ in range(2):  # warm-up frames after a stage change (materials/RTX)
             self.app.update()
         self._stack_hash = h
         return h
 
-    def _pump_until_loaded(self, timeout_s: float = 600.0) -> None:
+    def _pump_until_loaded(self, cancelled: Callable[[], bool], timeout_s: float = 600.0) -> None:
         from isaacsim.core.experimental.utils.stage import is_stage_loading
 
         t0 = time.time()
         while is_stage_loading():
+            if cancelled():
+                raise CancelledJob()
             self.app.update()
             if time.time() - t0 > timeout_s:
                 raise RuntimeError("stage load timed out")
@@ -96,16 +117,19 @@ class KitBackend:
         if cancelled():
             raise CancelledJob()
         if job.op == "render_still":
-            return self.render_still(p, progress, cancelled)
+            return self.render_still(job, progress, cancelled)
         if job.op == "simulate_lane":
             return self.simulate_lane(p, progress, cancelled)
-        raise ValueError(f"unknown op {job.op}")
+        raise InvalidJob(f"unknown op {job.op}")
 
-    def render_still(self, p: dict[str, Any], progress, cancelled) -> dict[str, Any]:
+    def render_still(self, job: Job, progress, cancelled) -> dict[str, Any]:
+        p = job.params
         rep = self.rep
-        self.ensure_stage(p["base_ref"], p["layers"], progress)
+        self.ensure_stage(p["base_ref"], p["layers"], progress, cancelled)
+        if cancelled():
+            raise CancelledJob()
         subframes = self._set_mode(p.get("mode", "rt2"), int(p.get("total_spp", 64)), int(p.get("subframes", 16)))
-        out_dir = self.out / "jobs" / p["job_key"]
+        out_dir = self.out / "jobs" / job.key
         out_dir.mkdir(parents=True, exist_ok=True)
         progress({"phase": "render", "frames_total": 1})
         rp = rep.create.render_product(p["camera"], (int(p.get("width", 1920)), int(p.get("height", 1080))))
@@ -115,14 +139,18 @@ class KitBackend:
         writer.initialize(backend=backend, rgb=True)
         writer.attach([rp])
         try:
+            if cancelled():
+                raise CancelledJob()
             rep.orchestrator.step(rt_subframes=subframes, delta_time=0.0)
             rep.orchestrator.wait_until_complete()
+            if cancelled():
+                raise CancelledJob()
         finally:
             writer.detach()
             rp.destroy()
         pngs = sorted(glob.glob(str(out_dir / "**" / "rgb_*.png"), recursive=True))
         if not pngs:
-            raise RuntimeError(f"no rgb output in {out_dir}")
+            raise InvalidJob(f"no rgb output in {out_dir}")
         progress({"frames_done": 1, "pct": 100})
         return {"output_path": pngs[-1], "mode": p.get("mode", "rt2"), "subframes": subframes, "layers": p["layers"]}
 
@@ -132,12 +160,14 @@ class KitBackend:
         or a path clearance below the threshold fail the check. Returns the sampled trajectory for the replay clip."""
         from pxr import Usd, UsdGeom
 
-        self.ensure_stage(p["base_ref"], p["layers"], progress)
+        self.ensure_stage(p["base_ref"], p["layers"], progress, cancelled)
+        if cancelled():
+            raise CancelledJob()
         stage = self.omni_usd.get_context().get_stage()
-        cache = UsdGeom.BBoxCache(Usd.TimeCode.Default(), [UsdGeom.Tokens.default_, UsdGeom.Tokens.render, UsdGeom.Tokens.guide])
+        cache = UsdGeom.BBoxCache(Usd.TimeCode.Default(), [UsdGeom.Tokens.default_, UsdGeom.Tokens.render, UsdGeom.Tokens.guide, UsdGeom.Tokens.proxy])
         lane = stage.GetPrimAtPath(f"/World/Site/Lanes/{p['lane']}")
         if not lane:
-            raise RuntimeError(f"lane {p['lane']} not in site layer")
+            raise InvalidJob(f"lane {p['lane']} not in site layer")
         lr = cache.ComputeWorldBound(lane).ComputeAlignedRange()
         la = [lr.GetMin()[0], lr.GetMin()[1], lr.GetMax()[0], lr.GetMax()[1]]
         min_clearance = float(p.get("min_clearance_m", 0.6))

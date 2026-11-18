@@ -10,6 +10,7 @@ import json
 import os
 import shutil
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
 
 from temporalio import activity
@@ -26,13 +27,14 @@ from models import (
     SimulateInput,
 )
 from paths import ASSET_ROOT, CATALOG, SITE_LAYER, run_dir, runs_dir
+from renderer import DEFAULT_BASE_REF
 from renderer_client import RendererClient, RendererError
 from sceneops.hashing import sha256_file
 from validate.judge import lane_check
 from validate.lint import lint_layer
 from validate.plan import render_plan
 
-BASE_REF = os.environ.get("RENDERER_BASE_REF", "Isaac/Environments/Simple_Warehouse/full_warehouse.usd")  # the warehouse stage the renderer opens
+BASE_REF = os.environ.get("RENDERER_BASE_REF", DEFAULT_BASE_REF)
 PREVIEW = {"mode": "rt2", "total_spp": 64, "subframes": 16}
 
 
@@ -61,9 +63,10 @@ def _layer_paths(layers: list[LayerRef]) -> list[Path]:
 def _atomic_copy(src: str | Path, dst: Path) -> None:
     """Copy, then rename into place: a Worker killed mid-copy never leaves a truncated file that a retry would trust."""
     dst.parent.mkdir(parents=True, exist_ok=True)
-    tmp = dst.with_name(f".{dst.name}.part")
-    shutil.copyfile(src, tmp)
-    tmp.replace(dst)
+    with TemporaryDirectory(prefix=f".{dst.name}.", dir=dst.parent) as staging:
+        tmp = Path(staging) / dst.name
+        shutil.copyfile(src, tmp)
+        tmp.replace(dst)
 
 
 def _shared_paths(paths: list[Path]) -> list[str]:
@@ -75,15 +78,14 @@ def _shared_paths(paths: list[Path]) -> list[str]:
         dst = shared / f"{sha}.usda"
         if not dst.exists() or sha256_file(dst) != sha:
             _atomic_copy(p, dst)
-        out.append(str(dst))
+        out.append(str(dst.resolve()))
     return out
 
 
 async def _job(op: str, params: dict[str, Any], key: str, hb: dict[str, Any], timeout: float) -> dict[str, Any]:
     client = RendererClient(renderer_url())
     try:
-        return await client.run(key, op, params, on_progress=lambda u: _phase(hb, f"{op}:{u.get('status') or u.get('phase')}"), timeout=timeout,
-                                cancelled=activity.is_cancelled)
+        return await client.run(key, op, params, on_progress=lambda u: _phase(hb, f"{op}:{u.get('status') or u.get('phase')}"), timeout=timeout)
     except RendererError as e:
         raise ApplicationError(f"{op}: {e}", type="RenderFailed", non_retryable=not e.retryable) from e
     finally:
@@ -94,19 +96,17 @@ async def _job(op: str, params: dict[str, Any], key: str, hb: dict[str, Any], ti
 @relay.traced
 async def render_preview(inp: RenderInput) -> RenderRef:
     """A still of the current layer stack from a named camera of the site layer: Isaac Sim RTX through the renderer
-    service, or the CPU plan view. Idempotent by output path: every output is renamed into place only once complete."""
+    service, or the CPU plan view. Verify the input layers even if this Workflow Id and step already have an output."""
     cam = inp.camera.rsplit("/", 1)[-1]
     mode = PREVIEW["mode"] if renderer_url() else "plan"
     out = run_dir(inp.run_id) / "renders" / f"{inp.step:03d}-{cam}-{mode}.png"
-    if out.exists():
-        return RenderRef(step=inp.step, camera=cam, mode=mode, path=str(out), sha256=sha256_file(out))
     paths = _layer_paths(inp.layers)
     async with heartbeating() as hb:
         if renderer_url():
             params = {**PREVIEW, "camera": f"/World/Cameras/{cam}", "width": inp.width, "height": inp.height}
             key = _job_key("render_still", inp.layers, params)
             _phase(hb, "submit")
-            result = await _job("render_still", {**params, "base_ref": BASE_REF, "layers": _shared_paths(paths), "job_key": key}, key, hb, timeout=1800)
+            result = await _job("render_still", {**params, "base_ref": BASE_REF, "layers": _shared_paths(paths)}, key, hb, timeout=1800)
             _atomic_copy(result["output_path"], out)
         else:
             _phase(hb, "plan")
@@ -127,7 +127,7 @@ async def simulate_lane(inp: SimulateInput) -> LaneCheck:
             params = {"lane": inp.lane, "robot": inp.robot, "min_clearance_m": inp.min_clearance_m, "render_clip": True}
             key = _job_key("simulate_lane", inp.layers, params)
             _phase(hb, "submit")
-            result = await _job("simulate_lane", {**params, "base_ref": BASE_REF, "layers": _shared_paths(paths), "job_key": key}, key, hb, timeout=1800)
+            result = await _job("simulate_lane", {**params, "base_ref": BASE_REF, "layers": _shared_paths(paths)}, key, hb, timeout=1800)
             if result.get("clip_path"):
                 clip = run_dir(inp.run_id) / "clips" / f"{inp.step:03d}-{inp.lane}.mp4"
                 _atomic_copy(result["clip_path"], clip)
