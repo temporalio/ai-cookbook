@@ -6,6 +6,9 @@ S3 ListObjectsV2 and GET.
 
 By default: the warehouse scene, the Nova Carter nav sample and robot, and the folder of every asset in site/catalog.json
 (textures included). Files already present with the same size are skipped. Mount <dest>/Assets/Isaac/6.1 as /opt/assets.
+
+Then it audits the catalog: agent layers may reference only catalog assets (validate/lint.py), so each one, composed with
+all its dependencies, must carry no OmniGraph or script nodes. The mirror exits non-zero if one does.
 """
 
 from __future__ import annotations
@@ -65,6 +68,20 @@ def fetch(client: httpx.Client, key: str, size: int, dest: Path) -> bool:
     return True
 
 
+def audit(root: Path) -> list[str]:
+    """Catalog assets that compose OmniGraph prims or scripting attributes, with what was found. [] means clean."""
+    from pxr import Usd
+
+    findings = []
+    for a in json.loads(CATALOG.read_text())["assets"]:
+        stage = Usd.Stage.Open(str(root / a["usd"]), load=Usd.Stage.LoadAll)
+        for prim in stage.Traverse(Usd.TraverseInstanceProxies(Usd.PrimAllPrimsPredicate)):
+            names = [x.GetName() for x in prim.GetAttributes()]
+            if prim.GetTypeName().startswith("OmniGraph") or any(n.startswith(("omni:scripting", "inputs:script", "node:type")) for n in names):
+                findings.append(f"{a['id']}: {prim.GetPath()} [{prim.GetTypeName()}]")
+    return findings
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dest", required=True, help="local root; files land at <dest>/Assets/Isaac/<version>/...")
@@ -72,12 +89,18 @@ def main() -> None:
     ap.add_argument("--version", default=VERSION)
     ap.add_argument("--workers", type=int, default=16)
     ap.add_argument("--dry-run", action="store_true", help="list what would be mirrored and its size, download nothing")
+    ap.add_argument("--audit-only", action="store_true", help="skip the download; audit an existing mirror")
     args = ap.parse_args()
     dest = Path(args.dest)
     folders = set(DEFAULT_PREFIXES) | set(args.prefix)
     folders |= {a["usd"].rsplit("/", 1)[0] + "/" for a in json.loads(CATALOG.read_text())["assets"]}
     prefixes = sorted(f"Assets/Isaac/{args.version}/{f}" for f in folders)
     t0 = time.time()
+    root = dest / "Assets" / "Isaac" / args.version
+    if args.audit_only:
+        findings = audit(root)
+        print(json.dumps({"audit": findings or "clean"}), flush=True)
+        sys.exit(1 if findings else 0)
     with httpx.Client(headers={"User-Agent": "durable-simulation-agent-mirror/0.1"}) as client:
         objs = sorted({o for p in prefixes for o in list_objects(client, p)})
         print(f"{len(objs)} objects, {sum(s for _, s in objs) / 1e6:.0f} MB under {len(prefixes)} folders", flush=True)
@@ -96,9 +119,10 @@ def main() -> None:
                     errors.append(str(e))
                 if (fetched + skipped) % 500 == 0:
                     print(f"  {fetched + skipped}/{len(objs)}", flush=True)
+    findings = [] if errors else audit(root)
     print(json.dumps({"objects": len(objs), "fetched": fetched, "skipped": skipped, "seconds": round(time.time() - t0, 1), "errors": errors[:10],
-                      "mount": str(dest / "Assets" / "Isaac" / args.version)}), flush=True)
-    sys.exit(1 if errors else 0)
+                      "audit": findings or "clean", "mount": str(root)}), flush=True)
+    sys.exit(1 if errors or findings else 0)
 
 
 if __name__ == "__main__":

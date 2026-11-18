@@ -129,6 +129,7 @@ class AgentResult(Strict):
 class EnsureInput(Strict):
     run_id: str
     workflow_id: str
+    temporal_run_id: str  # sandboxes belong to one Workflow Execution, never to the Workflow Id
     gen: int
     grants: list[Grant]
     layers: list[LayerRef]

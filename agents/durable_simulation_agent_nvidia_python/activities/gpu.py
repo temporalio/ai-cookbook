@@ -51,7 +51,7 @@ def _layer_paths(layers: list[LayerRef]) -> list[Path]:
     paths = []
     for layer in layers:
         p = _layer_file(layer, "render")
-        report = lint_layer(p, asset_root=ASSET_ROOT)
+        report = lint_layer(p, catalog=CATALOG, asset_root=ASSET_ROOT)
         if not report.ok:
             raise ApplicationError(f"layer {layer.step} rejected by lint: {'; '.join(report.errors)[:500]}", type="LintRejected", non_retryable=True)
         paths.append(p)

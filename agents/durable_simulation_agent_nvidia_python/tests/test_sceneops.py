@@ -42,7 +42,7 @@ async def test_apply_lint_judge_fix_rehydrate_and_plan(fake, tmp_path):
     layer1 = tmp_path / "001.usda"
     await fake.download_layer("x1", 1, layer1)
     assert sha256_file(layer1) == env["data"]["sha256"]
-    assert lint_layer(layer1, asset_root="/opt/assets").ok
+    assert lint_layer(layer1, catalog=CATALOG, asset_root="/opt/assets").ok
     text = layer1.read_text()
     assert "dictionary agent" in text and "code_sha256" in text, "the layer carries its provenance in customLayerData"
 
@@ -98,12 +98,12 @@ def test_lint_rejects_what_kit_must_never_open(tmp_path):
     bad.write_text('#usda 1.0\n(\n    subLayers = [@../other.usda@]\n)\n\ndef Xform "World"\n{\n    def Xform "Agent"\n    {\n'
                    '        def Xform "a" (references = @http://evil.example/x.usd@)\n        {\n            custom string omni:scripting:scripts = "x"\n        }\n'
                    '        def Camera "c"\n        {\n        }\n    }\n    def Xform "Elsewhere"\n    {\n    }\n}\n')
-    rep = lint_layer(bad, asset_root="/opt/assets")
+    rep = lint_layer(bad, catalog=CATALOG, asset_root="/opt/assets")
     msgs = " | ".join(rep.errors)
     assert not rep.ok
-    for needle in ("sublayers", "outside /opt/assets", "forbidden property", "/World/Elsewhere", "prim type 'Camera'"):
+    for needle in ("sublayers", "is not a catalog asset", "forbidden property", "/World/Elsewhere", "prim type 'Camera'"):
         assert needle in msgs, msgs
-    assert lint_layer(SITE_LAYER, asset_root="/opt/assets").ok is False, "the site layer itself is not an agent layer"
+    assert lint_layer(SITE_LAYER, catalog=CATALOG, asset_root="/opt/assets").ok is False, "the site layer itself is not an agent layer"
 
 
 def test_site_constants_match_the_layer():
@@ -160,7 +160,7 @@ def test_lint_refuses_payloads_variants_and_asset_paths_anywhere(tmp_path):
                                                         '            }\n        }\n    }\n}\n', "'/etc/passwd' outside /opt/assets"),
     }
     for i, (what, (body, needle)) in enumerate(cases.items()):
-        rep = lint_layer(_layer(tmp_path, f"case{i}.usda", body), asset_root="/opt/assets")
+        rep = lint_layer(_layer(tmp_path, f"case{i}.usda", body), catalog=CATALOG, asset_root="/opt/assets")
         assert not rep.ok and any(needle in e for e in rep.errors), (what, rep.errors)
 
 
@@ -177,7 +177,8 @@ def _author(tmp_path: Path, asset_root: Path, steps: list[str]) -> list[Path]:
         stage = Usd.Stage.CreateInMemory()
         stage.GetRootLayer().subLayerPaths = [str(path), *[str(p) for p in reversed(paths)], str(SITE_LAYER)]
         stage.SetEditTarget(Usd.EditTarget(layer))
-        exec(code, {"h": SceneHelpers(stage, load_catalog(CATALOG), asset_root=str(asset_root))})  # noqa: S102 — test code
+        ns = {"h": SceneHelpers(stage, load_catalog(CATALOG), asset_root=str(asset_root)), "stage": stage, "UsdGeom": UsdGeom, "Gf": Gf}  # what sceneops.apply provides
+        exec(code, ns)  # noqa: S102 — test code
         layer.Save()
         paths.append(path)
     return paths
@@ -208,3 +209,57 @@ def test_a_re_placed_name_keeps_only_its_new_asset(tmp_path):
     verdict = judge_layers(layers, site_layer=SITE_LAYER, catalog=CATALOG, asset_root=str(assets))
     assert [a["path"] for a in verdict["placed_assets"]] == ["/World/Agent/station_1"]
     assert {p["path"]: p["kind"] for p in verdict["agent_prims"]}["/World/Agent/station_2"] == "floor_marking"
+
+
+def test_the_judge_measures_what_is_really_there(tmp_path):
+    """Assets found by their references and measured with full transforms; geometry counts; overhead items do not."""
+    crate = load_catalog(CATALOG)["crate_plastic_a"]
+    x = 1.5 - crate["local_bbox"][2]  # unscaled, the crate ends 0.9 m short of L2 (x 2.4)
+    s = (3.0 - x) / crate["local_bbox"][2]  # scaled, it reaches 0.6 m into L2
+    layers = _author(tmp_path, Path("/opt/assets"), [
+        f"p = h.place_asset('crate_plastic_a', {x}, 2.0, name='crate')\nUsdGeom.XformCommonAPI(stage.GetPrimAtPath(p)).SetScale(Gf.Vec3f({s}, {s}, 1.0))",
+        "q = stage.DefinePrim('/World/Agent/untagged', 'Xform')\nq.GetReferences().AddReference('/opt/assets/Isaac/Props/Pallet/pallet.usd')\n"
+        "UsdGeom.XformCommonAPI(q).SetTranslate(Gf.Vec3d(3.4, -8.0, 0.0))",
+        "c = UsdGeom.Cube.Define(stage, '/World/Agent/wall')\nc.CreateSizeAttr(1.0)\nUsdGeom.XformCommonAPI(c).SetTranslate(Gf.Vec3d(3.4, -15.0, 0.5))",
+        "h.place_asset('lamp_ceiling', 3.4, -5.0, name='lamp')",
+    ])
+    verdict = judge_layers(layers, site_layer=SITE_LAYER, catalog=CATALOG, min_clearance_m=0.6)
+    flagged = {(v["asset"], v["volume"]) for v in verdict["violations"]}
+    assert ("/World/Agent/crate", "L2") in flagged, "a scale op does not hide the crate"
+    assert ("/World/Agent/untagged", "L2") in flagged, "an asset without the helper's custom data is still an asset"
+    assert ("/World/Agent/wall", "L2") in flagged, "hand-built geometry is an obstacle too"
+    assert not any(a == "/World/Agent/lamp" for a, _ in flagged), "a ceiling lamp over the lane blocks nothing"
+    assert {a["path"] for a in verdict["placed_assets"]} >= {"/World/Agent/crate", "/World/Agent/untagged", "/World/Agent/lamp"}
+    lane = lane_check(layers, site_layer=SITE_LAYER, catalog=CATALOG, lane="L2")
+    assert lane["passed"] is False and lane["reached"] is False and lane["min_clearance_m"] == 0.0
+    assert set(lane["contacts"]) == {"/World/Agent/crate", "/World/Agent/untagged", "/World/Agent/wall"}
+
+
+def test_lint_allows_only_catalog_references_on_direct_children(tmp_path):
+    def lint(body: str):
+        return lint_layer(_layer(tmp_path, "l.usda", 'over "World"\n{\n    over "Agent"\n    {\n' + body + '    }\n}\n'), catalog=CATALOG, asset_root="/opt/assets")
+
+    assert lint('        def Xform "ok" (\n            prepend references = @/opt/assets/Isaac/Props/Pallet/pallet.usd@\n        )\n        {\n        }\n').ok
+    graph = lint('        def Xform "g" (\n            prepend references = @/opt/assets/Isaac/Samples/Replicator/OmniGraph/nova_carter_nav_only.usd@\n'
+                 '        )\n        {\n        }\n')
+    assert not graph.ok and "is not a catalog asset" in graph.errors[0], "under the asset root is not enough: that sample carries OmniGraph nodes"
+    internal = lint('        def Xform "i" (\n            prepend references = </World/Site/Lanes/L2>\n        )\n        {\n        }\n')
+    assert not internal.ok and "internal references are not allowed" in internal.errors[0]
+    nested = lint('        def Xform "group"\n        {\n            def Cube "hidden"\n            {\n            }\n        }\n')
+    assert not nested.ok and "only direct children" in nested.errors[0]
+
+
+async def test_a_damaged_cache_record_or_layer_file_is_redone_not_fatal(fake):
+    await fake.ensure("x4", "exec", [])
+    code = "h.place_asset('pallet', -2.0, -2.0, name='p1')\n"
+    assert (await fake.apply("x4", 1, code, {}, 0.6)).envelope["ok"]
+    layers = fake.root / "x4" / "work" / "layers"
+    record = layers / "001.result.json"
+    record.write_text(record.read_text()[:40])  # a killed attempt left half a record
+    again = (await fake.apply("x4", 1, code, {}, 0.6)).envelope
+    assert again["ok"] and again["cached"] is False, "a damaged record is a cache miss"
+    (layers / "001.usda").write_text("#usda 1.0\\n(\\n  this is not usda")  # and half a layer
+    record.unlink()
+    other = (await fake.apply("x4", 1, "h.place_asset('pallet', -3.0, -2.0, name='p2')\n", {}, 0.6)).envelope
+    assert other["ok"] and [a["path"] for a in other["data"]["placed_assets"]] == ["/World/Agent/p2"]
+    assert not list(layers.glob("*.part")), "results are renamed into place"

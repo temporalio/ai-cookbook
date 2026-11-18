@@ -129,3 +129,15 @@ async def test_an_idle_run_is_closed_and_its_next_activity_resumes_the_trace(fak
     run = relay._runs["wf-idle"]
     assert run.resumed and run.root_uuid == json.loads((d / "propagation.json").read_text())["root_uuid"]
     assert len(list(d.glob("atif-w5-*.json"))) == 2, "the resumed scope writes its own trajectory next to the first"
+
+
+async def test_the_idle_sweep_never_closes_a_run_that_is_working(fake_env, monkeypatch):
+    monkeypatch.setenv("NEMO_RELAY_IDLE_CLOSE_S", "0")
+    relay.configure(identity="w6")
+    await _env("wf-busy", "ping").run(ping, {"n": 1})
+    relay._runs["wf-busy"].in_flight = 1  # an Activity of wf-busy is running in this process
+    await _env("wf-sweeper", "ping").run(ping, {"n": 2})
+    assert "wf-busy" in relay._runs, "a run with an Activity in flight is not idle"
+    relay._runs["wf-busy"].in_flight = 0
+    await _env("wf-sweeper", "ping").run(ping, {"n": 3})
+    assert "wf-busy" not in relay._runs

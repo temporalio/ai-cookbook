@@ -2,16 +2,19 @@
 
 Kit evaluates code embedded in USD (OmniGraph script nodes, omni:scripting attributes) and resolves
 arbitrary asset paths. An agent layer may only: define prims under /World/Agent with allowlisted metadata,
-prim types, API schemas and shader ids, and reference assets inside the baked asset root. Bare path-prefix
-``over`` prims (/World, /World/Agent) are allowed so the layer composes. No variants, payloads, inherits,
-specializes, value clips or sublayers anywhere. No composition is performed here (Sdf only), so nothing in
-the layer can execute.
+prim types, API schemas and shader ids, only as direct children, and reference the catalog's own asset files. The asset root also holds
+assets that carry OmniGraph nodes (the Nova Carter sample, for one), so a path under the root is not enough;
+the catalog's assets and their dependencies carry none. Bare path-prefix ``over`` prims (/World, /World/Agent)
+are allowed so the layer composes. No variants, payloads, inherits, specializes, value clips or sublayers
+anywhere. No composition is performed here (Sdf only), so nothing in the layer can execute.
 """
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from pxr import Sdf
 
@@ -63,10 +66,18 @@ def _asset_values(layer: Sdf.Layer, sp: Sdf.Path, prop: Sdf.AttributeSpec) -> li
     return out
 
 
-def lint_layer(path: str | Path, *, asset_root: str = "/opt/assets", limits: dict | None = None) -> LintReport:
+def catalog_references(catalog: dict[str, dict[str, Any]] | str | Path, asset_root: str) -> set[str]:
+    """The asset paths an agent layer may reference: the catalog's files under the asset root, nothing else."""
+    entries = catalog.values() if isinstance(catalog, dict) else json.loads(Path(catalog).read_text())["assets"]
+    return {f"{asset_root.rstrip('/')}/{a['usd']}" for a in entries}
+
+
+def lint_layer(path: str | Path, *, catalog: dict[str, dict[str, Any]] | str | Path, asset_root: str = "/opt/assets",
+               limits: dict | None = None) -> LintReport:
     """An allowlist, not a denylist: agent layers may only carry what the helper API writes. Anything else, a payload,
     a variant, an inherit, a value clip, a sublayer, is an error, wherever in the layer it appears."""
     limits = {**DEFAULT_LIMITS, **(limits or {})}
+    allowed_refs = catalog_references(catalog, asset_root)
     p = Path(path)
     rep = LintReport(ok=True)
     size = p.stat().st_size
@@ -120,6 +131,11 @@ def lint_layer(path: str | Path, *, asset_root: str = "/opt/assets", limits: dic
                 return
             rep.errors.append(f"{sp}: prims are only allowed under {AGENT_ROOT}, and its prefixes only as bare overs")
             return
+        if sp.GetParentPath() != AGENT_ROOT:
+            # Only direct children, which is all the helper API writes: nothing nested under a scaled group, nothing
+            # authored inside a referenced asset, nothing the judge's measurements cannot see.
+            rep.errors.append(f"{sp}: only direct children of {AGENT_ROOT} are allowed")
+            return
         for k in sorted(keys - AGENT_INFO_KEYS):
             rep.errors.append(f"{sp}: metadata {k!r} not allowed")
         t = spec.typeName
@@ -130,8 +146,10 @@ def lint_layer(path: str | Path, *, asset_root: str = "/opt/assets", limits: dic
             if base not in ALLOWED_API_SCHEMAS:
                 rep.errors.append(f"{sp}: API schema {api!r} not allowed")
         for ref in spec.referenceList.GetAddedOrExplicitItems():
-            if not _asset_path_ok(ref.assetPath, asset_root):
-                rep.errors.append(f"{sp}: reference {ref.assetPath!r} outside {asset_root}")
+            if not ref.assetPath:
+                rep.errors.append(f"{sp}: internal references are not allowed")
+            elif ref.assetPath not in allowed_refs:
+                rep.errors.append(f"{sp}: reference {ref.assetPath!r} is not a catalog asset")
 
     layer.Traverse(Sdf.Path.absoluteRootPath, visit)
     if prims > limits["max_prims"]:

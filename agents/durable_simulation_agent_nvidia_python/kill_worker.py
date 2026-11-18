@@ -1,5 +1,6 @@
 """Chaos: SIGKILL the Worker while a model call is in flight, wait, start it again, and show that Temporal retried only
-that Activity. The Worker's pid comes from runs/_worker.json, which worker.py writes.
+that Activity. The target is the Worker running that Activity attempt: its pid is in the identity Temporal reports
+(pid@host), and worker.py leaves a restart record under runs/_workers/<pid>.json.
 
     uv run kill_worker.py <workflow-id> [--activity invoke_model_activity] [--downtime 8]
 """
@@ -12,9 +13,11 @@ import contextlib
 import json
 import os
 import signal
+import socket
 import subprocess
 import sys
 import time
+from pathlib import Path
 
 from temporalio.api.enums.v1 import EventType, PendingActivityState
 from temporalio.client import WorkflowExecutionStatus
@@ -26,6 +29,17 @@ from paths import RECIPE_DIR, runs_dir
 def _in_flight(desc, activity_type: str):
     return [p for p in desc.raw_description.pending_activities
             if p.activity_type.name == activity_type and p.state == PendingActivityState.PENDING_ACTIVITY_STATE_STARTED]
+
+
+def _record_for(identity: str, records: Path) -> tuple[dict, Path]:
+    """The restart record of the Worker with this Temporal identity (pid@host), which must be a Worker on this host."""
+    pid, _, host = identity.partition("@")
+    if host != socket.gethostname() or not pid.isdigit():
+        raise SystemExit(f"the Activity is running on {identity!r}, not on a Worker on this host")
+    record = records / f"{pid}.json"
+    if not record.exists():
+        raise SystemExit(f"no restart record for Worker {identity!r} in {records}; was it started with this RUNS_DIR?")
+    return json.loads(record.read_text()), record
 
 
 def _tree(pid: int) -> list[int]:
@@ -45,13 +59,9 @@ async def main() -> None:
     ap.add_argument("--downtime", type=float, default=8.0)
     ap.add_argument("--timeout", type=float, default=600.0)
     args = ap.parse_args()
-    record = runs_dir() / "_worker.json"
-    if not record.exists():
-        raise SystemExit(f"no {record}: start the Worker with `uv run worker.py` first, and run this with the same RUNS_DIR")
-    info = json.loads(record.read_text())
-    missing = [k for k in info.get("secrets", []) if not os.environ.get(k)]
-    if missing:  # check before killing anything: the restarted Worker would not start without them
-        raise SystemExit(f"set {', '.join(missing)} in this shell first: the restarted Worker needs it, and worker.py does not write secrets to disk")
+    records = runs_dir() / "_workers"
+    if not any(records.glob("*.json")):
+        raise SystemExit(f"no Worker records in {records}: start the Worker with `uv run worker.py` first, and run this with the same RUNS_DIR")
     client = await connect()
     handle = client.get_workflow_handle(args.workflow_id)
     t0 = time.time()
@@ -67,10 +77,16 @@ async def main() -> None:
             print(f"    a review is pending, so no model call will come until the next round: run `uv run review.py {args.workflow_id} revise --notes ...` "
                   "in another terminal and this catches the first model call of round 2", flush=True)
         if hits:
+            info, record = _record_for(hits[0].last_worker_identity, records)
+            missing = [k for k in info.get("secrets", []) if not os.environ.get(k)]
+            if missing:  # check before killing anything: the restarted Worker would not start without them
+                raise SystemExit(f"set {', '.join(missing)} in this shell first: the restarted Worker needs it, and worker.py does not write secrets to disk")
             for p in reversed(_tree(info["pid"])):  # children first
                 with contextlib.suppress(ProcessLookupError):
                     os.kill(p, signal.SIGKILL)
-            print(f"[2] SIGKILL worker (pid {info['pid']}) at t+{time.time() - t0:.1f}s: {args.activity} attempt {hits[0].attempt} was mid-flight", flush=True)
+            record.unlink(missing_ok=True)  # the restarted Worker writes its own
+            print(f"[2] SIGKILL the {'+'.join(info.get('queues', []))} worker running it (pid {info['pid']}) at t+{time.time() - t0:.1f}s: "
+                  f"{args.activity} attempt {hits[0].attempt} was mid-flight", flush=True)
             break
         if time.time() - t0 > args.timeout:
             raise SystemExit("timed out waiting for the activity")

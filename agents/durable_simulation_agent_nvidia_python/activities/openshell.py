@@ -139,13 +139,14 @@ class OpenShellCLI:
         return Path(path)
     # @@@SNIPEND
 
-    async def ensure(self, name: str, kind: str, grants: list[Grant], heartbeat=lambda phase: None) -> bool:
+    async def ensure(self, name: str, kind: str, grants: list[Grant], *, labels: dict[str, str] | None = None, heartbeat=lambda phase: None) -> bool:
         """Idempotent: get, create if missing, wait until ready. Returns whether this call created it."""
         created = False
         if not await self.exists(name):
             heartbeat("create")
+            label_args = [arg for k, v in (labels or {}).items() for arg in ("--label", f"{k}={v}")]
             r = await self._run("sandbox", "create", "--name", name, "--from", self.image, "--policy", str(self.policy_file(kind, grants)),
-                                "--no-auto-providers", "--detach", "-o", "json", "--", "sleep", "infinity", timeout=600)
+                                *label_args, "--no-auto-providers", "--detach", "-o", "json", "--", "sleep", "infinity", timeout=600)
             if r.exit_code != 0:
                 raise SandboxError(f"sandbox create {name}: {r.stderr.strip()[:300]}")
             created = True
@@ -160,6 +161,14 @@ class OpenShellCLI:
             if phase in ("error", "failed", "Error", "Failed") or time.monotonic() > deadline:
                 raise SandboxError(f"sandbox {name} is in phase {phase}")
             await asyncio.sleep(2)
+
+    async def list_names(self, labels: dict[str, str]) -> list[str]:
+        """Names of the sandboxes carrying every one of these labels."""
+        selector = ",".join(f"{k}={v}" for k, v in labels.items())
+        r = await self._run("sandbox", "list", "--names", "--selector", selector, timeout=60)
+        if r.exit_code != 0:
+            raise SandboxError(f"sandbox list: {r.stderr.strip()[:300]}")
+        return [line.strip() for line in r.stdout.splitlines() if line.strip() and not line.startswith("No sandboxes")]
 
     async def delete(self, name: str) -> None:
         r = await self._run("sandbox", "delete", name, timeout=60)
@@ -256,16 +265,25 @@ class FakeSandboxes:
     async def exists(self, name: str) -> bool:
         return (self.root / name).exists()
 
-    async def ensure(self, name: str, kind: str, grants: list[Grant], heartbeat=lambda phase: None) -> bool:
+    async def ensure(self, name: str, kind: str, grants: list[Grant], *, labels: dict[str, str] | None = None, heartbeat=lambda phase: None) -> bool:
         if await self.exists(name):
             return False
         heartbeat("create")
         d = self.root / name
         (d / "work" / "layers").mkdir(parents=True)
+        (d / "labels.json").write_text(json.dumps(labels or {}))
         hosts = [g.host for g in grants if g.decision == "approved"] if kind == "tools" else []
         (d / "policy.json").write_text(json.dumps({"kind": kind, "hosts": hosts}))
         self._log(name, f"CONFIG:LOADED policy for {kind} sandbox ({len(hosts)} granted host(s): {', '.join(hosts) or 'none'})")
         return True
+
+    async def list_names(self, labels: dict[str, str]) -> list[str]:
+        out = []
+        for d in sorted(self.root.iterdir()) if self.root.exists() else []:
+            have = json.loads((d / "labels.json").read_text()) if (d / "labels.json").exists() else {}
+            if d.is_dir() and all(have.get(k) == v for k, v in labels.items()):
+                out.append(d.name)
+        return out
 
     async def delete(self, name: str) -> None:
         shutil.rmtree(self.root / name, ignore_errors=True)

@@ -17,9 +17,10 @@ def run_kit_service(registry, *, host: str, port: int, out: Path) -> None:
     from validate.lint import lint_layer
 
     asset_root = os.environ.get("ISAACSIM_ASSET_ROOT", "/opt/assets")
+    catalog = Path(os.environ.get("RENDERER_SITE_LAYER", "/opt/renderer/site/000_site.usda")).with_name("catalog.json")  # baked into the image
 
     def lint(path: str) -> None:  # the gpu Worker linted every layer already; Kit still never opens one that fails
-        report = lint_layer(path, asset_root=asset_root)
+        report = lint_layer(path, catalog=catalog, asset_root=asset_root)
         if not report.ok:
             raise RuntimeError(f"lint rejected {path}: {report.errors[:3]}")
 

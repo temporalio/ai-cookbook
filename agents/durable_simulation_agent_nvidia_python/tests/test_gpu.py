@@ -66,3 +66,38 @@ async def test_renderer_jobs_when_a_renderer_is_configured(fake_env, layer, monk
     finally:
         stop.set()
         server.shutdown()
+
+
+async def test_a_transient_renderer_failure_is_retried_and_the_job_runs_again(fake_env, layer, monkeypatch):
+    from temporalio.exceptions import ApplicationError
+
+    from workflows.tools import NON_RETRYABLE
+
+    class Unavailable(Exception):
+        retryable = True  # how the renderer marks a failure a retry can fix
+
+    class FlakyKit(FakeKit):
+        def run(self, job, progress, cancelled):
+            if not self.jobs:
+                self.jobs.append(job)
+                raise Unavailable("503 from the GPU")
+            return super().run(job, progress, cancelled)
+
+    registry = JobRegistry(cache_dir=fake_env / "flaky-cache")
+    backend = FlakyKit(fake_env / "flaky-out")
+    server = serve(registry, port=0)
+    stop = threading.Event()
+    run_forever_in_thread(registry, backend, stop)
+    monkeypatch.setenv("RENDERER_URL", f"http://127.0.0.1:{server.server_address[1]}")
+    monkeypatch.setenv("RENDERER_SHARED_DIR", str(fake_env / "shared"))
+    try:
+        env = ActivityEnvironment()
+        inp = RenderInput(run_id="wf-flaky", step=1, layers=[layer], camera="Station", width=640, height=360)
+        with pytest.raises(ApplicationError) as first:
+            await env.run(gpu.render_preview, inp)
+        assert first.value.type == "RenderFailed" and first.value.non_retryable is False and "RenderFailed" not in NON_RETRYABLE
+        ref = await env.run(gpu.render_preview, inp)  # what Temporal's retry does: the same job key, run again
+        assert ref.mode == "rt2" and len(backend.jobs) == 2
+    finally:
+        stop.set()
+        server.shutdown()

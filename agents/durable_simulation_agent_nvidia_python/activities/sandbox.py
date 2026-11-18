@@ -39,10 +39,20 @@ from validate.lint import lint_layer
 HEARTBEAT_EVERY = 10.0  # seconds; the Activities run with a 60 s heartbeat timeout (workflows/tools.py)
 
 
-def sandbox_name(workflow_id: str, kind: str, gen: int) -> str:
-    """Deterministic, short, DNS-style names (OpenShell 0.1.2 rejects long ones): a retried Activity converges on the same
-    sandbox instead of creating another. sim-<hash>-x1 is generation 1's exec sandbox, sim-<hash>-t2 generation 2's tools."""
-    return f"sim-{hashlib.sha1(workflow_id.encode()).hexdigest()[:6]}-{'x' if kind == 'exec' else 't'}{gen}"
+def _h(value: str, n: int) -> str:
+    return hashlib.sha1(value.encode()).hexdigest()[:n]
+
+
+def sandbox_name(workflow_id: str, temporal_run_id: str, kind: str, gen: int) -> str:
+    """Deterministic, short names (OpenShell 0.1.2 allows 19 characters), scoped to one Workflow Execution: a retried
+    Activity converges on the same sandbox, and a later execution with the same Workflow Id never inherits a sandbox, or
+    a grant, from an earlier one. sim-<wf><run>-x1 is generation 1's exec sandbox, sim-<wf><run>-t2 generation 2's tools."""
+    return f"sim-{_h(workflow_id, 6)}{_h(temporal_run_id, 4)}-{'x' if kind == 'exec' else 't'}{gen}"
+
+
+def sandbox_labels(workflow_id: str, temporal_run_id: str) -> dict[str, str]:
+    """Labels on every sandbox, so a later execution can find what an earlier one of the same Workflow Id left behind."""
+    return {"recipe-workflow": _h(workflow_id, 16), "recipe-run": _h(temporal_run_id, 16)}
 
 
 @contextlib.asynccontextmanager
@@ -94,6 +104,33 @@ def _layer_file(layer: LayerRef, what: str) -> Path:
     return p
 
 
+async def _export_log(sb, name: str, path: Path) -> bool:
+    """Best effort: a gateway log that cannot be read must not keep the sandbox alive."""
+    try:
+        text = await sb.logs(name)
+    except Exception as e:  # noqa: BLE001
+        activity.logger.warning("could not export the gateway log of %s: %s", name, e)
+        return False
+    if text.strip():
+        path.write_text(text)
+        return True
+    return False
+
+
+async def _retire(sb, name: str, log_path: Path) -> bool:
+    """Keep the gateway log of a sandbox from an earlier generation or execution if it can be read, then delete it. Never
+    blocks the new generation: a failure is logged and the sandbox reported as not retired."""
+    try:
+        if not await sb.exists(name):
+            return False
+        await _export_log(sb, name, log_path)
+        await sb.delete(name)
+        return True
+    except Exception as e:  # noqa: BLE001
+        activity.logger.warning("could not retire %s: %s", name, e)
+        return False
+
+
 @activity.defn
 @relay.traced
 async def ensure_sandboxes(inp: EnsureInput) -> SandboxesRef:
@@ -102,7 +139,8 @@ async def ensure_sandboxes(inp: EnsureInput) -> SandboxesRef:
     sandbox and recomposed; the layer stack hash must match the Workflow's record, so a rebuilt generation starts exactly
     where the deleted one stopped."""
     sb = backend()
-    names = {kind: sandbox_name(inp.workflow_id, kind, inp.gen) for kind in ("exec", "tools")}
+    names = {kind: sandbox_name(inp.workflow_id, inp.temporal_run_id, kind, inp.gen) for kind in ("exec", "tools")}
+    labels = sandbox_labels(inp.workflow_id, inp.temporal_run_id)
     logs_dir = run_dir(inp.run_id) / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
     # Check the layers before touching any sandbox: a generation that cannot be rehydrated is never created, and the
@@ -110,18 +148,22 @@ async def ensure_sandboxes(inp: EnsureInput) -> SandboxesRef:
     sources = {layer.step: _layer_file(layer, "rehydrate") for layer in inp.layers}
     async with heartbeating() as hb:
         retired: list[str] = []
-        if inp.gen > 1:  # whatever survives of the previous generation: keep its gateway log, then delete it
-            for kind in ("exec", "tools"):
-                old = sandbox_name(inp.workflow_id, kind, inp.gen - 1)
-                if await sb.exists(old):
-                    _phase(hb, f"retire:{old}")
-                    (logs_dir / f"g{inp.gen - 1}-{kind}.log").write_text(await sb.logs(old))
-                    await sb.delete(old)
-                    retired.append(old)
+        stale: dict[str, str] = {}
+        if inp.gen > 1:  # whatever survives of the previous generation
+            stale |= {sandbox_name(inp.workflow_id, inp.temporal_run_id, kind, inp.gen - 1): f"g{inp.gen - 1}-{kind}" for kind in ("exec", "tools")}
+        else:  # an earlier execution of this Workflow Id that timed out or was terminated could not release its sandboxes
+            _phase(hb, "orphans")
+            for name in await sb.list_names({"recipe-workflow": labels["recipe-workflow"]}):
+                if name not in names.values():
+                    stale[name] = f"orphan-{name}"
+        for old, log_name in stale.items():
+            _phase(hb, f"retire:{old}")
+            if await _retire(sb, old, logs_dir / f"{log_name}.log"):
+                retired.append(old)
         created: list[str] = []
         for kind, name in names.items():
             _phase(hb, f"ensure:{kind}")
-            if await sb.ensure(name, kind, inp.grants, heartbeat=lambda phase, k=kind: _phase(hb, f"{k}:{phase}")):
+            if await sb.ensure(name, kind, inp.grants, labels=labels, heartbeat=lambda phase, k=kind: _phase(hb, f"{k}:{phase}")):
                 created.append(name)
         pairs = [(layer.step, layer.sha256) for layer in inp.layers]
         stack_hash = layer_stack_hash([])
@@ -199,7 +241,7 @@ async def sandbox_apply(inp: ApplyInput) -> ApplyOutput:
             tmp.unlink()
             raise ApplicationError("downloaded layer sha256 differs from the sandbox's report", type="ExecFailed")
         _phase(hb, "lint")
-        report = lint_layer(tmp, asset_root=ASSET_ROOT)
+        report = lint_layer(tmp, catalog=CATALOG, asset_root=ASSET_ROOT)
         if not report.ok:
             tmp.unlink()
             return rejected({"type": "LintRejected", "msg": "; ".join(report.errors)[:800]}, data, report.warnings)
@@ -236,24 +278,35 @@ async def apply_grant(inp: GrantInput) -> Grant:
 @relay.traced
 async def release_sandboxes(inp: ReleaseInput) -> ReleaseOutput:
     """Export each sandbox's gateway log (the record of what it tried to reach), then delete it. Runs before every human
-    review and whenever a round ends another way, so no sandbox outlives its round."""
+    review and whenever a round ends another way, so no sandbox outlives its round. Both deletes are always attempted:
+    a log that cannot be read is skipped, and a failed delete fails the Activity (Temporal retries it) only after the
+    other sandbox's delete has been tried."""
     sb = backend()
     logs_dir = run_dir(inp.run_id) / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
-    deleted, logs = [], []
+    deleted, logs, errors = [], [], []
     async with heartbeating() as hb:
         for kind, name in (("exec", inp.exec_sandbox), ("tools", inp.tools_sandbox)):
-            if not name or not await sb.exists(name):
+            if not name:
+                continue
+            try:
+                present = await sb.exists(name)
+            except Exception:  # noqa: BLE001 — cannot tell: try the delete anyway
+                present = True
+            if not present:
                 continue
             _phase(hb, f"logs:{kind}")
-            text = await sb.logs(name)
-            if text.strip():
-                p = logs_dir / f"g{inp.gen}-{kind}.log"
-                p.write_text(text)
-                logs.append(str(p))
+            path = logs_dir / f"g{inp.gen}-{kind}.log"
+            if await _export_log(sb, name, path):
+                logs.append(str(path))
             _phase(hb, f"delete:{kind}")
-            await sb.delete(name)
-            deleted.append(name)
+            try:
+                await sb.delete(name)
+                deleted.append(name)
+            except Exception as e:  # noqa: BLE001
+                errors.append(f"{name}: {e}")
+    if errors:
+        raise ApplicationError(f"release: {'; '.join(errors)[:500]}", type="ReleaseFailed")
     return ReleaseOutput(deleted=deleted, logs=logs)
 
 

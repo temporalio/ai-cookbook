@@ -62,10 +62,11 @@ class JobRegistry:
 
     # ---- submission / attach ----
     def submit(self, key: str, op: str, params: dict[str, Any]) -> tuple[Job, bool]:
-        """Returns (job, created). If the key exists in any state, attach (created=False)."""
+        """Returns (job, created). A queued, running or finished job with this key is attached (created=False); a failed or
+        cancelled one runs again, so a retried Activity gets a new attempt instead of the cached failure."""
         with self._lock:
             job = self._jobs.get(key)
-            if job is not None:
+            if job is not None and job.status not in (FAILED, CANCELLED):
                 job.adopters += 1
                 return job, False
             job = Job(key=key, op=op, params=params)
@@ -134,10 +135,3 @@ class JobRegistry:
     def _persist(self, job: Job) -> None:
         if self._cache_dir:
             (self._cache_dir / f"{job.key}.json").write_text(json.dumps(job.public(), sort_keys=True))
-
-    def forget_failed(self, key: str) -> None:
-        """Allow a resubmit after a failed/cancelled run (the activity retries with the same key)."""
-        with self._lock:
-            job = self._jobs.get(key)
-            if job and job.status in (FAILED, CANCELLED):
-                del self._jobs[key]

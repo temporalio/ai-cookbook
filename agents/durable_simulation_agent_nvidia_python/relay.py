@@ -211,9 +211,9 @@ def _snapshot(run: _Run) -> Path:
     return p
 
 
-async def _close_run(run: _Run, reason: str) -> None:
-    """Close the run's scope in this process: a `run_closed` mark, the scope popped, subscribers drained, the final
-    snapshot written. A later Activity of the same run in this process resumes the trace from propagation.json."""
+def _detach(run: _Run, reason: str) -> None:
+    """The synchronous half of closing a run: out of the table, a `run_closed` mark, the scope popped. With no await in
+    between, no Activity of this run can start on the closing scope; the next one opens a resumed scope instead."""
     _runs.pop(run.key, None)
     run.closed = True
     r = _r()
@@ -222,19 +222,36 @@ async def _close_run(run: _Run, reason: str) -> None:
     with r.use_scope_stack(run.stack):
         r.scope.event("run_closed", handle=run.handle, data=stats)
         r.scope.pop(run.handle, output=stats)
-    await r.subscribers.flush_async()  # subscriber delivery is asynchronous; drain before exporting
-    _snapshot(run)
-    _deregister(run)
+
+
+async def _finish(runs: list[_Run]) -> None:
+    """The asynchronous half: drain the subscribers once, then write each detached run's final snapshot."""
+    await _r().subscribers.flush_async()  # subscriber delivery is asynchronous; drain before exporting
+    for run in runs:
+        try:
+            _snapshot(run)
+        finally:
+            _deregister(run)
+
+
+async def _close_run(run: _Run, reason: str) -> None:
+    """Close the run's scope in this process. A later Activity of the same run here resumes the trace from propagation.json."""
+    _detach(run, reason)
+    await _finish([run])
 
 
 async def _close_idle(current: str) -> None:
     """Close the scopes of runs that have had no Activity in this process for a while (a run waiting days for its
-    review holds nothing here), so a long-lived Worker keeps only its active runs open."""
+    review holds nothing here), so a long-lived Worker keeps only its active runs open. Every run is checked and detached
+    before the first await, so a run that starts an Activity while the sweep drains cannot be closed under it."""
     limit = float(os.environ.get("NEMO_RELAY_IDLE_CLOSE_S", "300"))
     now = time.time()
-    for run in [r for k, r in _runs.items() if k != current and r.in_flight == 0 and now - r.last_used > limit]:
+    idle = [run for key, run in list(_runs.items()) if key != current and run.in_flight == 0 and now - run.last_used > limit]
+    for run in idle:
+        _detach(run, "idle")
+    if idle:
         try:
-            await _close_run(run, "idle")
+            await _finish(idle)
         except Exception:  # noqa: BLE001 — tracing never fails the Activity that happened to trigger the cleanup
             pass
 

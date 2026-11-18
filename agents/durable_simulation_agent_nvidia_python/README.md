@@ -87,7 +87,8 @@ uv run bundle.py <workflow-id>                  # beat 5: history, gateway logs,
 
 Beats 2 and 3 need the agent at work. With a fast model, round 1 can end seconds after the grant; then play them during
 round 2, after the revise. `kill_worker.py` says so when a review is pending and catches the next model call either way.
-It starts the Worker again in the background with the same settings and logs to `runs/_worker.log`.
+It kills the Worker that is running the call, found by the identity Temporal reports for it, and starts that Worker again
+in the background with the same settings, logging to `runs/_worker.log`.
 
 `uv run rehearsal.py` plays all of it unattended against a running Worker. Watch the run in the Temporal UI
 (`http://localhost:8233`): one Activity per model call, sandbox operation, render and lane check, on two Task Queues;
@@ -137,6 +138,10 @@ before Kit opens it, and writes its outputs back under the same directory. To tr
 
 Without `RENDERER_URL`, `render_preview` draws a plan view of the composed layers and `check_lane` measures every
 footprint against the lane volume. The Workflow sees the same `RenderRef` and `LaneCheck` either way.
+
+Sandboxes belong to one Workflow Execution: their names and labels carry the Run Id. Don't give this Workflow an
+execution timeout. A timed-out or terminated execution can't release its sandboxes; the next execution with the same
+Workflow Id releases them, keeping their gateway logs, but until then they hold whatever was granted to them.
 
 Layers, renders, lane checks and gateway logs are files under `RUNS_DIR` (default `runs/`) on the Worker host that ran
 the Activity. With Workers on more than one host, point `RUNS_DIR` at storage every Worker can reach; otherwise a
@@ -238,10 +243,13 @@ async def apply_grant(self, name: str, grant: Grant) -> None:
 ## The layers, in code
 
 Each `apply_usd_code` call runs the model's Python through the helper API in the exec sandbox and leaves one sublayer for
-the step. The Activity copies the layer out and lints it before anything else opens it. The lint is an allowlist: prims
-only under `/World/Agent`, with the metadata, prim types and API schemas the helper API writes; no variants, payloads,
-inherits, value clips, sublayers or scripting attributes anywhere; asset paths only under the asset root. Then the
-Activity judges the layer against the trusted site layer and records its hash in the Workflow's state. The sandbox caches by step and code hash, so a retried Activity
+the step. The Activity copies the layer out and lints it before anything else opens it. The lint is an allowlist: only
+direct children of `/World/Agent`, with the metadata, prim types and API schemas the helper API writes; no variants,
+payloads, inherits, value clips, sublayers or scripting attributes anywhere; references only to the catalog's own asset
+files. A path under the asset root is not enough, because the root also holds assets that carry OmniGraph nodes; the
+catalog's assets carry none, and `renderer/mirror_assets.py` audits that whenever it mirrors them. Then the Activity
+judges the layer against the trusted site layer, measuring every asset and piece of geometry under its full transform,
+and records the layer's hash in the Workflow's state. The sandbox caches by step and code hash, so a retried Activity
 gets the same layer back.
 
 *File: workflows/tools.py*
@@ -291,10 +299,10 @@ to match the Workflow's record, so a rebuilt generation starts exactly where the
 ```python
 async def _build(self, gen: int) -> None:
     base = self._current()
-    wf_id = workflow.info().workflow_id
+    wf_id, run_id = workflow.info().workflow_id, workflow.info().run_id
     try:
         ref = await workflow.execute_activity(
-            sb.ensure_sandboxes, EnsureInput(run_id=base.run_id, workflow_id=wf_id, gen=gen, grants=base.grants, layers=base.layers),
+            sb.ensure_sandboxes, EnsureInput(run_id=base.run_id, workflow_id=wf_id, temporal_run_id=run_id, gen=gen, grants=base.grants, layers=base.layers),
             summary=f"sandboxes: generation {gen}" + (f", {len(base.layers)} layers rehydrated" if base.layers else ""), **ENSURE_OPTS)
         if ref.layer_stack_hash != layer_stack_hash(base.layer_pairs()):
             raise RuntimeError(f"generation {gen} recomposed a different layer stack ({ref.layer_stack_hash[:12]} != {layer_stack_hash(base.layer_pairs())[:12]})")
@@ -303,7 +311,8 @@ async def _build(self, gen: int) -> None:
         # are deterministic, so release them by name; a failure to release must not hide the original error.
         with contextlib.suppress(Exception):
             await asyncio.shield(workflow.execute_activity(
-                sb.release_sandboxes, ReleaseInput(run_id=base.run_id, gen=gen, exec_sandbox=sb.sandbox_name(wf_id, "exec", gen), tools_sandbox=sb.sandbox_name(wf_id, "tools", gen)),
+                sb.release_sandboxes, ReleaseInput(run_id=base.run_id, gen=gen, exec_sandbox=sb.sandbox_name(wf_id, run_id, "exec", gen),
+                                                   tools_sandbox=sb.sandbox_name(wf_id, run_id, "tools", gen)),
                 summary=f"release failed generation {gen}", **RELEASE_OPTS))
         raise
     self.state = base.with_sandboxes(ref.gen, ref.exec_sandbox, ref.tools_sandbox)
@@ -439,9 +448,12 @@ search, the validator rejecting a wrong host and a stale review id, the grant ap
 violation and the lane check that fails on it, a revision in a new generation rebuilt from the recorded layer with the
 same layer stack hash, the one-call fix, approval and the manifest, the four records on disk; a sandbox deleted
 mid-round; a cancellation that still releases the sandboxes; a retried apply that runs the code once; an unknown tool
-name that goes back to the model; a review refused until the checks cover the current layout. The lint, including the
-payloads, variants and asset paths it refuses, the judge, a re-placed name keeping only its new asset, the search
-mapping and the site constants are tested on the host with usd-core. The Relay runtime is tested with two process
+name that goes back to the model; a review refused until the checks cover the current layout, and an unchecked layout
+that can be revised or rejected but not approved. The lint, including the payloads, variants, nested prims and
+non-catalog references it refuses, the judge with a scaled crate, an untagged asset and hand-built geometry in a lane, a
+re-placed name keeping only its new asset, a damaged apply cache, the search mapping and the site constants are tested
+on the host with usd-core. The sandbox Activities are tested for a later execution retiring an earlier one's leftovers
+without inheriting its grant, and for a release that deletes both sandboxes when a log or a delete fails. The Relay runtime is tested with two process
 identities resuming one trace, two runs in one process keeping separate trajectories, an idle run closed and resumed,
-and a faulted model call answered by the fallback. The gpu Activities are tested against a stub of the renderer's job
-API. A stub `openshell` CLI covers the adapter's error classification and that a cancelled call stops the CLI.
+and a faulted model call answered by the fallback. The gpu Activities are tested against the renderer's job service with
+a fake backend, including a transient failure that is retried and run again. A stub `openshell` CLI covers the adapter's error classification and that a cancelled call stops the CLI.

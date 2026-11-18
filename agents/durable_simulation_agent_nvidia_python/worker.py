@@ -44,8 +44,12 @@ async def main() -> None:
     runs_dir().mkdir(parents=True, exist_ok=True)
     # For kill_worker.py: how to start this Worker again with the same settings. Secrets stay off disk; the restart takes
     # them from the shell that runs kill_worker.py.
+    # One record per Worker process, keyed by pid: the pid is in the identity Temporal reports for every Activity attempt.
     env = {k: os.environ[k] for k in RESTART_ENV if k in os.environ} | {"RUNS_DIR": str(runs_dir())}
-    (runs_dir() / "_worker.json").write_text(json.dumps({"pid": os.getpid(), "argv": sys.argv[1:], "env": env, "secrets": [k for k in SECRETS if os.environ.get(k)]}))
+    records = runs_dir() / "_workers"
+    records.mkdir(parents=True, exist_ok=True)
+    (records / f"{os.getpid()}.json").write_text(json.dumps({"pid": os.getpid(), "argv": sys.argv[1:], "queues": which, "env": env,
+                                                             "secrets": [k for k in SECRETS if os.environ.get(k)]}))
     await asyncio.gather(*(w.run() for w in workers))
 
 

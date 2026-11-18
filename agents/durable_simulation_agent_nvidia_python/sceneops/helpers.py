@@ -22,6 +22,8 @@ SITE_ROOT = "/World/Site"
 LANES = f"{SITE_ROOT}/Lanes"
 KEEP_CLEAR = f"{SITE_ROOT}/KeepClear"
 DOCKS_PREFIX = f"{SITE_ROOT}/Dock_"
+OVERHEAD_M = 2.0  # anything whose bottom is higher (ceiling lamps, signs) never blocks a lane, as in the renderer's check
+FLAT_M = 0.02  # anything lower than this is paint on the floor
 
 
 class SceneHelpers:
@@ -29,7 +31,8 @@ class SceneHelpers:
         self.stage = stage
         self.catalog = catalog
         self.asset_root = asset_root.rstrip("/")
-        self._bbox = UsdGeom.BBoxCache(Usd.TimeCode.Default(), [UsdGeom.Tokens.default_, UsdGeom.Tokens.guide])
+        self._bbox = UsdGeom.BBoxCache(Usd.TimeCode.Default(), [UsdGeom.Tokens.default_, UsdGeom.Tokens.guide])  # the site's volumes are guides
+        self._render_bbox = UsdGeom.BBoxCache(Usd.TimeCode.Default(), [UsdGeom.Tokens.default_, UsdGeom.Tokens.render])  # what gets rendered
 
     # ---------- catalog ----------
     def search(self, query: str, k: int = 8) -> list[dict[str, Any]]:
@@ -123,20 +126,82 @@ class SceneHelpers:
         return removed
 
     def agent_prims(self) -> list[dict[str, Any]]:
-        """Everything active under /World/Agent: assets (with footprint), floor markings and lights (with aabb)."""
+        """Everything active under /World/Agent: assets (with footprint), floor markings, lights and other geometry (with aabb)."""
         root = self.stage.GetPrimAtPath(AGENT_ROOT)
         out = []
         for prim in (root.GetChildren() if root else []):
             if not prim.IsActive():
                 continue
-            cid = prim.GetCustomDataByKey("agent:catalog_id")
-            kind = "asset" if cid else (prim.GetCustomDataByKey("agent:kind") or "other")
-            if cid:
-                box = self.footprint(prim.GetPath().pathString)
+            ids = self._asset_ids(prim)
+            if ids:
+                kind, box = "asset", [round(v, 2) for v in self._asset_box(prim, ids)[0]]
             else:
-                r = self._bbox.ComputeWorldBound(prim).ComputeAlignedRange()
-                box = None if r.IsEmpty() else [round(r.GetMin()[0], 2), round(r.GetMin()[1], 2), round(r.GetMax()[0], 2), round(r.GetMax()[1], 2)]
-            out.append({"path": prim.GetPath().pathString, "kind": kind, "catalog_id": cid, "aabb": box})
+                b = self._geometry_box(prim)
+                box = None if b is None else [round(v, 2) for v in b[0]]
+                kind = (prim.GetCustomDataByKey("agent:kind") or "other") if b is None else ("floor_marking" if b[2] < FLAT_M else "geometry")
+                if prim.IsA(UsdLux.BoundableLightBase) or prim.IsA(UsdLux.NonboundableLightBase):
+                    kind = "light"
+            out.append({"path": prim.GetPath().pathString, "kind": kind, "catalog_id": ids[0] if ids else None, "aabb": box})
+        return out
+
+    # ---------- what stands on the floor: assets found by their references, measured with full transforms ----------
+    def _catalog_files(self) -> dict[str, str]:
+        return {f"{self.asset_root}/{a['usd']}": a["id"] for a in self.catalog.values()}
+
+    def _references(self, prim: Usd.Prim) -> list[str]:
+        """The prim's composed references from this stage's own layers. The referenced files may not exist on this host, so
+        the prim index cannot be asked; applying the local opinions' list edits, weakest first, gives the same list."""
+        local = {layer.identifier for layer in self.stage.GetLayerStack()}
+        refs: list = []
+        for spec in reversed(prim.GetPrimStack()):
+            if spec.layer.identifier in local:
+                refs = spec.referenceList.ApplyEditsToList(refs)
+        return [r.assetPath for r in refs if r.assetPath]
+
+    def _asset_ids(self, prim: Usd.Prim) -> list[str]:
+        """Catalog ids of the assets the prim references, whatever its custom data says."""
+        files = self._catalog_files()
+        return [files[r] for r in self._references(prim) if r in files]
+
+    def _asset_box(self, prim: Usd.Prim, ids: list[str]) -> tuple[list[float], float, float]:
+        """([xmin, ymin, xmax, ymax], zmin, zmax) of the referenced assets' measured local boxes under the prim's full world
+        transform: translate, rotate, scale and matrix ops alike."""
+        m = UsdGeom.XformCache(Usd.TimeCode.Default()).GetLocalToWorldTransform(prim)
+        pts = []
+        for cid in ids:
+            entry = self._entry(cid)
+            lb = entry.get("local_bbox")
+            if not lb:
+                w, d, _ = entry["size_m"]
+                lb = [-w / 2, -d / 2, w / 2, d / 2]
+            z0, z1 = entry.get("local_z") or [0.0, float(entry["size_m"][2])]
+            pts += [m.Transform(Gf.Vec3d(x, y, z)) for x in (lb[0], lb[2]) for y in (lb[1], lb[3]) for z in (z0, z1)]
+        xs, ys, zs = [q[0] for q in pts], [q[1] for q in pts], [q[2] for q in pts]
+        return [min(xs), min(ys), max(xs), max(ys)], min(zs), max(zs)
+
+    def _geometry_box(self, prim: Usd.Prim) -> tuple[list[float], float, float] | None:
+        """The world box of geometry authored in the layers (render and default purposes), or None if the prim has none."""
+        r = self._render_bbox.ComputeWorldBound(prim).ComputeAlignedRange()
+        if r.IsEmpty():
+            return None
+        lo, hi = r.GetMin(), r.GetMax()
+        return [lo[0], lo[1], hi[0], hi[1]], lo[2], hi[2]
+
+    def obstacles(self) -> list[dict[str, Any]]:
+        """What the clearance rules apply to: every asset and every piece of geometry on the floor, with its footprint.
+        Overhead items (bottom above OVERHEAD_M) never block a lane; flat geometry is a floor marking, which may touch a
+        lane but not lie inside it."""
+        root = self.stage.GetPrimAtPath(AGENT_ROOT)
+        out = []
+        for prim in (root.GetChildren() if root else []):
+            if not prim.IsActive():
+                continue
+            ids = self._asset_ids(prim)
+            box = self._asset_box(prim, ids) if ids else self._geometry_box(prim)
+            if box is None or box[1] > OVERHEAD_M:
+                continue
+            kind = "asset" if ids else ("floor_marking" if box[2] < FLAT_M else "geometry")
+            out.append({"path": prim.GetPath().pathString, "kind": kind, "catalog_id": ids[0] if ids else None, "aabb": box[0]})
         return out
 
     def place_asset(self, catalog_id: str, x: float, y: float, yaw_deg: float = 0.0, name: str | None = None) -> str:
@@ -234,22 +299,22 @@ class SceneHelpers:
         root = self.stage.GetPrimAtPath(AGENT_ROOT)
         out = []
         for prim in (root.GetChildren() if root else []):
-            if not prim.IsActive():
+            ids = self._asset_ids(prim) if prim.IsActive() else []
+            if not ids:
                 continue
-            cid = prim.GetCustomDataByKey("agent:catalog_id")
-            if not cid:
-                continue
-            t, r, *_ = UsdGeom.XformCommonAPI(prim).GetXformVectors(Usd.TimeCode.Default())
-            out.append({"path": prim.GetPath().pathString, "catalog_id": cid, "x": float(t[0]), "y": float(t[1]),
-                        "yaw_deg": float(r[2]), "footprint": self.footprint(prim.GetPath().pathString)})
+            m = UsdGeom.XformCache(Usd.TimeCode.Default()).GetLocalToWorldTransform(prim)
+            t, ax = m.ExtractTranslation(), m.TransformDir(Gf.Vec3d(1, 0, 0))
+            out.append({"path": prim.GetPath().pathString, "catalog_id": ids[0], "x": float(t[0]), "y": float(t[1]),
+                        "yaw_deg": math.degrees(math.atan2(ax[1], ax[0])), "footprint": self._asset_box(prim, ids)[0]})
         return out
 
     def footprint(self, prim_path: str) -> list[float]:
-        """Conservative world-space AABB [xmin, ymin, xmax, ymax] from the catalog size and yaw."""
+        """World-space AABB [xmin, ymin, xmax, ymax] of the asset at prim_path, under its full transform."""
         prim = self._agent_prim(prim_path)
-        entry = self._entry(prim.GetCustomDataByKey("agent:catalog_id"))
-        t, r, *_ = UsdGeom.XformCommonAPI(prim).GetXformVectors(Usd.TimeCode.Default())
-        return self.footprint_at(entry["id"], float(t[0]), float(t[1]), float(r[2]))
+        ids = self._asset_ids(prim)
+        if not ids:
+            raise ValueError(f"{prim_path} does not reference a catalog asset")
+        return self._asset_box(prim, ids)[0]
 
     def footprint_at(self, catalog_id: str, x: float, y: float, yaw_deg: float = 0.0) -> list[float]:
         """World AABB [xmin, ymin, xmax, ymax] a catalog asset would occupy at (x, y, yaw): its local bbox (pivots are not
@@ -274,23 +339,17 @@ class SceneHelpers:
         return math.hypot(gx, gy)
 
     def check_clearance(self, min_clearance_m: float = 0.6) -> list[dict[str, Any]]:
-        """Violations of lane / keep-clear clearance for every placed asset (cheap pre-check; the
-        trusted side re-validates with real geometry)."""
+        """Lane and keep-clear violations of everything on the floor: assets and geometry need the clearance, floor
+        markings may touch a volume but not lie inside it. [] means OK."""
         vols = self.site_volumes()
         out = []
-        for asset in self.placed_assets():
+        for ob in self.obstacles():
             for v in vols:
-                gap = self._aabb_gap(asset["footprint"], v["aabb"])
-                if gap < min_clearance_m:
-                    out.append({"asset": asset["path"], "volume": v["name"], "kind": v["kind"],
-                                "clearance_m": round(gap, 3), "required_m": min_clearance_m,
+                gap = self._aabb_gap(ob["aabb"], v["aabb"])
+                required = 0.0 if ob["kind"] == "floor_marking" else min_clearance_m
+                if (gap == 0.0) if ob["kind"] == "floor_marking" else (gap < min_clearance_m):
+                    out.append({"asset": ob["path"], "volume": v["name"], "kind": v["kind"], "clearance_m": round(gap, 3), "required_m": required,
                                 "status": "encroaches" if gap == 0.0 else "too_close"})
-        for prim in self.agent_prims():  # painted markings may touch a lane but never lie inside it (the trusted judge agrees)
-            if prim["kind"] == "floor_marking" and prim["aabb"]:
-                for v in vols:
-                    if self._aabb_gap(prim["aabb"], v["aabb"]) == 0.0:
-                        out.append({"asset": prim["path"], "volume": v["name"], "kind": v["kind"], "clearance_m": 0.0, "required_m": 0.0,
-                                    "status": "encroaches"})
         return out
 
     def build_area(self) -> list[float] | None:
@@ -324,12 +383,12 @@ class SceneHelpers:
             gap = self._aabb_gap(fp, v["aabb"])
             if gap < min_clearance_m:
                 out.append({"with": v["name"], "kind": v["kind"], "clearance_m": round(gap, 3), "required_m": min_clearance_m})
-        for a in self.placed_assets():
-            if a["path"] == exclude:
+        for ob in self.obstacles():
+            if ob["path"] == exclude or ob["kind"] == "floor_marking":
                 continue
-            fb = a["footprint"]
+            fb = ob["aabb"]
             if fp[0] < fb[2] and fb[0] < fp[2] and fp[1] < fb[3] and fb[1] < fp[3]:
-                out.append({"with": a["path"], "kind": "asset_overlap"})
+                out.append({"with": ob["path"], "kind": "asset_overlap"})
         ba = self.build_area()
         if ba and not (fp[0] >= ba[0] and fp[1] >= ba[1] and fp[2] <= ba[2] and fp[3] <= ba[3]):
             out.append({"with": "BuildArea", "kind": "outside_build_area", "aabb": [round(v, 2) for v in ba]})
@@ -395,13 +454,26 @@ class SceneHelpers:
         for _ in range(rounds):
             dirty = False
             for a in self.placed_assets():
-                if self.conflicts_for(a["catalog_id"], a["x"], a["y"], a["yaw_deg"], exclude=a["path"], min_clearance_m=min_clearance_m):
+                if self._fp_conflicts(a["footprint"], a["path"], min_clearance_m):
+                    if not self._plain_placement(a["path"]):
+                        moves.append({"path": a["path"], "moved": False, "reason": "scaled or matrix-transformed: re-place it with h.place_asset"})
+                        continue
                     res = self.nudge_clear(a["path"], min_clearance_m=min_clearance_m)
                     moves.append(res)
                     dirty = dirty or res.get("moved", False)
             if not dirty:
                 break
         return moves
+
+    def _plain_placement(self, prim_path: str) -> bool:
+        """True when the prim's transform is what place_asset writes (translate and rotate, unit scale), which is what
+        nudge_clear and set_position can move."""
+        prim = self._agent_prim(prim_path)
+        api = UsdGeom.XformCommonAPI(prim)
+        if not api:
+            return False
+        scale = api.GetXformVectors(Usd.TimeCode.Default())[2]
+        return all(abs(c - 1.0) < 1e-9 for c in scale)
 
     def distance_to_dock(self, prim_path: str, dock_n: int) -> float:
         prim = self._agent_prim(prim_path)

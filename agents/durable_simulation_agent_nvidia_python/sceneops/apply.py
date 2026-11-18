@@ -110,6 +110,17 @@ def stack_from_root(work: Path, root: Sdf.Layer) -> list[dict]:
     return out
 
 
+def _cached(res_path: Path) -> dict | None:
+    """The cached result of an earlier attempt at this step, or None. A damaged record is a cache miss, not an error."""
+    try:
+        prev = json.loads(res_path.read_text())
+        prev["data"]["sha256"]  # noqa: B018 — must be present
+        return prev
+    except (OSError, ValueError, KeyError, TypeError):
+        res_path.unlink(missing_ok=True)
+        return None
+
+
 def cmd_apply(args: argparse.Namespace, started: float) -> None:
     work, site = Path(args.work), Path(args.site)
     code = sys.stdin.read()
@@ -118,8 +129,8 @@ def cmd_apply(args: argparse.Namespace, started: float) -> None:
     with locked(work):
         res_path = work / "layers" / f"{args.step:03d}.result.json"
         lp = layer_path(work, args.step)
-        if res_path.exists() and lp.exists():
-            prev = json.loads(res_path.read_text())
+        prev = _cached(res_path) if lp.exists() else None
+        if prev is not None:
             if prev.get("code_sha256") == code_sha and sha256_file(lp) == prev["data"]["sha256"]:
                 prev["cached"] = True
                 prev["elapsed_ms"] = int((time.time() - started) * 1000)
@@ -128,8 +139,13 @@ def cmd_apply(args: argparse.Namespace, started: float) -> None:
         prior = [s for s in existing_steps(work) if s < args.step]
         root = rebuild_root(work, site, prior)
         stage = Usd.Stage.Open(str(work / "scene.usda"))
+        layer = None
         if lp.exists():
-            layer = Sdf.Layer.FindOrOpen(str(lp))
+            try:
+                layer = Sdf.Layer.FindOrOpen(str(lp))
+            except Exception:  # noqa: BLE001 — a layer file left half-written by a killed attempt is recreated
+                lp.unlink()
+        if layer is not None:
             layer.Clear()
         else:
             layer = Sdf.Layer.CreateNew(str(lp))
@@ -176,7 +192,9 @@ def cmd_apply(args: argparse.Namespace, started: float) -> None:
         warnings = [f"precheck: {v['asset']} {v['status']} {v['volume']} ({v['clearance_m']} m < {v['required_m']} m)" for v in summary["violations"]]
         env = {"ok": True, "op": "apply", "step": args.step, "code_sha256": code_sha, "data": data, "warnings": warnings,
                "error": None, "cached": False}
-        res_path.write_text(json.dumps(env, sort_keys=True))
+        tmp = res_path.with_name(res_path.name + ".part")
+        tmp.write_text(json.dumps(env, sort_keys=True))
+        tmp.replace(res_path)  # renamed into place only once complete
         emit("apply", data, ok=True, warnings=warnings, started=started, step=args.step, code_sha256=code_sha, cached=False)
 
 

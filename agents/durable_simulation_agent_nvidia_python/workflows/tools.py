@@ -44,7 +44,8 @@ with workflow.unsafe.imports_passed_through():
 USD_SEARCH_HOST = "search.simready.omniverse.nvidia.com"  # NVIDIA's public SimReady asset search
 GRANT_WAIT = timedelta(minutes=10)  # how long the agent waits for a person before it carries on with the catalog
 STEP_CAP = 8  # applies per round; the reviewer's revision starts a new round
-NON_RETRYABLE = ["SandboxLost", "LayerMissing", "RehydrateMismatch", "LintRejected", "RenderFailed"]
+# RenderFailed is not listed: the renderer says per error whether a retry can help (a 503 can, an unknown op cannot).
+NON_RETRYABLE = ["SandboxLost", "LayerMissing", "RehydrateMismatch", "LintRejected"]
 SANDBOX_OPTS: dict[str, Any] = dict(
     start_to_close_timeout=timedelta(minutes=10),
     heartbeat_timeout=timedelta(seconds=60),
@@ -253,7 +254,8 @@ async def request_review(rc: RunContextWrapper[AgentCtx], summary: str) -> str:
     """Finish this round and hand the layout to a human reviewer. Call it after check_lane and render_preview on the final layout."""
     ctx = rc.context
     if not ctx.state.layers:
-        return json.dumps({"ok": False, "type": "NothingToReview", "msg": "Place the cell with apply_usd_code first, then request_review."})
+        ctx.review_refusal = "place the cell with apply_usd_code, then run check_lane('L2') and render_preview('Station') on it."
+        return json.dumps({"ok": False, "type": "NothingToReview", "msg": "Before review, " + ctx.review_refusal})
     step = ctx.state.step  # the checks must be of the layout the reviewer will see, not of an earlier step
     missing = []
     if not any(c.step == step for c in ctx.state.lane_checks):

@@ -284,3 +284,24 @@ async def test_review_needs_checks_of_the_current_layout(fake_env):
     # request_review ends the agent's run; the refusal comes back in the Workflow's next prompt
     assert any("Your request_review was refused" in i and "on the current layout (step 2)" in i for i in outputs["model_inputs"]), "step 1's checks do not cover step 2"
     assert [c.step for c in state.lane_checks] == [1, 2] and [r.step for r in state.renders] == [1, 2]
+
+
+@pytest.mark.timeout(120)
+async def test_an_unchecked_layout_cannot_be_approved(fake_env):
+    script = [("request_review", {"summary": "nothing yet"})] * 3  # refused each time: no layers
+    async with await WorkflowEnvironment.start_time_skipping() as env:
+        async with AgentEnvironment(model=scripted_model(script), model_params=ModelActivityParameters(start_to_close_timeout=timedelta(seconds=30))) as agent_env:
+            client = agent_env.applied_on_client(env.client)
+            tq = f"test-{uuid.uuid4().hex[:6]}"
+            async with Worker(client, task_queue=tq, workflows=[SimulationAgentWorkflow], activities=ACTIVITIES):
+                handle = await start(client, tq, hours=1)
+                rid = await until_review(handle, [])
+                hist = await handle.fetch_history()
+                prompts = [e.activity_task_scheduled_event_attributes.input.payloads[0].data.decode() for e in hist.events
+                           if e.HasField("activity_task_scheduled_event_attributes") and e.activity_task_scheduled_event_attributes.activity_type.name == "invoke_model_activity"]
+                assert sum("Your request_review was refused: place the cell" in p for p in prompts) == 2, "each refusal re-prompted the agent"
+                with pytest.raises(WorkflowUpdateFailedError):
+                    await handle.execute_update(SimulationAgentWorkflow.review, ReviewDecision(review_id=rid, action="approve", notes=""))
+                assert await handle.execute_update(SimulationAgentWorkflow.review, ReviewDecision(review_id=rid, action="reject", notes="nothing to review")) == "reject"
+                result = await handle.result()
+    assert result.status == "rejected" and result.layers == []

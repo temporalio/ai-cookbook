@@ -72,18 +72,24 @@ def _asset_overlaps(assets: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 def lane_check(layer_paths: list[str | Path], *, site_layer: str | Path, catalog: str | Path, lane: str, robot: str = "carter",
                min_clearance_m: float = 0.6, asset_root: str = "/opt/assets") -> dict[str, Any]:
-    """Geometry only: every placed asset's footprint against the lane volume. `passed` needs the required clearance from
-    everything; `reached` is false when something stands in the lane itself. Isaac Sim replaces this with a PhysX
-    drive-through when a renderer is configured (activities/gpu.py)."""
+    """Geometry only: every asset and piece of geometry on the floor against the lane volume, measured with full
+    transforms. `passed` needs the required clearance from everything; floor markings may touch the lane but not lie in
+    it; `reached` is false when something stands in the lane itself. Isaac Sim replaces this with a PhysX drive-through
+    when a renderer is configured (activities/gpu.py)."""
     h = compose(layer_paths, site_layer=site_layer, catalog=catalog, asset_root=asset_root)
     vol = next((v for v in h.site_volumes() if v["name"] == lane), None)
     if vol is None:
         raise ValueError(f"no lane {lane!r} in the site layer")
-    gaps, contacts = [], []
-    for a in h.placed_assets():
-        gap = SceneHelpers._aabb_gap(a["footprint"], vol["aabb"])
+    gaps, contacts, blocked = [], [], False
+    for ob in h.obstacles():
+        gap = SceneHelpers._aabb_gap(ob["aabb"], vol["aabb"])
+        if ob["kind"] == "floor_marking":
+            if gap == 0.0:
+                contacts.append(ob["path"])
+            continue
         gaps.append(gap)
         if gap < min_clearance_m:
-            contacts.append({"path": a["path"], "clearance_m": round(gap, 3)})
+            contacts.append(ob["path"])
+            blocked = blocked or gap == 0.0
     return {"lane": lane, "robot": robot, "passed": not contacts, "min_clearance_m": round(min(gaps), 3) if gaps else 99.0,
-            "contacts": [c["path"] for c in contacts], "reached": not any(c["clearance_m"] == 0.0 for c in contacts), "method": "geometry"}
+            "contacts": contacts, "reached": not blocked, "method": "geometry"}

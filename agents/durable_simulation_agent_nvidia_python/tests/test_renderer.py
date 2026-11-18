@@ -96,8 +96,7 @@ def test_cancel_running_and_queued_jobs(service):
         time.sleep(0.05)
     assert req("GET", f"{base}/jobs/slow")[1]["status"] == "cancelled" and req("GET", f"{base}/jobs/queued")[1]["status"] == "cancelled"
     assert req("DELETE", f"{base}/jobs/slow")[0] == 409 and req("DELETE", f"{base}/jobs/nope")[0] == 404
-    reg.forget_failed("slow")  # a retried Activity can submit the same key again
-    assert req("POST", f"{base}/jobs", {"key": "slow", "op": "render_still", "params": {"frames": 2}})[0] == 202
+    assert req("POST", f"{base}/jobs", {"key": "slow", "op": "render_still", "params": {"frames": 2}})[0] == 202, "a retried Activity runs the job again"
 
 
 def test_one_job_at_a_time(service):

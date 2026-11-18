@@ -125,7 +125,7 @@ class SimulationAgentWorkflow:
                     self.decision = ReviewDecision(review_id=self.pending_review_id, action="reject", notes="review window expired")
             decision, self.decision, self.pending_review_id = self.decision, None, None
             assert decision is not None
-            self.decisions.append({"round": self.round, "summary": summary, **decision.model_dump(), "at": workflow.now().isoformat(timespec="seconds")})
+            self.decisions = [*self.decisions, {"round": self.round, "summary": summary, **decision.model_dump(), "at": workflow.now().isoformat(timespec="seconds")}]
             if decision.action in ("approve", "reject"):
                 return await self._finish(inp, "approved" if decision.action == "approve" else "rejected")
             self.notes = [*self.notes, decision.notes]  # revise: another round, in a new sandbox generation rebuilt from the recorded layers
@@ -187,10 +187,10 @@ class SimulationAgentWorkflow:
     # @@@SNIPSTART build-generation
     async def _build(self, gen: int) -> None:
         base = self._current()
-        wf_id = workflow.info().workflow_id
+        wf_id, run_id = workflow.info().workflow_id, workflow.info().run_id
         try:
             ref = await workflow.execute_activity(
-                sb.ensure_sandboxes, EnsureInput(run_id=base.run_id, workflow_id=wf_id, gen=gen, grants=base.grants, layers=base.layers),
+                sb.ensure_sandboxes, EnsureInput(run_id=base.run_id, workflow_id=wf_id, temporal_run_id=run_id, gen=gen, grants=base.grants, layers=base.layers),
                 summary=f"sandboxes: generation {gen}" + (f", {len(base.layers)} layers rehydrated" if base.layers else ""), **ENSURE_OPTS)
             if ref.layer_stack_hash != layer_stack_hash(base.layer_pairs()):
                 raise RuntimeError(f"generation {gen} recomposed a different layer stack ({ref.layer_stack_hash[:12]} != {layer_stack_hash(base.layer_pairs())[:12]})")
@@ -199,7 +199,8 @@ class SimulationAgentWorkflow:
             # are deterministic, so release them by name; a failure to release must not hide the original error.
             with contextlib.suppress(Exception):
                 await asyncio.shield(workflow.execute_activity(
-                    sb.release_sandboxes, ReleaseInput(run_id=base.run_id, gen=gen, exec_sandbox=sb.sandbox_name(wf_id, "exec", gen), tools_sandbox=sb.sandbox_name(wf_id, "tools", gen)),
+                    sb.release_sandboxes, ReleaseInput(run_id=base.run_id, gen=gen, exec_sandbox=sb.sandbox_name(wf_id, run_id, "exec", gen),
+                                                       tools_sandbox=sb.sandbox_name(wf_id, run_id, "tools", gen)),
                     summary=f"release failed generation {gen}", **RELEASE_OPTS))
             raise
         self.state = base.with_sandboxes(ref.gen, ref.exec_sandbox, ref.tools_sandbox)
@@ -247,6 +248,12 @@ class SimulationAgentWorkflow:
     def _validate_review(self, decision: ReviewDecision) -> None:
         if self.pending_review_id is None or decision.review_id != self.pending_review_id or self.decision is not None:
             raise ValueError(f"no matching review pending (pending {self.pending_review_id!r}, got {decision.review_id!r})")
+        st = self._current()
+        checked = st.layers and any(c.step == st.step for c in st.lane_checks) and any(r.step == st.step for r in st.renders)
+        if decision.action == "approve" and not checked:
+            # The round can end without a checked layout (no layers, a refused review, the turn budget): a person can still
+            # revise or reject it, but approving needs a lane check and a preview of the layout being approved.
+            raise ValueError(f"nothing checked to approve at step {st.step}: revise or reject")
 
     @workflow.query
     def pending_grant(self) -> dict[str, Any] | None:
