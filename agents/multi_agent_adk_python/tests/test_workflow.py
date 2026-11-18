@@ -21,7 +21,7 @@ from google.adk.models.llm_request import LlmRequest
 from google.adk.models.llm_response import LlmResponse
 from google.genai import types
 from temporalio import activity
-from temporalio.contrib.google_adk_agents import GoogleAdkPlugin
+from temporalio.google_adk import GoogleAdkPlugin
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 

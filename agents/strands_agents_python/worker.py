@@ -1,10 +1,10 @@
 import asyncio
 
+import mcp
 from mcp import StdioServerParameters, stdio_client
-from strands.tools.mcp import MCPClient
 from temporalio.client import Client
-from temporalio.contrib.strands import StrandsPlugin
 from temporalio.envconfig import ClientConfig
+from temporalio.strands_agents import StrandsPlugin
 from temporalio.worker import Worker
 
 from activities.tools import get_recent_aws_announcements
@@ -13,10 +13,14 @@ from workflows.aws_assistant_workflow import AWSAssistantWorkflow
 TASK_QUEUE = "strands-aws-assistant-task-queue"
 
 
-def make_aws_docs_client() -> MCPClient:
-    """Factory for the AWS Documentation MCP server, run locally via uvx."""
-    return MCPClient(
-        lambda: stdio_client(
+def make_aws_docs_client() -> mcp.Client:
+    """Factory for the AWS Documentation MCP server, run locally via uvx.
+
+    The worker calls this each time it opens a connection, so it returns a new
+    `mcp.Client` and transport on every call.
+    """
+    return mcp.Client(
+        stdio_client(
             StdioServerParameters(
                 command="uvx",
                 args=["awslabs.aws-documentation-mcp-server@latest"],

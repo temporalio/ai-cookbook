@@ -10,7 +10,7 @@ from fakes import (
     text_response,
     tool_call_response,
 )
-from temporalio.contrib.openai_agents import ModelActivityParameters, OpenAIAgentsPlugin
+from temporalio.openai_agents import ModelActivityParameters, OpenAIAgentsPlugin
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 

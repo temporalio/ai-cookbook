@@ -8,7 +8,7 @@ from datetime import timedelta
 import pytest
 from fakes import ScriptedModel, ScriptedModelProvider, text_response
 from temporalio.client import Client
-from temporalio.contrib.openai_agents import ModelActivityParameters, OpenAIAgentsPlugin
+from temporalio.openai_agents import ModelActivityParameters, OpenAIAgentsPlugin
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 

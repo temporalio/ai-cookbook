@@ -6,7 +6,7 @@ priority: 750
 
 # Durable agent with tools using the OpenAI Agents SDK
 
-This recipe shows how to build a durable agent using the [OpenAI Agents SDK Integration for Temporal](https://github.com/temporalio/sdk-python/tree/main/temporalio/contrib/openai_agents). The agent has access to [tools](https://github.com/temporalio/sdk-python/tree/main/temporalio/contrib/openai_agents) (Temporal Activities) to answer user questions. The agent can determine which tools to use based on the user's input and execute them as needed.
+This recipe shows how to build a durable agent using the [OpenAI Agents SDK integration for Temporal](https://docs.temporal.io/develop/python/integrations/openai-agents). The agent has access to tools (Temporal Activities) to answer user questions. The agent can determine which tools to use based on the user's input and execute them as needed.
 
 This recipe highlights key implementation patterns:
 
@@ -17,6 +17,8 @@ This recipe highlights key implementation patterns:
   - Enables the agent to invoke Temporal Activities as tools, using Temporal's durable execution for tool calls
 - **Durable execution**: The agent's state and execution are managed by Temporal, providing reliability and observability
 - **Plugin configuration**: Uses the `OpenAIAgentsPlugin` to configure Temporal for OpenAI Agents SDK integration
+
+The integration ships as the [`temporalio-openai-agents`](https://pypi.org/project/temporalio-openai-agents/) package, which requires Python 3.11 or later. Import it from `temporalio.openai_agents`. Earlier releases shipped inside the `temporalio` package as `temporalio.contrib.openai_agents`; those imports still forward to the new package, but new code should use `temporalio.openai_agents`.
 
 ## Create the Activity
 
@@ -63,7 +65,7 @@ from datetime import timedelta
 
 from agents import Agent, Runner
 from temporalio import workflow
-from temporalio.contrib import openai_agents
+from temporalio.openai_agents.workflow import activity_as_tool
 
 from activities.tools import calculate_circle_area, get_weather
 
@@ -77,11 +79,11 @@ class HelloWorldAgent:
             instructions="You are a helpful assistant that determines what tool to use based on the user's question.",
             # Tools for the agent to use that are defined as activities
             tools=[
-                openai_agents.workflow.activity_as_tool(
+                activity_as_tool(
                     get_weather, 
                     start_to_close_timeout=timedelta(seconds=10)
                 ),
-                openai_agents.workflow.activity_as_tool(
+                activity_as_tool(
                     calculate_circle_area, 
                     start_to_close_timeout=timedelta(seconds=10)
                 )
@@ -98,6 +100,7 @@ class HelloWorldAgent:
 
 Create the process for executing Activities and Workflows.
 You configure the Temporal client with the `OpenAIAgentsPlugin` to enable OpenAI Agents SDK integration.
+`ModelActivityParameters` sets the options for the Activities that call the model. Model Activities heartbeat with a 10-second heartbeat timeout by default; pass `heartbeat_timeout=None` to turn this off.
 
 *File: worker.py*
 
@@ -107,8 +110,8 @@ import asyncio
 from datetime import timedelta
 
 from temporalio.client import Client
-from temporalio.contrib.openai_agents import ModelActivityParameters, OpenAIAgentsPlugin
 from temporalio.envconfig import ClientConfig
+from temporalio.openai_agents import ModelActivityParameters, OpenAIAgentsPlugin
 from temporalio.worker import Worker
 
 from activities.tools import calculate_circle_area, get_weather
@@ -157,8 +160,8 @@ import asyncio
 
 from temporalio.client import Client
 from temporalio.common import WorkflowIDConflictPolicy
-from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
 from temporalio.envconfig import ClientConfig
+from temporalio.openai_agents import OpenAIAgentsPlugin
 
 from workflows.hello_world_workflow import HelloWorldAgent
 
