@@ -8,9 +8,9 @@ priority: 500
 
 A simulation agent runs for hours, burns GPU time, executes code a model wrote, and needs a person to approve things
 along the way. The hard parts are not the model calls. They are state, retries, human gates, trust boundaries and
-provenance. This recipe is the laptop-sized version of the reference demo Temporal built with NVIDIA
-([temporalio/openshell-omniverse-demo](https://github.com/temporalio/openshell-omniverse-demo)): the same agent loop,
-the same tools, the same records, with CPU stand-ins where the demo uses a GPU.
+provenance. This recipe is the reference demo Temporal built with NVIDIA: the same agent loop, the same tools, the same
+records. It runs on a laptop with CPU stand-ins for the GPU parts, and it includes the Isaac Sim service for when you
+have a GPU.
 
 - **Temporal remembers.** The agent loop is a Workflow. Every model call, sandbox operation, render and lane check is an
   Activity with retries and heartbeats on one of two Task Queues. Human decisions are Workflow Updates with validators.
@@ -21,8 +21,8 @@ the same tools, the same records, with CPU stand-ins where the demo uses a GPU.
   every recorded grant and every recorded layer.
 - **NVIDIA Omniverse simulates and judges.** The agent authors the warehouse cell as one OpenUSD sublayer per step,
   through a small helper API inside the exec sandbox. Every layer is linted before anything else opens it and judged
-  against the trusted site layer. With the demo's renderer service, Isaac Sim renders previews and drives a Nova Carter
-  AMR through the lane; without it, a plan view and a geometry check stand in.
+  against the trusted site layer. With the recipe's renderer service on a GPU host, Isaac Sim renders previews and
+  drives a Nova Carter AMR through the lane; without it, a plan view and a geometry check stand in.
 - **NVIDIA Nemotron thinks, NeMo Relay records.** Nemotron answers through NVIDIA NIM. Every Activity and every model
   call is a span in a NeMo Relay trajectory that continues across a Worker restart, with marks for the retry and for the
   fallback model that answered when the primary failed.
@@ -47,6 +47,7 @@ Relay trajectories, and the OpenUSD layers with their stack hash. `bundle.py` co
 | `worker.py`, `start_workflow.py` | The Workers and a run |
 | `grant.py`, `review.py`, `delete_sandbox.py`, `kill_worker.py`, `bundle.py`, `rehearsal.py` | The operator: decide a grant, decide a review, two chaos beats, collect the records, play every beat unattended |
 | `sandbox-image/` | The sandbox image for real OpenShell: Python, usd-core, sceneops and the site |
+| `renderer/` | The Isaac Sim service for a GPU host: a job API, the Isaac Sim backend, its image, and an asset mirror |
 
 ## Prerequisites
 
@@ -54,7 +55,8 @@ Relay trajectories, and the OpenUSD layers with their stack hash. `bundle.py` co
 - The [Temporal CLI](https://docs.temporal.io/cli) for a local Temporal Service
 - An NVIDIA API key from [build.nvidia.com](https://build.nvidia.com) (`NVIDIA_API_KEY`); the hosted NIM endpoints have a free tier
 - Optional: [OpenShell](https://docs.nvidia.com/openshell) on Linux (kernel 6.2+) or on Apple Silicon with Docker Desktop
-- Optional: a GPU host running the demo's Isaac Sim renderer service
+- Optional: a Linux host with an NVIDIA RTX GPU, Docker with the NVIDIA Container Toolkit, and an NGC account for the
+  Isaac Sim 6.1 container
 
 ## Run it
 
@@ -113,14 +115,25 @@ image, which the network rules match. To follow the gateway's decisions live: `o
 
 ### Isaac Sim previews and lane checks
 
-The demo repository's `renderer/` is a job service in front of Isaac Sim 6.1: `render_still` for an RTX frame from a
-named camera and `simulate_lane` for a PhysX drive-through of the Nova Carter. Run it on the GPU host, start the gpu
-Worker there, and the same tool calls become Isaac Sim jobs:
+`renderer/` is a job service in front of Isaac Sim 6.1 with two operations. `render_still` renders an RTX frame from a
+named camera of the site layer. `simulate_lane` checks the lane against the real geometry and drives the Nova Carter
+through it with PhysX. On the GPU host, mirror the assets the renderer opens, build and start its container, and start
+the gpu Worker next to it; the same tool calls become Isaac Sim jobs:
 
 ```bash
-export RENDERER_URL=http://127.0.0.1:8799 RENDERER_SHARED_DIR=/srv/renderer   # a directory the renderer reads layers from
-uv run worker.py gpu                            # on the GPU host; the agent Worker runs anywhere
+uv run renderer/mirror_assets.py --dest /opt/isaac-assets      # the warehouse, the Nova Carter, every catalog asset: about 4.6 GB
+docker login nvcr.io                                           # user $oauthtoken, password: your NGC API key
+docker build -f renderer/Dockerfile -t durable-simulation-agent-renderer:0.1 .
+docker run -d --name renderer --gpus all --network host --user root \
+  -v /opt/isaac-assets/Assets/Isaac/6.1:/opt/assets:ro -v /srv/renderer:/srv/renderer \
+  durable-simulation-agent-renderer:0.1                        # first start compiles shaders: give it a few minutes
+curl -s localhost:8799/healthz                                 # {"backend": "kit", "ready": true, ...}
+RENDERER_URL=http://127.0.0.1:8799 RENDERER_SHARED_DIR=/srv/renderer uv run worker.py gpu   # the agent Worker runs anywhere
 ```
+
+The gpu Worker lints each layer and copies it into the shared directory by content hash; the renderer lints it again
+before Kit opens it, and writes its outputs back under the same directory. To try the job API without a GPU:
+`uv run python -m renderer.run_service --backend fake --out /tmp/renderer-out`.
 
 Without `RENDERER_URL`, `render_preview` draws a plan view of the composed layers and `check_lane` measures every
 footprint against the lane volume. The Workflow sees the same `RenderRef` and `LaneCheck` either way.
@@ -414,9 +427,6 @@ class RelayModel(Model):
 ```
 <!--SNIPEND-->
 
-The demo goes one step further and feeds the trace back into the loop: a digest of the run's own trajectory becomes
-advice for the next model turn, Relay's adaptive runtime adds NIM scheduling hints, and the primary model is routed
-around on evidence. See [`docs/relay-feedback.md`](https://github.com/temporalio/openshell-omniverse-demo/blob/master/docs/relay-feedback.md) in the demo repository.
 
 ## Tests
 

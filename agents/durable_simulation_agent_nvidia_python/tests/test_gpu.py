@@ -1,11 +1,11 @@
 """The gpu Task Queue's Activities: the CPU plan view and the geometry lane check on real layers, and the same Activities
-as renderer jobs when RENDERER_URL points at a renderer service (here: a stub of the demo's job API)."""
+as renderer jobs when RENDERER_URL points at the recipe's renderer service (here with its fake backend)."""
 
 from __future__ import annotations
 
 import json
 import threading
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 
 import pytest
 from temporalio.testing import ActivityEnvironment
@@ -13,6 +13,9 @@ from temporalio.testing import ActivityEnvironment
 from activities import gpu
 from activities.openshell import FakeSandboxes
 from models import LayerRef, RenderInput, SimulateInput
+from renderer.fake_backend import FakeKit
+from renderer.jobs import JobRegistry
+from renderer.server import run_forever_in_thread, serve
 from sceneops.hashing import sha256_file
 
 CODE = "h.place_asset('packing_table', -3.0, 2.0, 90, name='station_1')\nh.place_asset('pallet', 1.7, -3.0, 0, name='staging_1')\n"
@@ -40,61 +43,26 @@ async def test_cpu_plan_view_and_geometry_lane_check(fake_env, layer):
     assert json.loads((fake_env / "wf-gpu" / "lane" / "001-L2.json").read_text())["contacts"] == ["/World/Agent/staging_1"]
 
 
-class _StubRenderer(BaseHTTPRequestHandler):
-    """The demo renderer's job API: POST /jobs (202, or 409 when the key is known), GET /jobs/<key>."""
-
-    jobs: dict[str, dict] = {}
-    root = None
-
-    def log_message(self, *args):  # quiet
-        pass
-
-    def do_POST(self):
-        body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-        known = body["key"] in self.jobs
-        if not known:
-            self.jobs[body["key"]] = {"status": "running", "op": body["op"], "params": body["params"], "polls": 0}
-        self.send_response(409 if known else 202)
-        self.send_header("Content-Type", "application/json")
-        self.end_headers()
-        self.wfile.write(json.dumps({"key": body["key"], "status": "running", "adopters": int(known)}).encode())
-
-    def do_GET(self):
-        key = self.path.rsplit("/", 1)[-1]
-        job = self.jobs[key]
-        job["polls"] += 1
-        if job["polls"] >= 2:
-            d = self.root / key
-            d.mkdir(parents=True, exist_ok=True)
-            if job["op"] == "render_still":
-                (d / "rgb_0000.png").write_bytes(b"\x89PNG\r\n\x1a\n")
-                job.update(status="done", result={"output_path": str(d / "rgb_0000.png")})
-            else:
-                (d / "lane.mp4").write_bytes(b"\x00\x00\x00\x18ftypmp42")
-                job.update(status="done", result={"passed": True, "min_clearance_m": 0.9, "contacts": [], "clip_path": str(d / "lane.mp4"), "method": "physx",
-                                                  "drive": {"ok": True, "reached": True}})
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self.end_headers()
-        self.wfile.write(json.dumps({"key": key, "status": job["status"], "progress": {"phase": "render"}, "result": job.get("result")}).encode())
-
-
 async def test_renderer_jobs_when_a_renderer_is_configured(fake_env, layer, monkeypatch):
-    _StubRenderer.jobs, _StubRenderer.root = {}, fake_env / "renderer-out"
-    server = ThreadingHTTPServer(("127.0.0.1", 0), _StubRenderer)
-    threading.Thread(target=server.serve_forever, daemon=True).start()
-    monkeypatch.setenv("RENDERER_URL", f"http://127.0.0.1:{server.server_port}")
+    """The same Activities against the recipe's renderer service, with its fake backend standing in for Isaac Sim."""
+    registry = JobRegistry(cache_dir=fake_env / "renderer-cache")
+    backend = FakeKit(fake_env / "renderer-out", lane_passes_after_step=1)
+    server = serve(registry, port=0)
+    stop = threading.Event()
+    run_forever_in_thread(registry, backend, stop)
+    monkeypatch.setenv("RENDERER_URL", f"http://127.0.0.1:{server.server_address[1]}")
     monkeypatch.setenv("RENDERER_SHARED_DIR", str(fake_env / "shared"))
     try:
         env = ActivityEnvironment()
         ref = await env.run(gpu.render_preview, RenderInput(run_id="wf-gpu", step=1, layers=[layer], camera="Station", width=1280, height=720))
-        assert ref.mode == "rt2" and ref.path.endswith("001-Station-rt2.png") and (fake_env / "wf-gpu" / "renders" / "001-Station-rt2.png").read_bytes().startswith(b"\x89PNG")
+        assert ref.mode == "rt2" and ref.path.endswith("001-Station-rt2.png") and Path(ref.path).read_bytes().startswith(b"\x89PNG")
         chk = await env.run(gpu.simulate_lane, SimulateInput(run_id="wf-gpu", step=1, layers=[layer], lane="L2", robot="carter", min_clearance_m=0.6))
-        assert chk.passed and chk.method == "physx" and chk.reached is True and chk.clip_path.endswith("001-L2.mp4")
-        jobs = list(_StubRenderer.jobs.values())
-        assert [j["op"] for j in jobs] == ["render_still", "simulate_lane"]
-        assert jobs[0]["params"]["camera"] == "/World/Cameras/Station" and jobs[0]["params"]["mode"] == "rt2" and jobs[0]["params"]["base_ref"] == gpu.BASE_REF
-        assert jobs[0]["params"]["layers"] == [str(fake_env / "shared" / "layers" / f"{layer.sha256}.usda")], "the renderer reads linted copies by content hash"
-        assert jobs[1]["params"]["lane"] == "L2" and jobs[1]["params"]["render_clip"] is True
+        assert chk.passed and chk.method == "fake" and chk.reached is True and chk.clip_path.endswith("001-L2.mp4")
+        jobs = backend.jobs
+        assert [j.op for j in jobs] == ["render_still", "simulate_lane"]
+        assert jobs[0].params["camera"] == "/World/Cameras/Station" and jobs[0].params["mode"] == "rt2" and jobs[0].params["base_ref"] == gpu.BASE_REF
+        assert jobs[0].params["layers"] == [str(fake_env / "shared" / "layers" / f"{layer.sha256}.usda")], "the renderer reads linted copies by content hash"
+        assert jobs[1].params["lane"] == "L2" and jobs[1].params["render_clip"] is True and jobs[1].key != jobs[0].key
     finally:
+        stop.set()
         server.shutdown()

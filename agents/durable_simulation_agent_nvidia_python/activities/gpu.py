@@ -1,7 +1,7 @@
-"""The `gpu` Task Queue: previews and lane checks. With RENDERER_URL set, both are jobs for the Isaac Sim renderer service
-of the full demo (github.com/temporalio/openshell-omniverse-demo, `renderer/`): an RTX still from a named camera and a
-PhysX drive-through of the Nova Carter along the lane. Without it, the same Activities draw a plan view and check the lane
-geometry on the CPU. Either way the Workflow sees a RenderRef and a LaneCheck, and the records land in runs/<workflow-id>/."""
+"""The `gpu` Task Queue: previews and lane checks. With RENDERER_URL set, both are jobs for the Isaac Sim service in
+`renderer/`: an RTX still from a named camera and a PhysX drive-through of the Nova Carter along the lane. Without it,
+the same Activities draw a plan view and check the lane geometry on the CPU. Either way the Workflow sees a RenderRef and
+a LaneCheck, and the records land in runs/<workflow-id>/."""
 
 from __future__ import annotations
 
