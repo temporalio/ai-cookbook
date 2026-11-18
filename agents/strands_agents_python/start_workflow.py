@@ -2,8 +2,8 @@ import asyncio
 
 from temporalio.client import Client
 from temporalio.common import WorkflowIDConflictPolicy
-from temporalio.contrib.strands import StrandsPlugin
 from temporalio.envconfig import ClientConfig
+from temporalio.strands_agents import StrandsPlugin
 
 from workflows.aws_assistant_workflow import AWSAssistantWorkflow
 

@@ -3,12 +3,14 @@ name = "cookbook-basic-openai-agent"
 version = "0.1"
 description = "Basic example showing how to build a Durable Agent using the OpenAI Agents SDK Temporal integration"
 authors = [{ name = "Temporal Technologies Inc", email = "sdk@temporal.io" }]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 readme = "README.md"
 license = "MIT"
 dependencies = [
-    "temporalio[opentelemetry]>=1.15.0,<2",
-    "openai-agents>=0.1.0",
+    "temporalio>=1.36.0,<2",
+    "temporalio-openai-agents>=2.0.0,<3",
+    "openai-agents>=0.22,<0.25",
+    "openai>=1.40.0",
 ]
 
 [dependency-groups]
@@ -20,3 +22,9 @@ dev = [
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+[tool.uv]
+# This table replaces the repo-root uv.toml for this recipe, so it repeats the two-week cooldown. The Temporal packages
+# are exempted up to the temporalio-openai-agents 2.0.0 GA release (2026-11-17), which needs temporalio 1.36.
+# Drop this table once these releases are older than two weeks (after 2026-12-01).
+exclude-newer = "2 weeks"
+exclude-newer-package = { temporalio = "2026-11-18T00:00:00Z", temporalio-openai-agents = "2026-11-18T00:00:00Z" }

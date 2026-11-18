@@ -2,8 +2,8 @@ import asyncio
 
 from temporalio.client import Client
 from temporalio.common import WorkflowIDConflictPolicy
-from temporalio.contrib.openai_agents import OpenAIAgentsPlugin
 from temporalio.envconfig import ClientConfig
+from temporalio.openai_agents import OpenAIAgentsPlugin
 
 from workflows.hello_world_workflow import HelloWorldAgent
 
