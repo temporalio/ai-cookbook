@@ -145,6 +145,33 @@ async def test_an_activity_does_not_wait_for_another_runs_model_call(fake_env):
     assert _results(fake_env / "wf-B" / "relay", "concurrent") == []
 
 
+@pytest.mark.timeout(10, method="thread")
+async def test_closing_a_run_does_not_wait_for_another_runs_model_call(fake_env, monkeypatch):
+    """Relay's flush also waits for model calls already running. Closing run A waits a bounded time for its last
+    trajectory, which lands once run B's call ends."""
+    monkeypatch.setattr(relay, "FINAL_EXPORT_WAIT_S", 0.2)
+    relay.configure(identity="closing")
+    provider_started, complete_provider = asyncio.Event(), asyncio.Event()
+
+    async def provider(headers, request):
+        provider_started.set()
+        await complete_provider.wait()
+        return "response", {"output": "response"}
+
+    await _env("wf-A", "ping").run(ping, {"run": "A"})
+    model = asyncio.create_task(_env("wf-B", "model").run(relay.model_call, "test-model", {}, provider))
+    await provider_started.wait()
+    files = await asyncio.wait_for(_env("wf-A", "finish").run(finish, "approved"), 2)
+    assert any(f.endswith(".jsonl") for f in files)
+    complete_provider.set()
+    assert await model == "response"
+    await relay.drain()
+    d = fake_env / "wf-A" / "relay"
+    assert {"ok": True, "run": "A"} in _results(d, "closing")
+    events = [json.loads(line) for line in next(d.glob("events-closing-*.jsonl")).read_text().splitlines()]
+    assert "run_closed" in [e.get("name") for e in events]
+
+
 async def test_truncated_propagation_is_replaced(fake_env):
     path = fake_env / "wf-damaged" / "relay" / "propagation.json"
     path.parent.mkdir(parents=True)

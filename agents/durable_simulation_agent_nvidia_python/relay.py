@@ -5,11 +5,11 @@ agent scope per run per Worker process. The scope's propagation context is store
 (runs/<workflow-id>/relay/propagation.json), so another process, the gpu Worker or the agent Worker after a kill, continues
 the same trace: the same root id, with a nested "resumed" scope. Each process writes an ATIF trajectory (Relay's
 AtifExporter) and a JSONL of lifecycle events into that directory. The trajectory is rewritten in the background after
-every Activity and model call, so a killed process leaves its part of the record behind; the exporter waits for every
-model call it has seen, other runs' included, so no Activity waits for it. Relay's subscribers are process-wide, so
-each snapshot keeps only the steps of its own run's scope tree, and a run with no Activity for NEMO_RELAY_IDLE_CLOSE_S seconds (default 300, for example
-during a review wait) is closed; its next Activity resumes the trace. Switch off with NEMO_RELAY=0; every hook is then a
-pass-through.
+every Activity and model call, so a killed process leaves its part of the record behind. Relay's export and flush wait
+for model calls already running in the process, other runs' included, so no Activity waits for them. Relay's
+subscribers are process-wide, so each snapshot keeps only the steps of its own run's scope tree, and a run with no
+Activity for NEMO_RELAY_IDLE_CLOSE_S seconds (default 300, for example during a review wait) is closed; its next
+Activity resumes the trace. Switch off with NEMO_RELAY=0; every hook is then a pass-through.
 """
 
 from __future__ import annotations
@@ -286,26 +286,23 @@ def _detach(run: _Run, reason: str) -> None:
         r.scope.pop(run.handle, output=stats)
 
 
-async def _finish(runs: list[_Run], wait: float = 0.0) -> None:
-    """The asynchronous half: deliver the pending events once, then export each detached run a last time and deregister
-    it. Waits up to `wait` seconds; an export held up by another run's model call completes in the background."""
-    tasks: list[asyncio.Task] = []
+async def _finish(runs: list[_Run]) -> None:
+    """The asynchronous half, run as a background task: deliver the pending events, then export each detached run a last
+    time and deregister it. Relay's flush, like its export, waits for model calls already running, other runs' included."""
     try:
         await _r().subscribers.flush_async()
     except Exception:  # noqa: BLE001
         logger.warning("Could not deliver pending Relay events", exc_info=True)
-    finally:
-        for run in runs:
-            run.final = True
-            tasks.append(_export_soon(run))
-    if tasks and wait > 0:
-        await asyncio.wait(tasks, timeout=wait)
+    for run in runs:
+        run.final = True
+    await asyncio.gather(*(_export_soon(run) for run in runs))
 
 
 async def _close_run(run: _Run, reason: str) -> None:
-    """Close the run's scope in this process. A later Activity of the same run here resumes the trace from propagation.json."""
+    """Close the run's scope in this process. A later Activity of the same run here resumes the trace from propagation.json.
+    Waits up to FINAL_EXPORT_WAIT_S for the last trajectory; after that it lands in the background."""
     _detach(run, reason)
-    await _finish([run], wait=FINAL_EXPORT_WAIT_S)
+    await asyncio.wait([_spawn(_finish([run]))], timeout=FINAL_EXPORT_WAIT_S)
 
 
 async def _close_idle(current: str) -> None:
