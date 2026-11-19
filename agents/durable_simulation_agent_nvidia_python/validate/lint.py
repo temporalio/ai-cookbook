@@ -157,6 +157,9 @@ def lint_layer(path: str | Path, *, catalog: dict[str, dict[str, Any]] | str | P
                 rep.errors.append(f"{sp}: internal references are not allowed")
             elif ref.assetPath not in allowed_refs:
                 rep.errors.append(f"{sp}: reference {ref.assetPath!r} is not a catalog asset")
+            elif not ref.primPath.isEmpty or not ref.layerOffset.IsIdentity():
+                # The catalog measured each asset's default prim. A prim path could pick a part without its parent's scale.
+                rep.errors.append(f"{sp}: a catalog reference names the asset file only, with no prim path or layer offset")
 
     layer.Traverse(Sdf.Path.absoluteRootPath, visit)
     if prims > limits["max_prims"]:

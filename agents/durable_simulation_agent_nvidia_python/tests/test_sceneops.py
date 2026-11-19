@@ -242,6 +242,22 @@ def test_the_judge_measures_what_is_really_there(tmp_path):
     assert set(lane["contacts"]) == {"/World/Agent/crate", "/World/Agent/untagged", "/World/Agent/wall"}
 
 
+def test_a_later_layer_cannot_hide_geometry_behind_a_placed_asset(tmp_path):
+    """Each layer passes the lint alone: step 1 places a cone, step 2 makes the same prim an 8 m Cube reaching into L2.
+    The prim keeps the cone's reference, so the judge measures the cone's box and the Cube's geometry together."""
+    layers = _author(tmp_path, Path("/opt/assets"), [
+        "h.place_asset('traffic_cone', -14.0, 5.0, name='cone')",
+        "c = UsdGeom.Cube.Define(stage, '/World/Agent/cone')\nc.CreateSizeAttr(8.0)\nUsdGeom.XformCommonAPI(c).SetTranslate(Gf.Vec3d(-1.0, -8.0, 0.0))",
+    ])
+    assert all(lint_layer(layer, catalog=CATALOG).ok for layer in layers)
+    verdict = judge_layers(layers, site_layer=SITE_LAYER, catalog=CATALOG)
+    cone = next(p for p in verdict["agent_prims"] if p["path"] == "/World/Agent/cone")
+    assert cone["kind"] == "asset" and cone["aabb"][0] == -5.0 and cone["aabb"][2] == 3.0
+    assert ("/World/Agent/cone", "L2") in {(v["asset"], v["volume"]) for v in verdict["violations"]}
+    lane = lane_check(layers, site_layer=SITE_LAYER, catalog=CATALOG, lane="L2")
+    assert lane["passed"] is False and lane["contacts"] == ["/World/Agent/cone"]
+
+
 def test_lint_allows_only_catalog_references_on_direct_children(tmp_path):
     def lint(body: str):
         return lint_layer(_layer(tmp_path, "l.usda", 'over "World"\n{\n    over "Agent"\n    {\n' + body + '    }\n}\n'), catalog=CATALOG, asset_root="/opt/assets")
@@ -254,6 +270,8 @@ def test_lint_allows_only_catalog_references_on_direct_children(tmp_path):
     assert not internal.ok and "internal references are not allowed" in internal.errors[0]
     nested = lint('        def Xform "group"\n        {\n            def Cube "hidden"\n            {\n            }\n        }\n')
     assert not nested.ok and "only direct children" in nested.errors[0]
+    part = lint('        def Xform "part" (\n            prepend references = @/opt/assets/Isaac/Props/Pallet/pallet.usd@</Root/Mesh>\n        )\n        {\n        }\n')
+    assert not part.ok and "asset file only" in part.errors[0], "the catalog measured the default prim, not a part of the asset"
 
 
 @pytest.mark.parametrize("prim", ["over", "def", "def Cube"])

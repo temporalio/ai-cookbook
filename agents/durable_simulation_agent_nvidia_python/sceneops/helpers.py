@@ -133,11 +133,11 @@ class SceneHelpers:
             if not prim.IsActive():
                 continue
             ids = self._asset_ids(prim)
+            b = self._box(prim, ids)
+            box = None if b is None else [round(v, 2) for v in b[0]]
             if ids:
-                kind, box = "asset", [round(v, 2) for v in self._asset_box(prim, ids)[0]]
+                kind = "asset"
             else:
-                b = self._geometry_box(prim)
-                box = None if b is None else [round(v, 2) for v in b[0]]
                 kind = (prim.GetCustomDataByKey("agent:kind") or "other") if b is None else ("floor_marking" if b[2] < FLAT_M else "geometry")
                 if prim.IsA(UsdLux.BoundableLightBase) or prim.IsA(UsdLux.NonboundableLightBase):
                     kind = "light"
@@ -187,6 +187,18 @@ class SceneHelpers:
         lo, hi = r.GetMin(), r.GetMax()
         return [lo[0], lo[1], hi[0], hi[1]], lo[2], hi[2]
 
+    def _box(self, prim: Usd.Prim, ids: list[str]) -> tuple[list[float], float, float] | None:
+        """The prim's world box: its referenced assets' measured boxes together with any geometry authored on the prim itself.
+        Each layer is linted alone, so a later layer can turn a placed asset into a Cube; both parts count."""
+        geometry = self._geometry_box(prim)
+        if not ids:
+            return geometry
+        asset = self._asset_box(prim, ids)
+        if geometry is None:
+            return asset
+        (a, az0, az1), (g, gz0, gz1) = asset, geometry
+        return [min(a[0], g[0]), min(a[1], g[1]), max(a[2], g[2]), max(a[3], g[3])], min(az0, gz0), max(az1, gz1)
+
     def obstacles(self) -> list[dict[str, Any]]:
         """What the clearance rules apply to: every asset and every piece of geometry on the floor, with its footprint.
         Overhead items (bottom above OVERHEAD_M) never block a lane; flat geometry is a floor marking, which may touch a
@@ -197,7 +209,7 @@ class SceneHelpers:
             if not prim.IsActive():
                 continue
             ids = self._asset_ids(prim)
-            box = self._asset_box(prim, ids) if ids else self._geometry_box(prim)
+            box = self._box(prim, ids)
             if box is None or box[1] > OVERHEAD_M:
                 continue
             kind = "asset" if ids else ("floor_marking" if box[2] < FLAT_M else "geometry")
@@ -308,7 +320,7 @@ class SceneHelpers:
             m = UsdGeom.XformCache(Usd.TimeCode.Default()).GetLocalToWorldTransform(prim)
             t, ax = m.ExtractTranslation(), m.TransformDir(Gf.Vec3d(1, 0, 0))
             out.append({"path": prim.GetPath().pathString, "catalog_id": ids[0], "x": float(t[0]), "y": float(t[1]),
-                        "yaw_deg": math.degrees(math.atan2(ax[1], ax[0])), "footprint": self._asset_box(prim, ids)[0]})
+                        "yaw_deg": math.degrees(math.atan2(ax[1], ax[0])), "footprint": self._box(prim, ids)[0]})
         return out
 
     def footprint(self, prim_path: str) -> list[float]:
@@ -317,7 +329,7 @@ class SceneHelpers:
         ids = self._asset_ids(prim)
         if not ids:
             raise ValueError(f"{prim_path} does not reference a catalog asset")
-        return self._asset_box(prim, ids)[0]
+        return self._box(prim, ids)[0]
 
     def footprint_at(self, catalog_id: str, x: float, y: float, yaw_deg: float = 0.0) -> list[float]:
         """World AABB [xmin, ymin, xmax, ymax] a catalog asset would occupy at (x, y, yaw): its local bbox (pivots are not

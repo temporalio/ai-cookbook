@@ -236,8 +236,8 @@ async def apply_grant(self, name: str, grant: Grant) -> None:
 
 Each `apply_usd_code` call runs Python in the exec sandbox and writes one sublayer. The Activity lints the layer
 before composing it for the judge. The lint accepts static prims directly under `/World/Agent`. Catalog references
-must define an Xform. The judge computes geometry bounds and applies the full transforms to catalog assets.
-The Activity records the layer hash in the Workflow's state.
+must define an Xform and name only the asset file. The judge measures each prim by its computed geometry bounds and the
+boxes of the catalog assets it references, under full transforms. The Activity records the layer hash in the Workflow's state.
 
 The sandbox caches completed applies by step and code hash. If the code times out, the Workflow reports the timeout
 and rebuilds the sandbox from the recorded layers.
@@ -342,7 +342,8 @@ NeMo Relay observes the same run that Temporal makes durable. Each Worker proces
 while the run is active; the first one stores the scope's propagation context with the run, and every later process, the
 gpu Worker or the agent Worker after a kill, continues the same trace from it. Each run's trajectory keeps only its own
 spans, even when one Worker serves many runs. Every Activity is a tool span, with its attempt and a
-`temporal_retry` mark when Temporal retried it.
+`temporal_retry` mark when Temporal retried it. Trajectories are written in the background, so an Activity never waits
+for another run's model call.
 
 *File: relay.py*
 
@@ -378,7 +379,7 @@ def traced(fn: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
             return out
         finally:
             run.activities += 1
-            await _after(run)
+            _after(run)
 
     return wrapper
 ```

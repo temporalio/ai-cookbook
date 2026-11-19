@@ -4,9 +4,10 @@ Activity side only. Every Activity of a run, and every model call the Agents plu
 agent scope per run per Worker process. The scope's propagation context is stored with the run
 (runs/<workflow-id>/relay/propagation.json), so another process, the gpu Worker or the agent Worker after a kill, continues
 the same trace: the same root id, with a nested "resumed" scope. Each process writes an ATIF trajectory (Relay's
-AtifExporter) and a JSONL of lifecycle events into that directory, snapshotted after every Activity, so a killed process
-leaves its part of the record behind. Relay's subscribers are process-wide, so each snapshot keeps only the steps of
-its own run's scope tree, and a run with no Activity for NEMO_RELAY_IDLE_CLOSE_S seconds (default 300, for example
+AtifExporter) and a JSONL of lifecycle events into that directory. The trajectory is rewritten in the background after
+every Activity and model call, so a killed process leaves its part of the record behind; the exporter waits for every
+model call it has seen, other runs' included, so no Activity waits for it. Relay's subscribers are process-wide, so
+each snapshot keeps only the steps of its own run's scope tree, and a run with no Activity for NEMO_RELAY_IDLE_CLOSE_S seconds (default 300, for example
 during a review wait) is closed; its next Activity resumes the trace. Switch off with NEMO_RELAY=0; every hook is then a
 pass-through.
 """
@@ -20,6 +21,7 @@ import logging
 import os
 import socket
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from functools import wraps
 from pathlib import Path
@@ -33,6 +35,10 @@ from paths import run_dir
 RUNTIME = "nemo-relay"
 AGENT_NAME, AGENT_VERSION = "simulation agent", "0.1"
 logger = logging.getLogger(__name__)
+FINAL_EXPORT_WAIT_S = 10.0  # how long a closing Activity waits for its run's last trajectory; after that it lands in the background
+# Exports block a thread until open model calls finish. Keep them off the loop's default executor, which also resolves host names.
+_exports = ThreadPoolExecutor(max_workers=4, thread_name_prefix="relay-export")
+_background: set[asyncio.Task] = set()
 
 
 class _Cfg:
@@ -53,7 +59,9 @@ class _Run:
     sub_events: str
     open_n: int  # export file names are unique per open, so a re-open never overwrites an earlier export
     known: set[str]  # uuids of this run's scope tree: the run scope and every span under it
-    snapshot_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    export_task: asyncio.Task | None = None
+    export_again: bool = False  # set by every request; the running export goes round once more instead of queueing another
+    final: bool = False  # the scope is closed and its events delivered: deregister after the last export
     started: float = field(default_factory=time.time)
     last_used: float = field(default_factory=time.time)
     in_flight: int = 0  # Activities and model calls of this run running in this process right now; never closed as idle
@@ -227,14 +235,42 @@ def _run_trajectory(doc: dict[str, Any], known: set[str]) -> dict[str, Any]:
     return doc
 
 
-async def _snapshot(run: _Run) -> None:
+def _spawn(coro: Awaitable[Any]) -> asyncio.Task:
+    task = asyncio.get_running_loop().create_task(coro)
+    _background.add(task)
+    task.add_done_callback(_background.discard)
+    return task
+
+
+def _export_soon(run: _Run) -> asyncio.Task:
+    """Rewrite the run's trajectory in the background, one export at a time per run."""
+    run.export_again = True
+    if run.export_task is None or run.export_task.done():
+        run.export_task = _spawn(_export(run))
+    return run.export_task
+
+
+async def _export(run: _Run) -> None:
     p = relay_dir(run.key) / f"atif-{_Cfg.identity}-{run.open_n}.json"
-    async with run.snapshot_lock:
-        # The process-wide exporter can wait for another run's LLM span. Keep the event loop free to finish that call.
-        raw = await asyncio.to_thread(run.atif.export_json)
-        tmp = p.with_name(f".{p.name}.part")
-        tmp.write_text(json.dumps(_run_trajectory(json.loads(raw), run.known), indent=1))
-        tmp.replace(p)
+    loop = asyncio.get_running_loop()
+    while run.export_again:
+        run.export_again = False
+        try:
+            raw = await loop.run_in_executor(_exports, run.atif.export_json)
+            tmp = p.with_name(f".{p.name}.part")
+            tmp.write_text(json.dumps(_run_trajectory(json.loads(raw), run.known), indent=1))
+            tmp.replace(p)  # a Worker killed mid-write leaves the previous snapshot, never a truncated one
+        except Exception:  # noqa: BLE001
+            logger.warning("Could not export the Relay trajectory for %s", run.key, exc_info=True)
+    if run.final:
+        _deregister(run)
+
+
+async def drain() -> None:
+    """Wait for the background exports on this event loop (the tests read the files after it)."""
+    loop = asyncio.get_running_loop()
+    while pending := [t for t in _background if t.get_loop() is loop and not t.done()]:
+        await asyncio.gather(*pending, return_exceptions=True)
 
 
 def _detach(run: _Run, reason: str) -> None:
@@ -250,51 +286,50 @@ def _detach(run: _Run, reason: str) -> None:
         r.scope.pop(run.handle, output=stats)
 
 
-async def _finish(runs: list[_Run]) -> None:
-    """The asynchronous half: drain the subscribers once, then write each detached run's final snapshot."""
+async def _finish(runs: list[_Run], wait: float = 0.0) -> None:
+    """The asynchronous half: deliver the pending events once, then export each detached run a last time and deregister
+    it. Waits up to `wait` seconds; an export held up by another run's model call completes in the background."""
+    tasks: list[asyncio.Task] = []
     try:
         await _r().subscribers.flush_async()
-        for run in runs:
-            try:
-                await _snapshot(run)
-            except Exception:  # noqa: BLE001
-                logger.warning("Could not export final Relay snapshot for %s", run.key, exc_info=True)
+    except Exception:  # noqa: BLE001
+        logger.warning("Could not deliver pending Relay events", exc_info=True)
     finally:
         for run in runs:
-            _deregister(run)
+            run.final = True
+            tasks.append(_export_soon(run))
+    if tasks and wait > 0:
+        await asyncio.wait(tasks, timeout=wait)
 
 
 async def _close_run(run: _Run, reason: str) -> None:
     """Close the run's scope in this process. A later Activity of the same run here resumes the trace from propagation.json."""
     _detach(run, reason)
-    await _finish([run])
+    await _finish([run], wait=FINAL_EXPORT_WAIT_S)
 
 
 async def _close_idle(current: str) -> None:
     """Close the scopes of runs that have had no Activity in this process for a while (a run waiting days for its
     review holds nothing here), so a long-lived Worker keeps only its active runs open. Every run is checked and detached
-    before the first await, so a run that starts an Activity while the sweep drains cannot be closed under it."""
+    before the exports start, so a run that starts an Activity meanwhile opens a new scope. The Activity that triggered
+    the sweep does not wait for the exports."""
     limit = float(os.environ.get("NEMO_RELAY_IDLE_CLOSE_S", "300"))
     now = time.time()
     idle = [run for key, run in list(_runs.items()) if key != current and run.in_flight == 0 and now - run.last_used > limit]
     for run in idle:
         _detach(run, "idle")
     if idle:
+        _spawn(_finish(idle))
+
+
+def _after(run: _Run) -> None:
+    run.last_used = time.time()
+    run.in_flight -= 1
+    if not run.closed:
         try:
-            await _finish(idle)
-        except Exception:  # noqa: BLE001 — tracing never fails the Activity that happened to trigger the cleanup
-            pass
-
-
-async def _after(run: _Run) -> None:
-    try:
-        if not run.closed and not asyncio.current_task().cancelling():
-            await _snapshot(run)
-    except Exception:  # noqa: BLE001
-        logger.warning("Could not export Relay snapshot for %s", run.key, exc_info=True)
-    finally:
-        run.last_used = time.time()
-        run.in_flight -= 1
+            _export_soon(run)
+        except Exception:  # noqa: BLE001 — tracing never fails the Activity
+            logger.warning("Could not schedule the Relay export for %s", run.key, exc_info=True)
 
 
 async def _start(info: activity.Info) -> tuple[_Run, Any]:
@@ -338,7 +373,7 @@ def traced(fn: Callable[..., Awaitable[Any]]) -> Callable[..., Awaitable[Any]]:
             return out
         finally:
             run.activities += 1
-            await _after(run)
+            _after(run)
 
     return wrapper
 # @@@SNIPEND
@@ -378,7 +413,7 @@ async def model_call(model_name: str, request: dict[str, Any], fn: ProviderFn) -
         return holder.get("out")
     finally:
         run.llm_calls += 1
-        await _after(run)
+        _after(run)
 
 
 def mark_here(name: str, data: dict[str, Any] | None = None) -> None:

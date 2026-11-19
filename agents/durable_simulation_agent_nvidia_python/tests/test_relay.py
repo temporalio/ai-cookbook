@@ -57,6 +57,7 @@ async def test_activities_are_tool_spans_and_a_second_process_resumes_the_trace(
     # the gpu Worker, or the agent Worker after a kill: a new process continues the same trace
     relay.configure(identity="w2")
     await _env("wf-relay", "ping").run(ping, {"a": 3})
+    await relay.drain()  # the trajectory is written in the background
     run = relay._runs["wf-relay"]
     assert run.resumed and run.root_uuid == prop["root_uuid"]
     assert len(list(d.glob("atif-*.json"))) == 2 and json.loads(next(d.glob("atif-w2-*.json")).read_text())["session_id"] == "wf-relay/w2"
@@ -119,9 +120,11 @@ async def test_two_runs_in_one_process_keep_separate_trajectories(fake_env):
 
 
 @pytest.mark.timeout(10, method="thread")
-async def test_a_snapshot_does_not_block_another_runs_model_call(fake_env):
+async def test_an_activity_does_not_wait_for_another_runs_model_call(fake_env):
+    """Relay's exporter waits for every model call it has seen, other runs' included. Run B's call stays open until run
+    A's Activity has returned, so an Activity that waited for its export would never return."""
     relay.configure(identity="concurrent")
-    provider_started, complete_provider, tool_called = asyncio.Event(), asyncio.Event(), asyncio.Event()
+    provider_started, complete_provider = asyncio.Event(), asyncio.Event()
 
     async def provider(headers, request):
         provider_started.set()
@@ -130,15 +133,14 @@ async def test_a_snapshot_does_not_block_another_runs_model_call(fake_env):
 
     @relay.traced
     async def tool():
-        tool_called.set()
         return {"run": "A"}
 
     model = asyncio.create_task(_env("wf-B", "model").run(relay.model_call, "test-model", {}, provider))
     await provider_started.wait()
-    snapshot = asyncio.create_task(_env("wf-A", "ping").run(tool))
-    await tool_called.wait()
+    assert await asyncio.wait_for(_env("wf-A", "ping").run(tool), 2) == {"run": "A"}
     complete_provider.set()
-    assert await asyncio.gather(snapshot, model) == [{"run": "A"}, "response"]
+    assert await model == "response"
+    await relay.drain()
     assert _results(fake_env / "wf-A" / "relay", "concurrent") == [{"run": "A"}]
     assert _results(fake_env / "wf-B" / "relay", "concurrent") == []
 
@@ -174,10 +176,12 @@ async def test_an_idle_run_is_closed_and_its_next_activity_resumes_the_trace(fak
     await _env("wf-idle", "ping").run(ping, {"n": 1})
     await _env("wf-other", "ping").run(ping, {"n": 2})  # closes wf-idle: nothing of it is running here
     assert "wf-idle" not in relay._runs
+    await relay.drain()
     d = fake_env / "wf-idle" / "relay"
     events = [json.loads(line) for line in next(d.glob("events-w5-*.jsonl")).read_text().splitlines()]
     assert next(e for e in events if e.get("name") == "run_closed")["data"]["reason"] == "idle"
     await _env("wf-idle", "ping").run(ping, {"n": 3})
+    await relay.drain()
     run = relay._runs["wf-idle"]
     assert run.resumed and run.root_uuid == json.loads((d / "propagation.json").read_text())["root_uuid"]
     assert len(list(d.glob("atif-w5-*.json"))) == 2, "the resumed scope writes its own trajectory next to the first"
