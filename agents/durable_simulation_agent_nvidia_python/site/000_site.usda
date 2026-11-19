@@ -1,0 +1,132 @@
+#usda 1.0
+(
+    defaultPrim = "World"
+    doc = "oda site layer, aligned to Isaac Sim 6.1 full_warehouse.usd (interior x -26.3..5.46, y -23.4..30.6, racks y 8.1..25.7; measured with scripts/spike/vm/p2_stage_layout.py). Z-up, meters. Docks are on the east wall; L2 is the dock lane; the open floor south of the racks is the build area."
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+
+def Xform "World"
+{
+    def Scope "Site"
+    {
+        def Xform "Dock_1" (doc = "east wall dock door, centre of the apron")
+        {
+            double3 xformOp:translate = (4.9, -16, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+        def Xform "Dock_2"
+        {
+            double3 xformOp:translate = (4.9, -10, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+        def Xform "Dock_3"
+        {
+            double3 xformOp:translate = (4.9, -4, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+        def Xform "Dock_4"
+        {
+            double3 xformOp:translate = (4.9, 2, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate"]
+        }
+
+        def Scope "Lanes" (doc = "forklift lane volumes (guide purpose: never rendered); aabb = translate +- scale/2")
+        {
+            def Cube "L1" (doc = "cross aisle along the rack fronts: x -26..5.4, y 6..8")
+            {
+                uniform token purpose = "guide"
+                double size = 1
+                double3 xformOp:translate = (-10.3, 7, 0.5)
+                float3 xformOp:scale = (31.4, 2, 1)
+                uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+            }
+            def Cube "L2" (doc = "dock lane, north-south along the east wall docks: x 2.4..4.4, y -22..8")
+            {
+                uniform token purpose = "guide"
+                double size = 1
+                double3 xformOp:translate = (3.4, -7, 0.5)
+                float3 xformOp:scale = (2, 30, 1)
+                uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+            }
+            def Cube "L3" (doc = "south cross aisle: x -26..5.4, y -13..-11")
+            {
+                uniform token purpose = "guide"
+                double size = 1
+                double3 xformOp:translate = (-10.3, -12, 0.5)
+                float3 xformOp:scale = (31.4, 2, 1)
+                uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+            }
+        }
+
+        def Scope "KeepClear"
+        {
+            def Cube "KC_Dock4" (doc = "painted keep-clear apron in front of dock 4: x 0.9..5.4, y 0..4")
+            {
+                uniform token purpose = "guide"
+                double size = 1
+                double3 xformOp:translate = (3.15, 2, 0.5)
+                float3 xformOp:scale = (4.5, 4, 1)
+                uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+            }
+        }
+
+        def Scope "Candidates" (doc = "non-binding hints: open floor the agent may use")
+        {
+            def Cube "BuildArea" (doc = "open floor between the dock lane and the centre pillars, within 10 m of dock 4: x -5..0.3, y -5..5.4")
+            {
+                uniform token purpose = "guide"
+                double size = 1
+                double3 xformOp:translate = (-2.35, 0.2, 0.5)
+                float3 xformOp:scale = (5.3, 10.4, 1)
+                uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale"]
+            }
+        }
+    }
+
+    def Scope "Cameras"
+    {
+        def Camera "Wide" (doc = "south-west high angle over the build area toward the racks")
+        {
+            float focalLength = 24
+            float focusDistance = 20
+            matrix4d xformOp:transform = ( (0.789352, -0.613941, 0, 0), (0.168296, 0.216381, 0.961694, 0), (-0.590423, -0.759115, 0.274125, 0), (-14, -16, 7.5, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+        def Camera "Station" (doc = "three-quarter view of the packing cell from the south-west, racks and dock lane behind")
+        {
+            float focalLength = 28
+            float focusDistance = 11
+            matrix4d xformOp:transform = ( (0.784883, -0.619644, -1.38778e-17, 0), (0.162993, 0.206457, 0.964784, 0), (-0.597823, -0.757243, 0.263042, 0), (-10, -9, 4.2, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+        def Camera "TopDown" (doc = "orthographic plan over the build area, 24 m x 13.5 m (apertures are tenths of a metre); sits below the hanging lamps (z 5.8+) and the 9 m ceiling")
+        {
+            token projection = "orthographic"
+            float horizontalAperture = 240
+            float verticalAperture = 135
+            float2 clippingRange = (0.5, 100)
+            double3 xformOp:translate = (-3, 0, 5.5)
+            float3 xformOp:rotateXYZ = (0, 0, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+        }
+        def Camera "LaneL2" (doc = "footage: looks north-east down dock lane L2 from the south-west; sees the AMR approach, the keep-clear apron and the cell's east edge")
+        {
+            float focalLength = 24
+            float focusDistance = 14
+            matrix4d xformOp:transform = ( (0.935876, -0.35233, 0, 0), (0.0739601, 0.196456, 0.977719, 0), (-0.34448, -0.915024, 0.209917, 0), (-3, -19, 4.5, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+        def Camera "RobotEye" (doc = "AMR approach from the south cross aisle, looking north")
+        {
+            float focalLength = 18
+            double3 xformOp:translate = (-1.5, -10, 0.6)
+            float3 xformOp:rotateXYZ = (88, 0, 0)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:rotateXYZ"]
+        }
+    }
+
+    def Scope "Agent" (doc = "everything the agent authors lives under here, one sublayer per step")
+    {
+    }
+}
