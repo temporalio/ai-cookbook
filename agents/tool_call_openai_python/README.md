@@ -197,7 +197,7 @@ class ToolCallingWorkflow:
         result = await workflow.execute_activity(
             openai_responses.create,
             openai_responses.OpenAIResponsesRequest(
-                model="gpt-4o-mini",
+                model="gpt-5.4-mini",
                 instructions=system_instructions,
                 input=input_list,
                 tools=[get_weather_alerts.WEATHER_ALERTS_TOOL_OAI],
@@ -232,7 +232,7 @@ class ToolCallingWorkflow:
                 result = await workflow.execute_activity(
                     openai_responses.create,
                     openai_responses.OpenAIResponsesRequest(
-                        model="gpt-4o-mini",
+                        model="gpt-5.4-mini",
                         instructions="return the tool call result in a readable format",
                         input=input_list,
                         tools=[]

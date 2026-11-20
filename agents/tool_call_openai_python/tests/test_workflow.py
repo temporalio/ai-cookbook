@@ -34,7 +34,7 @@ def _make_message_response(text: str) -> Response:
     return Response(
         id="resp_test",
         created_at=1700000000,
-        model="gpt-4o-mini",
+        model="gpt-5.4-mini",
         object="response",
         output=[ResponseOutputMessage(
             id="msg_test",
@@ -53,7 +53,7 @@ def _make_function_call_response(name: str, call_id: str, arguments: str) -> Res
     return Response(
         id="resp_test",
         created_at=1700000000,
-        model="gpt-4o-mini",
+        model="gpt-5.4-mini",
         object="response",
         output=[ResponseFunctionToolCall(
             id="fc_test",
@@ -69,19 +69,19 @@ def _make_function_call_response(name: str, call_id: str, arguments: str) -> Res
     )
 
 
-_create_call_count = 0
+_create_models: list[str] = []
 
 
 @activity.defn(name="create")
 async def mock_create_no_tool(request: OpenAIResponsesRequest) -> Response:
+    _create_models.append(request.model)
     return _make_message_response("Code calls itself\nBase case breaks the loop at last\nStack unwinds with grace")
 
 
 @activity.defn(name="create")
 async def mock_create_with_weather(request: OpenAIResponsesRequest) -> Response:
-    global _create_call_count
-    _create_call_count += 1
-    if _create_call_count == 1:
+    _create_models.append(request.model)
+    if len(_create_models) == 1:
         return _make_function_call_response(
             "get_weather_alerts",
             "call_weather_123",
@@ -99,6 +99,7 @@ class TestToolCallingWorkflowNoTool:
     @pytest.mark.asyncio
     @pytest.mark.timeout(30)
     async def test_returns_text_when_no_tool_needed(self):
+        _create_models.clear()
         async with await WorkflowEnvironment.start_time_skipping(
             data_converter=pydantic_data_converter,
         ) as env:
@@ -117,14 +118,14 @@ class TestToolCallingWorkflowNoTool:
                 )
 
         assert "Code calls itself" in result
+        assert _create_models == ["gpt-5.4-mini"]
 
 
 class TestToolCallingWorkflowWithWeather:
     @pytest.mark.asyncio
     @pytest.mark.timeout(30)
     async def test_handles_weather_tool_call(self):
-        global _create_call_count
-        _create_call_count = 0
+        _create_models.clear()
 
         async with await WorkflowEnvironment.start_time_skipping(
             data_converter=pydantic_data_converter,
@@ -144,3 +145,4 @@ class TestToolCallingWorkflowWithWeather:
                 )
 
         assert "Flood Watch" in result
+        assert _create_models == ["gpt-5.4-mini", "gpt-5.4-mini"]
