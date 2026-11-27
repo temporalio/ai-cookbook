@@ -1,0 +1,23 @@
+[project]
+name = "cookbook-fixed-flow-openai-python"
+version = "0.1"
+description = "A bounded, policy-constrained underwriting agent using OpenAI and Temporal."
+authors = [{ name = "Temporal Technologies Inc", email = "sdk@temporal.io" }]
+requires-python = ">=3.10"
+readme = "README.md"
+license = "MIT"
+dependencies = [
+    "openai>=1.40.0",
+    "pydantic>=2.0.0",
+    "temporalio>=1.15.0,<2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+    "pytest-asyncio>=0.26.0",
+    "pytest-timeout>=2.4.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
